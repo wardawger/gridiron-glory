@@ -1,18 +1,37 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Trophy, Users, Shield, BarChart3, LogOut, RefreshCw, Zap } from 'lucide-react';
+import { Trophy, Users, Shield, BarChart3, LogOut, RefreshCw, Zap, ChevronDown, Plus } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
 import type { League, LeagueMember } from '../../types';
 
 interface Props {
   league: League | null;
+  allLeagues: League[];
   myMembership: LeagueMember | undefined;
   displayName: string | undefined;
   onSignOut: () => void;
   onRefresh: () => void;
   isRefreshing: boolean;
+  onSwitchLeague: (id: string) => void;
 }
 
-export function Header({ league, myMembership, displayName, onSignOut, onRefresh, isRefreshing }: Props) {
+export function Header({
+  league, allLeagues, myMembership, displayName,
+  onSignOut, onRefresh, isRefreshing, onSwitchLeague,
+}: Props) {
   const loc = useLocation();
+  const [showLeaguePicker, setShowLeaguePicker] = useState(false);
+  const pickerRef = useRef<HTMLDivElement>(null);
+
+  // Close picker when clicking outside
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+        setShowLeaguePicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   const nav = [
     { to: '/',          label: 'Standings',  icon: Trophy },
@@ -30,15 +49,62 @@ export function Header({ league, myMembership, displayName, onSignOut, onRefresh
     <header className="sticky top-0 z-40 bg-turf-950/90 backdrop-blur border-b border-turf-800">
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex items-center justify-between h-14">
-          {/* Logo */}
-          <Link to="/" className="flex items-center gap-2 group">
-            <div className="w-7 h-7 rounded bg-field-500 flex items-center justify-center">
-              <span className="font-display text-turf-950 text-sm leading-none">G</span>
+
+          {/* Logo + League Switcher */}
+          <div className="flex items-center gap-2">
+            <Link to="/" className="flex items-center gap-2 group flex-shrink-0">
+              <div className="w-7 h-7 rounded bg-field-500 flex items-center justify-center">
+                <span className="font-display text-turf-950 text-sm leading-none">G</span>
+              </div>
+            </Link>
+
+            {/* League picker */}
+            <div className="relative" ref={pickerRef}>
+              <button
+                onClick={() => setShowLeaguePicker(p => !p)}
+                className="flex items-center gap-1 group px-2 py-1 rounded-lg hover:bg-turf-800 transition-colors"
+              >
+                <span className="font-display text-lg tracking-wider text-white group-hover:text-field-400 transition-colors truncate max-w-[160px] sm:max-w-xs">
+                  {league?.name ?? 'GRIDIRON GLORY'}
+                </span>
+                {allLeagues.length > 1 && (
+                  <ChevronDown className={`w-4 h-4 text-turf-500 transition-transform flex-shrink-0 ${showLeaguePicker ? 'rotate-180' : ''}`} />
+                )}
+              </button>
+
+              {showLeaguePicker && (
+                <div className="absolute top-full left-0 mt-1 w-64 card shadow-xl shadow-black/40 overflow-hidden animate-slide-up z-50">
+                  <div className="p-2 space-y-0.5">
+                    <p className="text-xs text-turf-500 px-2 py-1 uppercase tracking-wide font-medium">Your Leagues</p>
+                    {allLeagues.map(l => (
+                      <button
+                        key={l.id}
+                        onClick={() => { onSwitchLeague(l.id); setShowLeaguePicker(false); }}
+                        className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors flex items-center justify-between gap-2 ${
+                          l.id === league?.id
+                            ? 'bg-field-900/60 text-field-300'
+                            : 'text-turf-300 hover:bg-turf-800 hover:text-white'
+                        }`}
+                      >
+                        <span className="truncate">{l.name}</span>
+                        {l.id === league?.id && (
+                          <span className="text-xs text-field-500 flex-shrink-0">Active</span>
+                        )}
+                      </button>
+                    ))}
+                    <div className="border-t border-turf-700 my-1" />
+                    <Link
+                      to="/create-league"
+                      onClick={() => setShowLeaguePicker(false)}
+                      className="w-full text-left px-3 py-2 rounded-lg text-sm text-turf-400 hover:bg-turf-800 hover:text-white transition-colors flex items-center gap-2"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Create new league
+                    </Link>
+                  </div>
+                </div>
+              )}
             </div>
-            <span className="font-display text-lg tracking-wider text-white group-hover:text-field-400 transition-colors">
-              {league?.name ?? 'GRIDIRON GLORY'}
-            </span>
-          </Link>
+          </div>
 
           {/* Nav */}
           <nav className="hidden md:flex items-center gap-1">
