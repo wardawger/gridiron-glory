@@ -15,7 +15,6 @@ export function useLeague(user: User | null) {
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState<string | null>(null);
 
-  // Derive rosters from draft picks
   const rosters = new Map<string, RosterEntry[]>();
   draftPicks.forEach(pick => {
     if (!rosters.has(pick.user_id)) rosters.set(pick.user_id, []);
@@ -37,7 +36,6 @@ export function useLeague(user: User | null) {
     setError(null);
 
     try {
-      // Find user's league membership
       const { data: mem, error: memErr } = await supabase
         .from('league_members')
         .select('league_id, leagues(*)')
@@ -51,7 +49,6 @@ export function useLeague(user: User | null) {
       const lg = (mem as any).leagues as League;
       setLeague(lg);
 
-      // Load all data in parallel
       const [membersRes, picksRes, captainRes, bonusRes] = await Promise.all([
         supabase.from('league_members').select('*').eq('league_id', lg.id),
         supabase.from('draft_picks').select('*').eq('league_id', lg.id).order('pick_number'),
@@ -72,7 +69,6 @@ export function useLeague(user: User | null) {
 
   useEffect(() => { load(); }, [load]);
 
-  // Real-time subscription for draft picks (live draft)
   useEffect(() => {
     if (!league) return;
     const channel = supabase
@@ -83,6 +79,8 @@ export function useLeague(user: User | null) {
       }, payload => {
         if (payload.eventType === 'INSERT') {
           setDraftPicks(prev => [...prev, payload.new as DraftPick].sort((a, b) => a.pick_number - b.pick_number));
+        } else if (payload.eventType === 'DELETE') {
+          setDraftPicks(prev => prev.filter(p => p.id !== payload.old.id));
         }
       })
       .on('postgres_changes', {
@@ -108,7 +106,6 @@ export function useLeague(user: User | null) {
   const createLeague = async (name: string, maxTeams: number, playerCount: number) => {
     if (!user) return { error: 'Not logged in' };
 
-    // Create league
     const { data: lg, error: lgErr } = await supabase
       .from('leagues')
       .insert({
@@ -127,7 +124,6 @@ export function useLeague(user: User | null) {
 
     if (lgErr) return { error: lgErr.message };
 
-    // Add creator as commissioner
     const { error: memErr } = await supabase.from('league_members').insert({
       league_id: lg.id,
       user_id:   user.id,
@@ -180,7 +176,6 @@ export function useLeague(user: User | null) {
     });
     if (pickErr) return { error: pickErr.message };
 
-    // Advance pick counter (or mark draft complete)
     const next = pickNum + 1;
     await supabase.from('leagues').update({
       draft_current_pick: next,
@@ -190,16 +185,39 @@ export function useLeague(user: User | null) {
     return {};
   };
 
+  const resetDraft = async () => {
+    if (!league) return { error: 'No league' };
+
+    const { error: deleteErr } = await supabase
+      .from('draft_picks')
+      .delete()
+      .eq('league_id', league.id);
+
+    if (deleteErr) return { error: deleteErr.message };
+
+    const { error: updateErr } = await supabase
+      .from('leagues')
+      .update({
+        draft_status: 'pending',
+        draft_current_pick: 1,
+        draft_order: [],
+      })
+      .eq('id', league.id);
+
+    if (updateErr) return { error: updateErr.message };
+
+    setDraftPicks([]);
+    return {};
+  };
+
   const setCaptain = async (week: number, teamId: string) => {
     if (!league || !user) return;
-    // Check team usage limit (max 2 weeks as captain)
     const uses = captainPicks.filter(p => p.user_id === user.id && p.team_id === teamId).length;
     const existing = captainPicks.find(p => p.user_id === user.id && p.week === week);
     if (existing?.team_id === teamId) {
-      // Toggle off
       await supabase.from('captain_picks').delete().eq('id', existing.id);
     } else {
-      if (!existing && uses >= 2) return; // limit reached
+      if (!existing && uses >= 2) return;
       await supabase.from('captain_picks').upsert({
         league_id: league.id,
         user_id:   user.id,
@@ -247,7 +265,7 @@ export function useLeague(user: User | null) {
   return {
     league, members, draftPicks, captainPicks, manualBonuses,
     rosters, myMembership, isCommissioner, loading, error,
-    createLeague, sendInvite, startDraft, makeDraftPick,
+    createLeague, sendInvite, startDraft, makeDraftPick, resetDraft,
     setCaptain, addManualBonus, removeManualBonus,
     updateWeek, updateScoring, removeFromRoster, reload: load,
   };
