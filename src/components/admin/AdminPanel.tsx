@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Shield, UserPlus, Copy, Check, Trash2, Plus, Mail, Settings, Gift } from 'lucide-react';
+import { Shield, UserPlus, Copy, Check, Trash2, Plus, Mail, Settings, Gift, RotateCcw, AlertTriangle } from 'lucide-react';
 import type {
   League, LeagueMember, ManualBonus,
   BonusType, ScoringSettings,
@@ -17,26 +17,29 @@ interface Props {
   onAddBonus: (bonus: Omit<ManualBonus, 'id' | 'awarded_at' | 'awarded_by' | 'league_id'>) => void;
   onRemoveBonus: (id: string) => void;
   onRemoveFromRoster: (userId: string, teamId: string) => void;
+  onResetDraft: () => Promise<{ error?: string }>;
 }
 
 type Tab = 'members' | 'scoring' | 'bonuses';
 
 export function AdminPanel({
   league, members, manualBonuses, isCommissioner,
-  onSendInvite, onUpdateWeek, onUpdateScoring, onAddBonus, onRemoveBonus,
+  onSendInvite, onUpdateWeek, onUpdateScoring, onAddBonus, onRemoveBonus, onResetDraft,
 }: Props) {
   const [tab, setTab]           = useState<Tab>('members');
   const [inviteEmail, setEmail] = useState('');
   const [inviteLink, setLink]   = useState('');
   const [copied, setCopied]     = useState(false);
   const [inviting, setInviting] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [resetError, setResetError] = useState('');
   const [scoring, setScoring]   = useState<ScoringSettings>(league.scoring);
-  const [bonusUserId, setBonusUser]  = useState('');
-  const [bonusType, setBonusType]    = useState<BonusType>('win_bowl');
-  const [bonusTeamId, setBonusTeamId]   = useState('');
+  const [bonusUserId, setBonusUser]       = useState('');
+  const [bonusType, setBonusType]         = useState<BonusType>('win_bowl');
+  const [bonusTeamId, setBonusTeamId]     = useState('');
   const [bonusTeamName, setBonusTeamName] = useState('');
-  const [bonusPoints, setBonusPoints] = useState<number>(5);
-  const [bonusNote, setBonusNote]     = useState('');
+  const [bonusPoints, setBonusPoints]     = useState<number>(5);
+  const [bonusNote, setBonusNote]         = useState('');
 
   if (!isCommissioner) {
     return (
@@ -71,22 +74,42 @@ export function AdminPanel({
   const handleAddBonus = () => {
     if (!bonusUserId || !bonusTeamId || !bonusTeamName) return;
     onAddBonus({
-      user_id: bonusUserId,
-      type: bonusType,
-      team_id: bonusTeamId,
+      user_id:   bonusUserId,
+      type:      bonusType,
+      team_id:   bonusTeamId,
       team_name: bonusTeamName,
-      points: bonusPoints,
-      note: bonusNote,
+      points:    bonusPoints,
+      note:      bonusNote,
     });
     setBonusTeamId('');
     setBonusTeamName('');
     setBonusNote('');
   };
 
+  const handleResetDraft = async () => {
+    const confirmed = window.confirm(
+      '⚠️ Reset the draft?\n\n' +
+      'This will permanently delete ALL draft picks and return the league to pre-draft status.\n\n' +
+      'This cannot be undone. Are you sure?'
+    );
+    if (!confirmed) return;
+
+    const doubleConfirmed = window.confirm(
+      'Last chance — are you absolutely sure you want to delete all draft picks?'
+    );
+    if (!doubleConfirmed) return;
+
+    setResetting(true);
+    setResetError('');
+    const result = await onResetDraft();
+    if (result?.error) setResetError(result.error);
+    setResetting(false);
+  };
+
   const tabs: { id: Tab; label: string; icon: any }[] = [
-    { id: 'members',  label: 'Members & Invites', icon: UserPlus },
-    { id: 'scoring',  label: 'Scoring',           icon: Settings },
-    { id: 'bonuses',  label: 'Postseason Bonuses',icon: Gift },
+    { id: 'members',  label: 'Members & Invites',  icon: UserPlus },
+    { id: 'scoring',  label: 'Scoring',             icon: Settings },
+    { id: 'bonuses',  label: 'Postseason Bonuses',  icon: Gift },
   ];
 
   return (
@@ -183,6 +206,34 @@ export function AdminPanel({
               <button onClick={() => onUpdateWeek(Math.min(18, league.current_week + 1))} className="btn-secondary btn-sm px-3">+</button>
             </div>
           </div>
+
+          {/* Reset Draft */}
+          <div className="card p-5 border-red-900/40">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-medium text-white">Reset Draft</p>
+                  <p className="text-xs text-turf-500 mt-0.5">
+                    Deletes all draft picks and returns the league to pre-draft status.
+                    Captain picks and bonuses are not affected.
+                    This cannot be undone.
+                  </p>
+                  {resetError && (
+                    <p className="text-xs text-red-400 mt-2">{resetError}</p>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={handleResetDraft}
+                disabled={resetting}
+                className="btn-danger flex-shrink-0"
+              >
+                <RotateCcw className={`w-4 h-4 ${resetting ? 'animate-spin' : ''}`} />
+                {resetting ? 'Resetting…' : 'Reset Draft'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -270,7 +321,6 @@ export function AdminPanel({
             </button>
           </div>
 
-          {/* Existing bonuses */}
           {manualBonuses.length > 0 && (
             <div className="card divide-y divide-turf-800">
               {manualBonuses.map(b => {
