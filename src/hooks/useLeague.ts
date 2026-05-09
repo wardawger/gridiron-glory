@@ -7,13 +7,16 @@ import type {
 } from '../types';
 
 export function useLeague(user: User | null) {
-  const [league, setLeague]     = useState<League | null>(null);
-  const [members, setMembers]   = useState<LeagueMember[]>([]);
-  const [draftPicks, setDraftPicks] = useState<DraftPick[]>([]);
+  const [allLeagues, setAllLeagues]     = useState<League[]>([]);
+  const [selectedLeagueId, setSelectedLeagueId] = useState<string | null>(null);
+  const [members, setMembers]           = useState<LeagueMember[]>([]);
+  const [draftPicks, setDraftPicks]     = useState<DraftPick[]>([]);
   const [captainPicks, setCaptainPicks] = useState<CaptainPick[]>([]);
   const [manualBonuses, setManualBonuses] = useState<ManualBonus[]>([]);
-  const [loading, setLoading]   = useState(true);
-  const [error, setError]       = useState<string | null>(null);
+  const [loading, setLoading]           = useState(true);
+  const [error, setError]               = useState<string | null>(null);
+
+  const league = allLeagues.find(l => l.id === selectedLeagueId) ?? null;
 
   const rosters = new Map<string, RosterEntry[]>();
   draftPicks.forEach(pick => {
@@ -30,45 +33,78 @@ export function useLeague(user: User | null) {
   const myMembership = members.find(m => m.user_id === user?.id);
   const isCommissioner = myMembership?.role === 'commissioner';
 
-  const load = useCallback(async () => {
+  // Load all leagues this user belongs to
+  const loadAllLeagues = useCallback(async () => {
     if (!user) { setLoading(false); return; }
     setLoading(true);
     setError(null);
 
     try {
-      const { data: mem, error: memErr } = await supabase
+      const { data: memberships, error: memErr } = await supabase
         .from('league_members')
         .select('league_id, leagues(*)')
-        .eq('user_id', user.id)
-        .limit(1)
-        .maybeSingle();
+        .eq('user_id', user.id);
 
       if (memErr) throw memErr;
-      if (!mem) { setLoading(false); return; }
+      if (!memberships || memberships.length === 0) {
+        setAllLeagues([]);
+        setSelectedLeagueId(null);
+        setLoading(false);
+        return;
+      }
 
-      const lg = (mem as any).leagues as League;
-      setLeague(lg);
+      const leagues = memberships.map((m: any) => m.leagues as League);
+      setAllLeagues(leagues);
 
-      const [membersRes, picksRes, captainRes, bonusRes] = await Promise.all([
-        supabase.from('league_members').select('*').eq('league_id', lg.id),
-        supabase.from('draft_picks').select('*').eq('league_id', lg.id).order('pick_number'),
-        supabase.from('captain_picks').select('*').eq('league_id', lg.id),
-        supabase.from('manual_bonuses').select('*').eq('league_id', lg.id),
-      ]);
+      // Select stored league or default to first
+      const stored = localStorage.getItem(`gridiron_league_${user.id}`);
+      const toSelect = stored && leagues.find(l => l.id === stored)
+        ? stored
+        : leagues[0].id;
 
-      if (membersRes.data)    setMembers(membersRes.data);
-      if (picksRes.data)      setDraftPicks(picksRes.data);
-      if (captainRes.data)    setCaptainPicks(captainRes.data);
-      if (bonusRes.data)      setManualBonuses(bonusRes.data);
+      setSelectedLeagueId(toSelect);
     } catch (e: any) {
-      setError(e.message ?? 'Failed to load league');
+      setError(e.message ?? 'Failed to load leagues');
     } finally {
       setLoading(false);
     }
   }, [user]);
 
-  useEffect(() => { load(); }, [load]);
+  // Load data for the selected league
+  const loadLeagueData = useCallback(async (leagueId: string) => {
+    const [membersRes, picksRes, captainRes, bonusRes] = await Promise.all([
+      supabase.from('league_members').select('*').eq('league_id', leagueId),
+      supabase.from('draft_picks').select('*').eq('league_id', leagueId).order('pick_number'),
+      supabase.from('captain_picks').select('*').eq('league_id', leagueId),
+      supabase.from('manual_bonuses').select('*').eq('league_id', leagueId),
+    ]);
 
+    if (membersRes.data)  setMembers(membersRes.data);
+    if (picksRes.data)    setDraftPicks(picksRes.data);
+    if (captainRes.data)  setCaptainPicks(captainRes.data);
+    if (bonusRes.data)    setManualBonuses(bonusRes.data);
+  }, []);
+
+  useEffect(() => { loadAllLeagues(); }, [loadAllLeagues]);
+
+  useEffect(() => {
+    if (!selectedLeagueId) return;
+    loadLeagueData(selectedLeagueId);
+  }, [selectedLeagueId, loadLeagueData]);
+
+  // Switch to a different league
+  const switchLeague = (leagueId: string) => {
+    if (!user) return;
+    setSelectedLeagueId(leagueId);
+    localStorage.setItem(`gridiron_league_${user.id}`, leagueId);
+    // Clear current league data while loading new one
+    setMembers([]);
+    setDraftPicks([]);
+    setCaptainPicks([]);
+    setManualBonuses([]);
+  };
+
+  // Real-time subscription for the selected league
   useEffect(() => {
     if (!league) return;
     const channel = supabase
@@ -87,7 +123,7 @@ export function useLeague(user: User | null) {
         event: 'UPDATE', schema: 'public', table: 'leagues',
         filter: `id=eq.${league.id}`,
       }, payload => {
-        setLeague(payload.new as League);
+        setAllLeagues(prev => prev.map(l => l.id === league.id ? payload.new as League : l));
       })
       .on('postgres_changes', {
         event: '*', schema: 'public', table: 'captain_picks',
@@ -132,7 +168,12 @@ export function useLeague(user: User | null) {
     });
 
     if (memErr) return { error: memErr.message };
-    await load();
+
+    // Add new league to list and switch to it
+    setAllLeagues(prev => [...prev, lg]);
+    setSelectedLeagueId(lg.id);
+    localStorage.setItem(`gridiron_league_${user.id}`, lg.id);
+
     return { league: lg };
   };
 
@@ -263,10 +304,11 @@ export function useLeague(user: User | null) {
   };
 
   return {
-    league, members, draftPicks, captainPicks, manualBonuses,
+    league, allLeagues, selectedLeagueId,
+    members, draftPicks, captainPicks, manualBonuses,
     rosters, myMembership, isCommissioner, loading, error,
-    createLeague, sendInvite, startDraft, makeDraftPick, resetDraft,
+    switchLeague, createLeague, sendInvite, startDraft, makeDraftPick, resetDraft,
     setCaptain, addManualBonus, removeManualBonus,
-    updateWeek, updateScoring, removeFromRoster, reload: load,
+    updateWeek, updateScoring, removeFromRoster, reload: loadAllLeagues,
   };
 }
