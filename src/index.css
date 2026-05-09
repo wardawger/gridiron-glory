@@ -1,0 +1,115 @@
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --field-dark:  #052e16;
+    --field-mid:   #166534;
+    --field-light: #22c55e;
+    --gold:        #f59e0b;
+    --turf-900:    #0d1117;
+    --turf-800:    #161b22;
+    --turf-700:    #21262d;
+    --turf-600:    #30363d;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    @apply bg-turf-950 text-white font-sans antialiased;
+    min-height: 100dvh;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { @apply bg-turf-700 rounded-full; }
+}
+
+@layer components {
+  /* ── Buttons ──────────────────────────────── */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 font-sans font-medium
+           rounded-lg transition-all duration-150 focus-visible:outline-none
+           focus-visible:ring-2 focus-visible:ring-field-400 disabled:opacity-40
+           disabled:pointer-events-none text-sm px-4 py-2;
+  }
+  .btn-primary {
+    @apply btn bg-field-500 hover:bg-field-400 text-turf-950 font-semibold
+           active:scale-95;
+  }
+  .btn-secondary {
+    @apply btn bg-turf-800 hover:bg-turf-700 text-white border border-turf-600
+           active:scale-95;
+  }
+  .btn-ghost {
+    @apply btn text-turf-400 hover:text-white hover:bg-turf-800 active:scale-95;
+  }
+  .btn-danger {
+    @apply btn bg-red-900/60 hover:bg-red-800 text-red-200 border border-red-800
+           active:scale-95;
+  }
+  .btn-gold {
+    @apply btn bg-gold-500 hover:bg-gold-400 text-turf-950 font-semibold
+           active:scale-95;
+  }
+  .btn-sm {
+    @apply text-xs px-3 py-1.5;
+  }
+  .btn-lg {
+    @apply text-base px-6 py-3;
+  }
+
+  /* ── Cards ───────────────────────────────── */
+  .card {
+    @apply bg-turf-900 border border-turf-700 rounded-xl;
+  }
+  .card-inner {
+    @apply bg-turf-800 border border-turf-700 rounded-lg;
+  }
+
+  /* ── Inputs ──────────────────────────────── */
+  .input {
+    @apply w-full bg-turf-800 border border-turf-600 rounded-lg px-3 py-2
+           text-white placeholder-turf-500 text-sm
+           focus:outline-none focus:border-field-500 focus:ring-1 focus:ring-field-500
+           transition-colors;
+  }
+  .label {
+    @apply block text-xs font-medium text-turf-400 mb-1.5 uppercase tracking-wide;
+  }
+
+  /* ── Badges ──────────────────────────────── */
+  .badge {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium;
+  }
+  .badge-green  { @apply badge bg-field-900/60 text-field-400 border border-field-800; }
+  .badge-gold   { @apply badge bg-amber-900/60 text-amber-400 border border-amber-800; }
+  .badge-red    { @apply badge bg-red-900/60 text-red-400 border border-red-800; }
+  .badge-blue   { @apply badge bg-blue-900/60 text-blue-400 border border-blue-800; }
+  .badge-purple { @apply badge bg-purple-900/60 text-purple-400 border border-purple-800; }
+  .badge-gray   { @apply badge bg-turf-700 text-turf-400 border border-turf-600; }
+
+  /* ── Section heading ─────────────────────── */
+  .section-title {
+    @apply font-display text-3xl tracking-wide text-white;
+  }
+
+  /* ── Skeleton ────────────────────────────── */
+  .skeleton {
+    @apply bg-turf-800 rounded animate-pulse;
+  }
+
+  /* ── Yard lines (decorative) ─────────────── */
+  .yard-lines {
+    background-image: repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 9.09%,
+      rgba(255,255,255,0.03) 9.09%,
+      rgba(255,255,255,0.03) calc(9.09% + 1px)
+    );
+  }
+}
