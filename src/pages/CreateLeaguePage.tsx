@@ -4,9 +4,10 @@ import { Loader2, Trophy, Users, ChevronRight } from 'lucide-react';
 interface Props {
   displayName: string;
   onCreate: (name: string, maxTeams: number, playerCount: number) => Promise<{ error?: string }>;
+  hasExistingLeague?: boolean;
 }
 
-export function CreateLeaguePage({ displayName, onCreate }: Props) {
+export function CreateLeaguePage({ displayName, onCreate, hasExistingLeague }: Props) {
   const [name, setName]         = useState('');
   const [maxTeams, setMaxTeams] = useState(10);
   const [players, setPlayers]   = useState(4);
@@ -31,10 +32,12 @@ export function CreateLeaguePage({ displayName, onCreate }: Props) {
         <div className="mb-8 text-center">
           <Trophy className="w-10 h-10 text-gold-400 mx-auto mb-3" />
           <h1 className="font-display text-4xl tracking-wider text-white">
-            WELCOME, {displayName.toUpperCase()}
+            {hasExistingLeague ? 'CREATE NEW LEAGUE' : `WELCOME, ${displayName.toUpperCase()}`}
           </h1>
           <p className="text-turf-400 mt-2 text-sm">
-            Set up your fantasy league. You'll be the commissioner.
+            {hasExistingLeague
+              ? 'Set up another league. You\'ll be the commissioner.'
+              : 'Set up your fantasy league. You\'ll be the commissioner.'}
           </p>
         </div>
 
