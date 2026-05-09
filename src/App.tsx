@@ -42,11 +42,19 @@ export default function App() {
     );
   }
 
+  // User is logged in but has no leagues yet
   if (!league.league) {
     return (
       <BrowserRouter>
         <Routes>
-          <Route path="/join/:token" element={<JoinPage user={auth.user} />} />
+          <Route path="/join/:token" element={
+            <JoinPage
+              user={auth.user}
+              onJoined={(leagueId) => {
+                league.reload();
+              }}
+            />
+          } />
           <Route path="*" element={
             <CreateLeaguePage
               displayName={auth.displayName ?? 'Commissioner'}
@@ -65,11 +73,13 @@ export default function App() {
       <div className="min-h-dvh flex flex-col">
         <Header
           league={lg}
+          allLeagues={league.allLeagues}
           myMembership={league.myMembership}
           displayName={auth.displayName}
           onSignOut={auth.signOut}
           onRefresh={cfb.refresh}
           isRefreshing={cfb.loading}
+          onSwitchLeague={league.switchLeague}
         />
         <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-6">
           <Routes>
@@ -85,10 +95,10 @@ export default function App() {
                 cfbLoading={cfb.loading}
               />
             } />
-            <Route path="/roster"          element={<RosterPage league={lg} members={league.members} draftPicks={league.draftPicks} captainPicks={league.captainPicks} gameData={cfb.gameData} userId={auth.user.id} onSetCaptain={league.setCaptain} />} />
-            <Route path="/roster/:userId"  element={<RosterPage league={lg} members={league.members} draftPicks={league.draftPicks} captainPicks={league.captainPicks} gameData={cfb.gameData} userId={auth.user.id} onSetCaptain={league.setCaptain} />} />
-            <Route path="/rankings"        element={<RankingsPage rankings={cfb.rankings} teams={cfb.teams} records={cfb.records} />} />
-            <Route path="/draft"           element={
+            <Route path="/roster"         element={<RosterPage league={lg} members={league.members} draftPicks={league.draftPicks} captainPicks={league.captainPicks} gameData={cfb.gameData} userId={auth.user.id} onSetCaptain={league.setCaptain} />} />
+            <Route path="/roster/:userId" element={<RosterPage league={lg} members={league.members} draftPicks={league.draftPicks} captainPicks={league.captainPicks} gameData={cfb.gameData} userId={auth.user.id} onSetCaptain={league.setCaptain} />} />
+            <Route path="/rankings"       element={<RankingsPage rankings={cfb.rankings} teams={cfb.teams} records={cfb.records} />} />
+            <Route path="/draft"          element={
               <DraftRoom
                 league={lg}
                 members={league.members}
@@ -100,7 +110,7 @@ export default function App() {
                 onMakePick={league.makeDraftPick}
               />
             } />
-            <Route path="/admin"           element={
+            <Route path="/admin"          element={
               <AdminPanel
                 league={lg}
                 members={league.members}
@@ -115,7 +125,21 @@ export default function App() {
                 onResetDraft={league.resetDraft}
               />
             } />
-            <Route path="/join/:token" element={<JoinPage user={auth.user} />} />
+            <Route path="/create-league"  element={
+              <CreateLeaguePage
+                displayName={auth.displayName ?? 'Commissioner'}
+                onCreate={league.createLeague}
+                hasExistingLeague
+              />
+            } />
+            <Route path="/join/:token"    element={
+              <JoinPage
+                user={auth.user}
+                onJoined={(leagueId) => {
+                  league.switchLeague(leagueId);
+                }}
+              />
+            } />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>
