@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
-import type { useAuth } from '../../hooks/useAuth';
+import type { useAuth } from '../hooks/useAuth';
 
 type Mode = 'login' | 'signup';
 
