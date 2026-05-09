@@ -6,19 +6,20 @@ import { supabase } from '../lib/supabase';
 
 interface Props {
   user: User | null;
+  onJoined?: (leagueId: string) => void;
 }
 
-export function JoinPage({ user }: Props) {
+export function JoinPage({ user, onJoined }: Props) {
   const { token }    = useParams<{ token: string }>();
   const navigate     = useNavigate();
   const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'needsAuth'>('loading');
   const [msg, setMsg] = useState('');
+  const [leagueName, setLeagueName] = useState('');
 
   useEffect(() => {
     if (!token) { setStatus('error'); setMsg('Invalid invite link.'); return; }
 
     const join = async () => {
-      // Look up invite
       const { data: invite, error: invErr } = await supabase
         .from('invites')
         .select('*, leagues(name)')
@@ -36,11 +37,13 @@ export function JoinPage({ user }: Props) {
         return;
       }
 
+      const name = (invite.leagues as any)?.name ?? 'the league';
+      setLeagueName(name);
+
       if (!user) {
-        // Store token for after auth
         sessionStorage.setItem('pending_invite', token);
         setStatus('needsAuth');
-        setMsg(`You've been invited to join "${(invite.leagues as any)?.name}". Sign up or sign in to continue.`);
+        setMsg(`You've been invited to join "${name}". Sign up or sign in to continue.`);
         return;
       }
 
@@ -54,12 +57,13 @@ export function JoinPage({ user }: Props) {
 
       if (existing) {
         setStatus('success');
-        setMsg(`You're already in this league!`);
-        setTimeout(() => navigate('/'), 2000);
+        setMsg(`You're already in "${name}"!`);
+        onJoined?.(invite.league_id);
+        setTimeout(() => navigate('/'), 1500);
         return;
       }
 
-      // Add to league
+      // Join the league
       const { error: joinErr } = await supabase.from('league_members').insert({
         league_id:    invite.league_id,
         user_id:      user.id,
@@ -73,27 +77,16 @@ export function JoinPage({ user }: Props) {
         return;
       }
 
-      // Mark invite accepted
       await supabase.from('invites').update({ accepted: true }).eq('id', invite.id);
 
       setStatus('success');
-      setMsg(`Welcome to "${(invite.leagues as any)?.name}"! Taking you to the league…`);
-      setTimeout(() => navigate('/'), 2000);
+      setMsg(`Welcome to "${name}"! Taking you there now…`);
+      onJoined?.(invite.league_id);
+      setTimeout(() => navigate('/'), 1500);
     };
 
     join();
-  }, [token, user, navigate]);
-
-  // If user just logged in and has a pending invite
-  useEffect(() => {
-    if (user) {
-      const pending = sessionStorage.getItem('pending_invite');
-      if (pending && pending === token) {
-        sessionStorage.removeItem('pending_invite');
-        // Re-trigger join by re-running the effect
-      }
-    }
-  }, [user, token]);
+  }, [token, user]);
 
   return (
     <div className="min-h-dvh flex items-center justify-center p-4">
@@ -115,7 +108,7 @@ export function JoinPage({ user }: Props) {
             <XCircle className="w-10 h-10 text-red-400 mx-auto" />
             <p className="text-red-300">{msg}</p>
             <button onClick={() => navigate('/')} className="btn-secondary w-full">
-              Go to Home
+              Go Home
             </button>
           </>
         )}
