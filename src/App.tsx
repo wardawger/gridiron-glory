@@ -18,7 +18,6 @@ export default function App() {
   const league = useLeague(auth.user);
   const cfb    = useCfbData();
 
-  // ── Loading ───────────────────────────────────────────────────────────────
   if (auth.loading || (auth.user && league.loading)) {
     return (
       <div className="min-h-dvh flex items-center justify-center">
@@ -32,7 +31,6 @@ export default function App() {
     );
   }
 
-  // ── Not logged in ─────────────────────────────────────────────────────────
   if (!auth.user) {
     return (
       <BrowserRouter>
@@ -44,7 +42,6 @@ export default function App() {
     );
   }
 
-  // ── No league yet ─────────────────────────────────────────────────────────
   if (!league.league) {
     return (
       <BrowserRouter>
@@ -61,7 +58,6 @@ export default function App() {
     );
   }
 
-  // ── Main app ──────────────────────────────────────────────────────────────
   const lg = league.league;
 
   return (
@@ -116,6 +112,7 @@ export default function App() {
                 onAddBonus={league.addManualBonus}
                 onRemoveBonus={league.removeManualBonus}
                 onRemoveFromRoster={league.removeFromRoster}
+                onResetDraft={league.resetDraft}
               />
             } />
             <Route path="/join/:token" element={<JoinPage user={auth.user} />} />
