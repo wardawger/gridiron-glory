@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Leaderboard } from '../components/league/Leaderboard';
-import type { League, LeagueMember, CaptainPick, GameData, ManualBonus, DraftPick, TeamSeasonStats } from '../types';
+import type { League, LeagueMember, CaptainPick, GameData, ManualBonus, DraftPick, TeamSeasonStats, APRanking } from '../types';
 import { buildLeaderboard } from '../services/scoring';
 
 interface Props {
@@ -12,13 +12,14 @@ interface Props {
   manualBonuses: ManualBonus[];
   gameData: GameData;
   seasonStats: Map<string, TeamSeasonStats>;
+  rankings: APRanking[];
   userId: string;
   cfbLoading: boolean;
 }
 
 export function HomePage({
   league, members, draftPicks, captainPicks, manualBonuses,
-  gameData, seasonStats, userId, cfbLoading,
+  gameData, seasonStats, rankings, userId, cfbLoading,
 }: Props) {
   const rosters = useMemo(() => {
     const map = new Map<string, { team_id: string; team_name: string; team_logo: string; team_conference: string; team_color: string }[]>();
@@ -32,8 +33,6 @@ export function HomePage({
     return map;
   }, [draftPicks]);
 
-  // Commissioner marks conf champ week complete via the current_week field
-  // We treat week >= 15 as conf championship week complete (adjustable)
   const confChampComplete = league.current_week >= 15;
 
   const leaderboard = useMemo(
@@ -56,8 +55,7 @@ export function HomePage({
         <div className="card p-4 flex items-center gap-3 text-sm border-amber-800/40 bg-amber-950/20">
           <span className="text-amber-400">📊</span>
           <span className="text-amber-300">
-            Statistical ranking bonuses (Top/Bottom 3 QBR, TDs, INTs, Sacks) are shown as a live preview.
-            Points lock in after conference championship week.
+            Statistical ranking bonuses are shown as a live preview (◎). Points lock in after conference championship week.
           </span>
         </div>
       )}
@@ -66,6 +64,8 @@ export function HomePage({
         currentWeek={league.current_week}
         userId={userId}
         confChampComplete={confChampComplete}
+        draftPicks={draftPicks}
+        rankings={rankings}
       />
     </div>
   );
