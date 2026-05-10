@@ -10,6 +10,16 @@ const headers = {
 
 const P4_CONFERENCES = new Set(['SEC', 'Big Ten', 'Big 12', 'ACC', 'FBS Independents', 'Pac-12']);
 
+// CFB seasons run Aug–Jan. If we're in Jan–July, the current season
+// year is the prior calendar year (e.g. Jan 2026 → 2025 season).
+// If we're in Aug–Dec, the current season year matches the calendar year.
+function getCurrentSeasonYear(): number {
+  const now = new Date();
+  const month = now.getMonth(); // 0 = Jan, 7 = Aug
+  return month >= 7 ? now.getFullYear() : now.getFullYear() - 1;
+}
+
+// Try requested year, fall back to prior year if empty
 async function fetchWithFallback(path: string, year: number): Promise<any[]> {
   let res = await fetch(`${BASE}${path}?year=${year}`, { headers });
   let data = await res.json();
@@ -20,7 +30,8 @@ async function fetchWithFallback(path: string, year: number): Promise<any[]> {
   return Array.isArray(data) ? data : [];
 }
 
-export async function fetchFbsTeams(year = 2025): Promise<CfbTeam[]> {
+export async function fetchFbsTeams(): Promise<CfbTeam[]> {
+  const year = getCurrentSeasonYear();
   const raw = await fetchWithFallback('/teams/fbs', year);
   return raw
     .map((t: any): CfbTeam => ({
@@ -35,7 +46,8 @@ export async function fetchFbsTeams(year = 2025): Promise<CfbTeam[]> {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-export async function fetchSeasonData(teams: CfbTeam[], year = 2025): Promise<GameData> {
+export async function fetchSeasonData(teams: CfbTeam[]): Promise<GameData> {
+  const year = getCurrentSeasonYear();
   const teamMap = new Map(teams.map(t => [t.id, t]));
   const gameData: GameData = {};
   teams.forEach(t => { gameData[t.id] = {}; });
@@ -108,7 +120,8 @@ export async function fetchSeasonData(teams: CfbTeam[], year = 2025): Promise<Ga
   return gameData;
 }
 
-export async function fetchRankings(teams: CfbTeam[], year = 2025): Promise<APRanking[]> {
+export async function fetchRankings(teams: CfbTeam[]): Promise<APRanking[]> {
+  const year = getCurrentSeasonYear();
   let data: any[] = [];
   try {
     const res = await fetch(`${BASE}/rankings?year=${year}&seasonType=regular`, { headers });
@@ -142,14 +155,18 @@ export async function fetchRankings(teams: CfbTeam[], year = 2025): Promise<APRa
     const curr = r.rank;
     const prev = prevRanks.get(r.school) ?? null;
     return {
-      rank: curr, team_name: r.school, team_id: t?.id,
-      record: t ? t.name : r.school, previous_rank: prev,
+      rank: curr,
+      team_name: r.school,
+      team_id: t?.id,
+      record: t ? t.name : r.school,
+      previous_rank: prev,
       trend: prev == null ? 'new' : curr < prev ? 'up' : curr > prev ? 'down' : 'same',
     };
   });
 }
 
-export async function fetchTeamRecords(year = 2025): Promise<Map<string, { wins: number; losses: number }>> {
+export async function fetchTeamRecords(): Promise<Map<string, { wins: number; losses: number }>> {
+  const year = getCurrentSeasonYear();
   const map = new Map<string, { wins: number; losses: number }>();
   try {
     let res = await fetch(`${BASE}/records?year=${year}`, { headers });
@@ -165,14 +182,12 @@ export async function fetchTeamRecords(year = 2025): Promise<Map<string, { wins:
   return map;
 }
 
-// ─── Season Stats (for Top/Bottom 3 auto-scoring) ──────────────────────────
-
-export async function fetchSeasonStats(teams: CfbTeam[], year = 2025): Promise<Map<string, TeamSeasonStats>> {
+export async function fetchSeasonStats(teams: CfbTeam[]): Promise<Map<string, TeamSeasonStats>> {
+  const year = getCurrentSeasonYear();
   const nameToId = new Map(teams.map(t => [t.name.toLowerCase(), t.id]));
   const map = new Map<string, TeamSeasonStats>();
 
   const resolveId = (school: string): string | null => {
-    // Try exact match first, then partial
     const exact = nameToId.get(school.toLowerCase());
     if (exact) return exact;
     for (const [name, id] of nameToId.entries()) {
@@ -182,79 +197,11 @@ export async function fetchSeasonStats(teams: CfbTeam[], year = 2025): Promise<M
   };
 
   try {
-    // Fetch passing (for QBR/passer rating), rushing, and defensive stats in parallel
-    const [passingRes, rushingRes, defensiveRes, sackRes] = await Promise.all([
+    const [passingRes, rushingRes, defensiveRes] = await Promise.all([
       fetch(`${BASE}/stats/season?year=${year}&statType=passing`, { headers }).then(r => r.ok ? r.json() : []),
       fetch(`${BASE}/stats/season?year=${year}&statType=rushing`, { headers }).then(r => r.ok ? r.json() : []),
       fetch(`${BASE}/stats/season?year=${year}&statType=defensive`, { headers }).then(r => r.ok ? r.json() : []),
-      fetch(`${BASE}/stats/season?year=${year}&statType=fumbles`, { headers }).then(r => r.ok ? r.json() : []),
     ]);
 
-    // QBR / passer rating — use "passer_rating" stat
-    const qbrMap = new Map<string, number>();
-    passingRes.forEach((s: any) => {
-      if (s.statName === 'passer_rating') {
-        const id = resolveId(s.team);
-        if (id) qbrMap.set(id, s.stat ?? 0);
-      }
-    });
-
-    // Rushing TDs
-    const rushTdMap = new Map<string, number>();
-    rushingRes.forEach((s: any) => {
-      if (s.statName === 'rushingTDs') {
-        const id = resolveId(s.team);
-        if (id) rushTdMap.set(id, s.stat ?? 0);
-      }
-    });
-
-    // Receiving TDs — in passing stats as receivingTDs
-    const recTdMap = new Map<string, number>();
-    passingRes.forEach((s: any) => {
-      if (s.statName === 'receivingTDs') {
-        const id = resolveId(s.team);
-        if (id) recTdMap.set(id, s.stat ?? 0);
-      }
-    });
-
-    // Defensive INTs
-    const intMap = new Map<string, number>();
-    defensiveRes.forEach((s: any) => {
-      if (s.statName === 'interceptions') {
-        const id = resolveId(s.team);
-        if (id) intMap.set(id, s.stat ?? 0);
-      }
-    });
-
-    // Sacks — in defensive stats
-    const sackMap = new Map<string, number>();
-    defensiveRes.forEach((s: any) => {
-      if (s.statName === 'sacks') {
-        const id = resolveId(s.team);
-        if (id) sackMap.set(id, s.stat ?? 0);
-      }
-    });
-
-    // Merge into one map per team
-    const allIds = new Set([
-      ...qbrMap.keys(), ...rushTdMap.keys(), ...recTdMap.keys(),
-      ...intMap.keys(), ...sackMap.keys(),
-    ]);
-
-    allIds.forEach(id => {
-      map.set(id, {
-        team_id:       id,
-        qbr:           qbrMap.get(id) ?? null,
-        rushing_tds:   rushTdMap.get(id) ?? null,
-        receiving_tds: recTdMap.get(id) ?? null,
-        def_ints:      intMap.get(id) ?? null,
-        sacks:         sackMap.get(id) ?? null,
-      });
-    });
-
-  } catch (e) {
-    console.warn('Failed to fetch season stats:', e);
-  }
-
-  return map;
-}
+    const qbrMap    = new Map<string, number>();
+    const recTdMap  = new Map<string, number
