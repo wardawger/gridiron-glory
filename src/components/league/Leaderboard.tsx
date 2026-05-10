@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { Crown, TrendingUp, Star, ChartBar } from 'lucide-react';
+import { Crown, TrendingUp, Star } from 'lucide-react';
 import type { LeaderboardEntry } from '../../types';
 
 const STAT_LABELS: Record<string, string> = {
