@@ -4,6 +4,8 @@ import type {
   GameData, ManualBonus,
 } from '../types';
 
+export { P4_CONFERENCES, DRAFT_CONF_MIN, DRAFT_CONF_MAX } from '../types';
+
 export function scoreGame(
   game: GameResult,
   settings: ScoringSettings,
