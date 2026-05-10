@@ -92,13 +92,14 @@ export default function App() {
                 manualBonuses={league.manualBonuses}
                 gameData={cfb.gameData}
                 seasonStats={cfb.seasonStats}
+                rankings={cfb.rankings}
                 userId={auth.user.id}
                 cfbLoading={cfb.loading}
               />
             } />
             <Route path="/roster"         element={<RosterPage league={lg} members={league.members} draftPicks={league.draftPicks} captainPicks={league.captainPicks} gameData={cfb.gameData} userId={auth.user.id} onSetCaptain={league.setCaptain} />} />
             <Route path="/roster/:userId" element={<RosterPage league={lg} members={league.members} draftPicks={league.draftPicks} captainPicks={league.captainPicks} gameData={cfb.gameData} userId={auth.user.id} onSetCaptain={league.setCaptain} />} />
-            <Route path="/rankings"       element={<RankingsPage rankings={cfb.rankings} teams={cfb.teams} records={cfb.records} />} />
+            <Route path="/"       element={<Page ={cfb.} teams={cfb.teams} records={cfb.records} />} />
             <Route path="/draft"          element={
               <DraftRoom
                 league={lg}
