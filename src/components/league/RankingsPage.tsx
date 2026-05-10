@@ -46,12 +46,17 @@ export function RankingsPage({ rankings, teams, records }: Props) {
                   </td>
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-3">
-                      <img
-                        src={logo}
-                        alt={r.team_name}
-                        className="w-8 h-8 object-contain rounded"
-                        onError={e => { (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(r.team_name)}&background=1a3a2a&color=22c55e&length=2`; }}
-                      />
+                      {/* White circle background for logo */}
+                      <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center flex-shrink-0 shadow-sm">
+                        <img
+                          src={logo}
+                          alt={r.team_name}
+                          className="w-7 h-7 object-contain"
+                          onError={e => {
+                            (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(r.team_name)}&background=1a3a2a&color=22c55e&length=2`;
+                          }}
+                        />
+                      </div>
                       <div>
                         <p className="font-medium text-white group-hover:text-field-300 transition-colors">
                           {r.team_name}
