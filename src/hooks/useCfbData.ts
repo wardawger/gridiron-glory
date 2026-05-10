@@ -14,14 +14,14 @@ interface CfbState {
 }
 
 export function useCfbData(): CfbState {
-  const [teams, setTeams]           = useState<CfbTeam[]>([]);
-  const [gameData, setGameData]     = useState<GameData>({});
-  const [rankings, setRankings]     = useState<APRanking[]>([]);
-  const [records, setRecords]       = useState<Map<string, { wins: number; losses: number }>>(new Map());
+  const [teams, setTeams]             = useState<CfbTeam[]>([]);
+  const [gameData, setGameData]       = useState<GameData>({});
+  const [rankings, setRankings]       = useState<APRanking[]>([]);
+  const [records, setRecords]         = useState<Map<string, { wins: number; losses: number }>>(new Map());
   const [seasonStats, setSeasonStats] = useState<Map<string, TeamSeasonStats>>(new Map());
-  const [loading, setLoading]       = useState(true);
-  const [error, setError]           = useState<string | null>(null);
-  const [tick, setTick]             = useState(0);
+  const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState<string | null>(null);
+  const [tick, setTick]               = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -54,5 +54,18 @@ export function useCfbData(): CfbState {
     return () => { cancelled = true; };
   }, [tick]);
 
-  return { teams, gameData, rankings, records, seasonStats, loading, error, refresh: () => setTick(t => t + 1) };
+  // Auto-refresh every 30 minutes during the season
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTick(t => t + 1);
+    }, 30 * 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  return {
+    teams, gameData, rankings, records, seasonStats,
+    loading, error,
+    refresh: () => setTick(t => t + 1),
+  };
 }
