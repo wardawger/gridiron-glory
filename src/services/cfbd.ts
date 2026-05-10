@@ -204,4 +204,49 @@ export async function fetchSeasonStats(teams: CfbTeam[]): Promise<Map<string, Te
     ]);
 
     const qbrMap    = new Map<string, number>();
-    const recTdMap  = new Map<string, number
+    const recTdMap  = new Map<string, number>();
+    passingRes.forEach((s: any) => {
+      const id = resolveId(s.team);
+      if (!id) return;
+      if (s.statName === 'passer_rating')  qbrMap.set(id, s.stat ?? 0);
+      if (s.statName === 'receivingTDs')   recTdMap.set(id, s.stat ?? 0);
+    });
+
+    const rushTdMap = new Map<string, number>();
+    rushingRes.forEach((s: any) => {
+      const id = resolveId(s.team);
+      if (!id) return;
+      if (s.statName === 'rushingTDs') rushTdMap.set(id, s.stat ?? 0);
+    });
+
+    const intMap  = new Map<string, number>();
+    const sackMap = new Map<string, number>();
+    defensiveRes.forEach((s: any) => {
+      const id = resolveId(s.team);
+      if (!id) return;
+      if (s.statName === 'interceptions') intMap.set(id, s.stat ?? 0);
+      if (s.statName === 'sacks')         sackMap.set(id, s.stat ?? 0);
+    });
+
+    const allIds = new Set([
+      ...qbrMap.keys(), ...rushTdMap.keys(), ...recTdMap.keys(),
+      ...intMap.keys(), ...sackMap.keys(),
+    ]);
+
+    allIds.forEach(id => {
+      map.set(id, {
+        team_id:       id,
+        qbr:           qbrMap.get(id)    ?? null,
+        rushing_tds:   rushTdMap.get(id) ?? null,
+        receiving_tds: recTdMap.get(id)  ?? null,
+        def_ints:      intMap.get(id)    ?? null,
+        sacks:         sackMap.get(id)   ?? null,
+      });
+    });
+
+  } catch (e) {
+    console.warn('Failed to fetch season stats:', e);
+  }
+
+  return map;
+}
