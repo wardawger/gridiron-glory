@@ -1,7 +1,7 @@
 // ─── Auth / Users ──────────────────────────────────────────────────────────
 
 export interface Profile {
-  id: string;          // matches auth.users.id
+  id: string;
   display_name: string;
   avatar_url: string | null;
   created_at: string;
@@ -18,8 +18,8 @@ export interface League {
   created_by: string;
   current_week: number;
   draft_status: DraftStatus;
-  draft_order: string[];      // array of user IDs in snake order
-  draft_current_pick: number; // index into the flat pick sequence
+  draft_order: string[];
+  draft_current_pick: number;
   max_teams_per_user: number;
   scoring: ScoringSettings;
   created_at: string;
@@ -55,6 +55,14 @@ export const DEFAULT_SCORING: ScoringSettings = {
 
 // ─── Draft ─────────────────────────────────────────────────────────────────
 
+// P4 conferences for draft enforcement
+export const P4_CONFERENCES = ['SEC', 'Big Ten', 'Big 12', 'ACC'] as const;
+export type P4Conference = typeof P4_CONFERENCES[number];
+
+// Draft rules: min 2 and max 3 from each P4 conference
+export const DRAFT_CONF_MIN = 2;
+export const DRAFT_CONF_MAX = 3;
+
 export interface DraftPick {
   id: string;
   league_id: string;
@@ -64,7 +72,7 @@ export interface DraftPick {
   team_logo: string;
   team_conference: string;
   round: number;
-  pick_number: number;       // overall pick number (1-based)
+  pick_number: number;
   picked_at: string;
 }
 
@@ -90,13 +98,36 @@ export interface CaptainPick {
 // ─── Manual Bonus ──────────────────────────────────────────────────────────
 
 export type BonusType =
+  // Postseason — bowl
   | 'bowl_eligible'
+  | 'not_bowl_eligible'
   | 'win_bowl'
+  // Conference championship
   | 'make_cc'
   | 'win_cc'
+  // CFP ladder
   | 'make_cfp'
-  | 'win_cfp_game'
-  | 'heisman';
+  | 'make_cfp_quarterfinal'
+  | 'make_cfp_semifinal'
+  | 'make_cfp_final'
+  | 'win_cfp_championship'
+  // Awards
+  | 'heisman_invitee'
+  | 'heisman_winner'
+  // Penalties
+  | 'coach_fired'
+  | 'fulmer_cup'
+  // Statistical rankings (awarded after conf championships)
+  | 'top3_qbr'
+  | 'top3_rushing_td'
+  | 'top3_receiving_td'
+  | 'top3_int'
+  | 'top3_sacks'
+  | 'bottom3_qbr'
+  | 'bottom3_rushing_td'
+  | 'bottom3_receiving_td'
+  | 'bottom3_int'
+  | 'bottom3_sacks';
 
 export interface ManualBonus {
   id: string;
@@ -112,24 +143,95 @@ export interface ManualBonus {
 }
 
 export const BONUS_LABELS: Record<BonusType, string> = {
-  bowl_eligible: 'Bowl Eligible',
-  win_bowl:      'Won Bowl Game',
-  make_cc:       'Made Conf. Championship',
-  win_cc:        'Won Conf. Championship',
-  make_cfp:      'Made CFP',
-  win_cfp_game:  'Won CFP Game',
-  heisman:       'Heisman Trophy',
+  // Bowl
+  bowl_eligible:          'Bowl Eligible',
+  not_bowl_eligible:      'Not Bowl Eligible',
+  win_bowl:               'Won Bowl Game (Non-CFP)',
+  // Conf championship
+  make_cc:                'Made Conf. Championship',
+  win_cc:                 'Won Conference',
+  // CFP
+  make_cfp:               'Made CFP',
+  make_cfp_quarterfinal:  'Made CFP Quarterfinal',
+  make_cfp_semifinal:     'Made CFP Semifinal',
+  make_cfp_final:         'Made CFP Final',
+  win_cfp_championship:   'Won CFP Championship',
+  // Awards
+  heisman_invitee:        'Heisman Invitee',
+  heisman_winner:         'Heisman Winner',
+  // Penalties
+  coach_fired:            'Coach Fired',
+  fulmer_cup:             'Fulmer Cup Suspension',
+  // Statistical (post conf championship)
+  top3_qbr:              'Top 3 in QBR',
+  top3_rushing_td:       'Top 3 in Rushing TDs',
+  top3_receiving_td:     'Top 3 in Receiving TDs',
+  top3_int:              'Top 3 in INTs (Defense)',
+  top3_sacks:            'Top 3 in Sacks',
+  bottom3_qbr:           'Bottom 3 in QBR',
+  bottom3_rushing_td:    'Bottom 3 in Rushing TDs',
+  bottom3_receiving_td:  'Bottom 3 in Receiving TDs',
+  bottom3_int:           'Bottom 3 in INTs (Defense)',
+  bottom3_sacks:         'Bottom 3 in Sacks',
 };
 
 export const BONUS_DEFAULT_POINTS: Record<BonusType, number> = {
-  bowl_eligible: 5,
-  win_bowl:      5,
-  make_cc:       10,
-  win_cc:        10,
-  make_cfp:      5,
-  win_cfp_game:  10,
-  heisman:       15,
+  bowl_eligible:          5,
+  not_bowl_eligible:      -5,
+  win_bowl:               5,
+  make_cc:                10,
+  win_cc:                 10,
+  make_cfp:               5,
+  make_cfp_quarterfinal:  10,
+  make_cfp_semifinal:     15,
+  make_cfp_final:         20,
+  win_cfp_championship:   25,
+  heisman_invitee:        10,
+  heisman_winner:         15,
+  coach_fired:            -10,
+  fulmer_cup:             -2,
+  top3_qbr:              3,
+  top3_rushing_td:       3,
+  top3_receiving_td:     3,
+  top3_int:              3,
+  top3_sacks:            3,
+  bottom3_qbr:           -3,
+  bottom3_rushing_td:    -3,
+  bottom3_receiving_td:  -3,
+  bottom3_int:           -3,
+  bottom3_sacks:         -3,
 };
+
+// Group bonus types for the admin UI
+export const BONUS_GROUPS: { label: string; types: BonusType[] }[] = [
+  {
+    label: 'Bowl Season',
+    types: ['bowl_eligible', 'not_bowl_eligible', 'win_bowl'],
+  },
+  {
+    label: 'Conference Championship',
+    types: ['make_cc', 'win_cc'],
+  },
+  {
+    label: 'College Football Playoff',
+    types: ['make_cfp', 'make_cfp_quarterfinal', 'make_cfp_semifinal', 'make_cfp_final', 'win_cfp_championship'],
+  },
+  {
+    label: 'Awards',
+    types: ['heisman_invitee', 'heisman_winner'],
+  },
+  {
+    label: 'Penalties',
+    types: ['coach_fired', 'fulmer_cup'],
+  },
+  {
+    label: 'Statistical Rankings (post Conf. Championship)',
+    types: [
+      'top3_qbr', 'top3_rushing_td', 'top3_receiving_td', 'top3_int', 'top3_sacks',
+      'bottom3_qbr', 'bottom3_rushing_td', 'bottom3_receiving_td', 'bottom3_int', 'bottom3_sacks',
+    ],
+  },
+];
 
 // ─── CFBD / Game Data ──────────────────────────────────────────────────────
 
@@ -154,7 +256,6 @@ export interface GameResult {
   completed: boolean;
 }
 
-// GameData: teamId → week → GameResult
 export type GameData = Record<string, Record<number, GameResult>>;
 
 export interface APRanking {
