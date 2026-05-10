@@ -1,25 +1,27 @@
 import { useState, useEffect } from 'react';
-import type { CfbTeam, GameData, APRanking } from '../types';
-import { fetchFbsTeams, fetchSeasonData, fetchRankings, fetchTeamRecords } from '../services/cfbd';
+import type { CfbTeam, GameData, APRanking, TeamSeasonStats } from '../types';
+import { fetchFbsTeams, fetchSeasonData, fetchRankings, fetchTeamRecords, fetchSeasonStats } from '../services/cfbd';
 
 interface CfbState {
   teams: CfbTeam[];
   gameData: GameData;
   rankings: APRanking[];
   records: Map<string, { wins: number; losses: number }>;
+  seasonStats: Map<string, TeamSeasonStats>;
   loading: boolean;
   error: string | null;
   refresh: () => void;
 }
 
 export function useCfbData(): CfbState {
-  const [teams, setTeams]       = useState<CfbTeam[]>([]);
-  const [gameData, setGameData] = useState<GameData>({});
-  const [rankings, setRankings] = useState<APRanking[]>([]);
-  const [records, setRecords]   = useState<Map<string, { wins: number; losses: number }>>(new Map());
-  const [loading, setLoading]   = useState(true);
-  const [error, setError]       = useState<string | null>(null);
-  const [tick, setTick]         = useState(0);
+  const [teams, setTeams]           = useState<CfbTeam[]>([]);
+  const [gameData, setGameData]     = useState<GameData>({});
+  const [rankings, setRankings]     = useState<APRanking[]>([]);
+  const [records, setRecords]       = useState<Map<string, { wins: number; losses: number }>>(new Map());
+  const [seasonStats, setSeasonStats] = useState<Map<string, TeamSeasonStats>>(new Map());
+  const [loading, setLoading]       = useState(true);
+  const [error, setError]           = useState<string | null>(null);
+  const [tick, setTick]             = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -31,15 +33,17 @@ export function useCfbData(): CfbState {
         if (cancelled) return;
         setTeams(t);
 
-        const [gd, rk, rec] = await Promise.all([
+        const [gd, rk, rec, stats] = await Promise.all([
           fetchSeasonData(t),
           fetchRankings(t),
           fetchTeamRecords(),
+          fetchSeasonStats(t),
         ]);
         if (cancelled) return;
         setGameData(gd);
         setRankings(rk);
         setRecords(rec);
+        setSeasonStats(stats);
       } catch (e: any) {
         if (!cancelled) setError(e.message ?? 'Failed to load CFB data');
       } finally {
@@ -50,5 +54,5 @@ export function useCfbData(): CfbState {
     return () => { cancelled = true; };
   }, [tick]);
 
-  return { teams, gameData, rankings, records, loading, error, refresh: () => setTick(t => t + 1) };
+  return { teams, gameData, rankings, records, seasonStats, loading, error, refresh: () => setTick(t => t + 1) };
 }
