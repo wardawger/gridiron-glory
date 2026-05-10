@@ -91,6 +91,7 @@ export default function App() {
                 captainPicks={league.captainPicks}
                 manualBonuses={league.manualBonuses}
                 gameData={cfb.gameData}
+                seasonStats={cfb.seasonStats}
                 userId={auth.user.id}
                 cfbLoading={cfb.loading}
               />
