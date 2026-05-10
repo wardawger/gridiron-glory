@@ -267,6 +267,27 @@ export interface APRanking {
   trend: 'up' | 'down' | 'same' | 'new';
 }
 
+// ─── Season Stats ──────────────────────────────────────────────────────────
+
+export interface TeamSeasonStats {
+  team_id: string;
+  qbr:           number | null;   // passer rating
+  rushing_tds:   number | null;
+  receiving_tds: number | null;
+  def_ints:      number | null;
+  sacks:         number | null;
+}
+
+export interface StatRankingBonus {
+  team_id:   string;
+  team_name: string;
+  stat:      'qbr' | 'rushing_tds' | 'receiving_tds' | 'def_ints' | 'sacks';
+  rank:      number;   // 1 = best
+  points:    number;   // +3 or -3
+  value:     number;   // actual stat value
+  isPreview: boolean;  // true until commissioner locks conf championship week
+}
+
 // ─── Scoring Outputs ───────────────────────────────────────────────────────
 
 export interface WeeklyScore {
