@@ -258,3 +258,96 @@ export function RosterView({
                           {captainUses}/2 captain uses
                         </div>
                       </td>
+
+                      {/* Week cells */}
+                      {WEEKS.map(w => {
+                        const game     = gameData[entry.team_id]?.[w];
+                        const isCap    = getCaptainForWeek(w) === entry.team_id;
+                        const isPast   = w < currentWeek;
+                        const isCurr   = w === currentWeek;
+                        const canSetCap = isOwner && onSetCaptain && !isPast && (captainUses < 2 || isCap);
+
+                        let bgColor = '';
+                        if (isCap) bgColor = 'bg-amber-900/30';
+                        else if (isCurr) bgColor = 'bg-field-900/20';
+
+                        let resultBadge = null;
+                        if (game?.result === 'W') {
+                          resultBadge = <span className="text-field-400 font-bold">W</span>;
+                        } else if (game?.result === 'L') {
+                          resultBadge = <span className="text-red-400 font-bold">L</span>;
+                        }
+
+                        return (
+                          <td
+                            key={w}
+                            className={`px-2 py-2 text-center align-top ${bgColor} ${
+                              isCurr ? 'border-x border-field-800/50' : ''
+                            }`}
+                          >
+                            {game ? (
+                              <div className="space-y-1">
+                                {/* Opponent + result */}
+                                <div className="flex items-center justify-center gap-1">
+                                  {resultBadge}
+                                  <span className={`truncate max-w-16 ${
+                                    game.result === 'W' ? 'text-turf-300' :
+                                    game.result === 'L' ? 'text-turf-500' :
+                                    'text-turf-400'
+                                  }`}>
+                                    {game.opponent.split(' ').slice(-1)[0]}
+                                    {game.opponent_rank && (
+                                      <span className="text-turf-600"> #{game.opponent_rank}</span>
+                                    )}
+                                  </span>
+                                </div>
+
+                                {/* Score if completed */}
+                                {game.home_score != null && game.away_score != null && (
+                                  <div className="text-turf-600 font-mono">
+                                    {game.home_score}–{game.away_score}
+                                  </div>
+                                )}
+
+                                {/* Captain badge or button */}
+                                {isCap && (
+                                  <div className="text-amber-400 font-bold">★ CAP</div>
+                                )}
+                                {canSetCap && !isCap && (
+                                  <button
+                                    onClick={() => onSetCaptain!(w, entry.team_id)}
+                                    className="text-turf-600 hover:text-gold-400 transition-colors text-xs border border-turf-700 hover:border-gold-600 rounded px-1 py-0.5 w-full"
+                                  >
+                                    + Cap
+                                  </button>
+                                )}
+                                {!canSetCap && !isCap && !isPast && (
+                                  <div className="text-turf-700 text-xs">max</div>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-turf-700">—</span>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Legend */}
+          <div className="border-t border-turf-800 px-4 py-3 flex items-center gap-4 text-xs text-turf-500 flex-wrap">
+            <span className="flex items-center gap-1"><span className="text-field-400 font-bold">W</span> Win</span>
+            <span className="flex items-center gap-1"><span className="text-red-400 font-bold">L</span> Loss</span>
+            <span className="flex items-center gap-1"><span className="text-amber-400">★ CAP</span> Captain pick</span>
+            <span className="flex items-center gap-1"><span className="text-turf-400">—</span> Bye / no game</span>
+            <span className="text-turf-600 ml-auto">Scroll right to see all weeks →</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
