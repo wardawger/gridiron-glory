@@ -312,6 +312,8 @@ export interface LeaderboardEntry {
   total_points: number;
   weekly_scores: WeeklyScore[];
   bonus_points: number;
+  stat_bonuses: StatRankingBonus[];
+  stat_points: number;
   roster: RosterEntry[];
 }
 
