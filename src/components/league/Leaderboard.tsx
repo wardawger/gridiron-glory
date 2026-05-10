@@ -4,7 +4,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   Cell, RadarChart, Radar, PolarGrid, PolarAngleAxis, Legend,
 } from 'recharts';
-import { Crown, TrendingUp, Star, TrendingDown, Minus } from 'lucide-react';
+import { Crown, TrendingUp, Star } from 'lucide-react';
 import type { LeaderboardEntry, DraftPick, APRanking } from '../../types';
 import { computeAnalytics, heatColor } from '../../services/analytics';
 
@@ -29,10 +29,40 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   );
 };
 
+// ── Sub-component: one analytics table row ────────────────────────────────
+
+interface AnalyticsRowProps {
+  label: string;
+  tooltip: string;
+  values: { display: string; color: string; textColor: string }[];
+}
+
+function AnalyticsRow({ label, tooltip, values }: AnalyticsRowProps) {
+  return (
+    <tr className="hover:bg-turf-800/20 transition-colors group">
+      <td className="px-4 py-2.5">
+        <span className="text-turf-300 text-xs font-medium" title={tooltip}>{label}</span>
+        <span className="text-turf-600 text-xs ml-1 hidden group-hover:inline" title={tooltip}>ⓘ</span>
+      </td>
+      {values.map((v, i) => (
+        <td
+          key={i}
+          className="px-3 py-2.5 text-center font-mono text-xs font-medium"
+          style={{ background: v.color }}
+        >
+          <span style={{ color: v.display === '—' ? '#495057' : undefined }}>{v.display}</span>
+        </td>
+      ))}
+    </tr>
+  );
+}
+
+// ── Main component ────────────────────────────────────────────────────────
+
 type AnalyticsTab = 'table' | 'radar' | 'weekly';
 
 export function Leaderboard({ entries, currentWeek, userId, confChampComplete, draftPicks, rankings }: Props) {
-  const navigate  = useNavigate();
+  const navigate = useNavigate();
   const [analyticsTab, setAnalyticsTab] = useState<AnalyticsTab>('table');
 
   const { analytics, undrafted } = useMemo(
@@ -45,7 +75,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
     points: e.total_points,
   }));
 
-  // Weekly trend data for line-style bar chart
+  // Weekly trend data
   const weeklyData = useMemo(() => {
     const weeks = Array.from({ length: currentWeek + 1 }, (_, i) => i);
     return weeks.map(w => {
@@ -57,22 +87,22 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
     }).filter(row => entries.some(e => (row[e.display_name.split(' ')[0]] ?? 0) !== 0));
   }, [entries, currentWeek]);
 
-  // Radar data: normalize each metric to 0-100 per player
+  // Radar data
   const radarData = useMemo(() => {
     if (analytics.length === 0) return [];
     const metrics = [
-      { key: 'avg_rank',     label: 'Avg Rank',    higherIsBetter: false },
-      { key: 'top25_avg',    label: 'Top 25%',     higherIsBetter: false },
-      { key: 'best_pick',    label: 'Best Pick',   higherIsBetter: true  },
-      { key: 'worst_pick',   label: 'Worst Pick',  higherIsBetter: true  },
-      { key: 'over_under',   label: 'Draft Value', higherIsBetter: false },
+      { key: 'avg_rank',    label: 'Avg Rank',    higherIsBetter: false },
+      { key: 'top25_avg',   label: 'Top 25%',     higherIsBetter: false },
+      { key: 'best_pick',   label: 'Best Pick',   higherIsBetter: true  },
+      { key: 'worst_pick',  label: 'Worst Pick',  higherIsBetter: true  },
+      { key: 'over_under',  label: 'Draft Value', higherIsBetter: false },
     ];
     return metrics.map(m => {
       const row: Record<string, any> = { metric: m.label };
       const values = analytics.map(a => {
-        if (m.key === 'best_pick')   return a.best_pick?.points ?? 0;
-        if (m.key === 'worst_pick')  return a.worst_pick?.points ?? 0;
-        if (m.key === 'over_under')  return a.over_under_pts;
+        if (m.key === 'best_pick')  return a.best_pick?.points ?? 0;
+        if (m.key === 'worst_pick') return a.worst_pick?.points ?? 0;
+        if (m.key === 'over_under') return a.over_under_pts;
         return (a as any)[m.key] ?? 0;
       });
       const min = Math.min(...values);
@@ -86,7 +116,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
     });
   }, [analytics]);
 
-  // Heat map values per row for coloring
+  // Heat map value arrays
   const avgRankValues   = analytics.map(a => a.avg_rank);
   const top25Values     = analytics.map(a => a.top25_avg);
   const mid50Values     = analytics.map(a => a.mid50_avg);
@@ -156,8 +186,14 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                 </div>
                 <div className="text-xs text-turf-500 flex items-center gap-2 mt-0.5 flex-wrap">
                   <span>{entry.roster.length} teams</span>
-                  {entry.bonus_points !== 0 && <span className="text-amber-500">{entry.bonus_points > 0 ? '+' : ''}{entry.bonus_points} bonus</span>}
-                  {statPts !== 0 && <span className={statPts > 0 ? 'text-blue-400' : 'text-red-400'}>{statPts > 0 ? '+' : ''}{statPts} stats{!confChampComplete ? ' ◎' : ''}</span>}
+                  {entry.bonus_points !== 0 && (
+                    <span className="text-amber-500">{entry.bonus_points > 0 ? '+' : ''}{entry.bonus_points} bonus</span>
+                  )}
+                  {statPts !== 0 && (
+                    <span className={statPts > 0 ? 'text-blue-400' : 'text-red-400'}>
+                      {statPts > 0 ? '+' : ''}{statPts} stats{!confChampComplete ? ' ◎' : ''}
+                    </span>
+                  )}
                   {lastWeek && lastWeek.points !== 0 && (
                     <span className="flex items-center gap-0.5">
                       <TrendingUp className="w-3 h-3" />
@@ -181,13 +217,15 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
           <div className="flex items-center justify-between px-5 py-4 border-b border-turf-800">
             <h2 className="section-title text-xl">Roster Analytics</h2>
             <div className="flex gap-1 bg-turf-800 p-1 rounded-lg">
-              {([['table', 'Table'], ['weekly', 'Weekly'], ['radar', 'Radar']] as const).map(([id, label]) => (
+              {(['table', 'weekly', 'radar'] as const).map(id => (
                 <button
                   key={id}
                   onClick={() => setAnalyticsTab(id)}
-                  className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${analyticsTab === id ? 'bg-field-500 text-turf-950' : 'text-turf-400 hover:text-white'}`}
+                  className={`px-3 py-1 rounded-md text-xs font-medium transition-all capitalize ${
+                    analyticsTab === id ? 'bg-field-500 text-turf-950' : 'text-turf-400 hover:text-white'
+                  }`}
                 >
-                  {label}
+                  {id}
                 </button>
               ))}
             </div>
@@ -209,7 +247,6 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                 </thead>
                 <tbody className="divide-y divide-turf-800/50">
 
-                  {/* Average rank */}
                   <AnalyticsRow
                     label="Avg AP Rank"
                     tooltip="Average AP ranking of all drafted teams (lower = better)"
@@ -220,7 +257,6 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                     }))}
                   />
 
-                  {/* Top 25% avg rank */}
                   <AnalyticsRow
                     label="Top 25% Rank"
                     tooltip="Average AP rank of your top-quartile teams"
@@ -231,7 +267,6 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                     }))}
                   />
 
-                  {/* Mid 50% avg rank */}
                   <AnalyticsRow
                     label="Middle 50% Rank"
                     tooltip="Average AP rank of your middle-half teams"
@@ -242,7 +277,6 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                     }))}
                   />
 
-                  {/* Bottom 25% avg rank */}
                   <AnalyticsRow
                     label="Bottom 25% Rank"
                     tooltip="Average AP rank of your bottom-quartile teams"
@@ -253,60 +287,61 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                     }))}
                   />
 
-                  {/* Separator */}
                   <tr><td colSpan={analytics.length + 1} className="py-1 bg-turf-800/30" /></tr>
 
-                  {/* Best pick */}
                   <AnalyticsRow
                     label="Best Pick"
                     tooltip="Your team with the most total season points"
                     values={analytics.map((a, i) => ({
-                      display: a.best_pick ? `${a.best_pick.team_name.split(' ').slice(-1)[0]} (${a.best_pick.points > 0 ? '+' : ''}${a.best_pick.points})` : '—',
+                      display: a.best_pick
+                        ? `${a.best_pick.team_name.split(' ').slice(-1)[0]} (${a.best_pick.points > 0 ? '+' : ''}${a.best_pick.points})`
+                        : '—',
                       color: heatColor(a.best_pick?.points ?? 0, bestPickValues, true),
                       textColor: PLAYER_COLORS[i],
                     }))}
                   />
 
-                  {/* Worst pick */}
                   <AnalyticsRow
                     label="Worst Pick"
                     tooltip="Your team with the fewest total season points"
                     values={analytics.map((a, i) => ({
-                      display: a.worst_pick ? `${a.worst_pick.team_name.split(' ').slice(-1)[0]} (${a.worst_pick.points > 0 ? '+' : ''}${a.worst_pick.points})` : '—',
+                      display: a.worst_pick
+                        ? `${a.worst_pick.team_name.split(' ').slice(-1)[0]} (${a.worst_pick.points > 0 ? '+' : ''}${a.worst_pick.points})`
+                        : '—',
                       color: heatColor(a.worst_pick?.points ?? 0, worstPickValues, true),
                       textColor: PLAYER_COLORS[i],
                     }))}
                   />
 
-                  {/* Best team by rank */}
                   <AnalyticsRow
                     label="Best Ranked Team"
                     tooltip="Your highest AP-ranked team"
                     values={analytics.map((a, i) => ({
-                      display: a.best_team ? `${a.best_team.team_name.split(' ').slice(-1)[0]} (#${a.best_team.rank})` : '—',
+                      display: a.best_team
+                        ? `${a.best_team.team_name.split(' ').slice(-1)[0]} (#${a.best_team.rank})`
+                        : '—',
                       color: 'transparent',
                       textColor: PLAYER_COLORS[i],
                     }))}
                   />
 
-                  {/* Worst team by rank */}
                   <AnalyticsRow
                     label="Worst Ranked Team"
-                    tooltip="Your lowest AP-ranked team (or unranked)"
+                    tooltip="Your lowest AP-ranked team"
                     values={analytics.map((a, i) => ({
-                      display: a.worst_team ? `${a.worst_team.team_name.split(' ').slice(-1)[0]} (#${a.worst_team.rank})` : '—',
+                      display: a.worst_team
+                        ? `${a.worst_team.team_name.split(' ').slice(-1)[0]} (#${a.worst_team.rank})`
+                        : '—',
                       color: 'transparent',
                       textColor: PLAYER_COLORS[i],
                     }))}
                   />
 
-                  {/* Separator */}
                   <tr><td colSpan={analytics.length + 1} className="py-1 bg-turf-800/30" /></tr>
 
-                  {/* Over/Under draft rank */}
                   <AnalyticsRow
                     label="Over/Under Draft Pts"
-                    tooltip="Sum of (pick number − AP rank) for your ranked teams. Negative = good value picks."
+                    tooltip="Sum of (pick number − AP rank). Negative = good value picks."
                     values={analytics.map((a, i) => ({
                       display: `${a.over_under_pts > 0 ? '+' : ''}${a.over_under_pts}`,
                       color: heatColor(a.over_under_pts, ouValues, false),
@@ -314,10 +349,9 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                     }))}
                   />
 
-                  {/* Over/Under avg */}
                   <AnalyticsRow
                     label="Over/Under Avg"
-                    tooltip="Average (pick number − AP rank) per ranked team. Negative = drafted better than their rank."
+                    tooltip="Average (pick number − AP rank) per ranked team."
                     values={analytics.map((a, i) => ({
                       display: `${a.over_under_avg > 0 ? '+' : ''}${a.over_under_avg}`,
                       color: heatColor(a.over_under_avg, ouAvgValues, false),
@@ -346,7 +380,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
             </div>
           )}
 
-          {/* ── WEEKLY POINTS VIEW ── */}
+          {/* ── WEEKLY VIEW ── */}
           {analyticsTab === 'weekly' && (
             <div className="p-5">
               <p className="text-xs text-turf-500 mb-4">Points scored per week by each player</p>
@@ -422,5 +456,3 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
     </div>
   );
 }
-
-// ── Su
