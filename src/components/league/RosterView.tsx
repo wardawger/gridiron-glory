@@ -18,6 +18,19 @@ interface Props {
 
 const WEEKS = Array.from({ length: 16 }, (_, i) => i); // weeks 0–15
 
+// Default logo when a team logo URL fails to load or is missing
+function teamLogoFallback(name: string): string {
+  const initials = name
+    .replace(/[^a-zA-Z ]/g, '')
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(w => w[0])
+    .join('')
+    .toUpperCase() || '?';
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(initials)}&background=052e16&color=4ade80&bold=true&size=80&font-size=0.45`;
+}
+
 // Format a startDate ISO string into readable date + time
 function formatGameDate(startDate: string | null | undefined): { date: string; time: string } {
   if (!startDate) return { date: 'TBD', time: 'TBD' };
@@ -62,7 +75,7 @@ function ScheduleModal({ team, gameData, captainPicks, userId, currentWeek, onCl
             src={team.team_logo}
             alt={team.team_name}
             className="h-12 w-12 object-contain"
-            onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+            onError={e => { (e.target as HTMLImageElement).src = teamLogoFallback(team.team_name); }}
           />
           <div className="flex-1 min-w-0">
             <h2 className="font-display text-xl font-bold text-white tracking-wide">{team.team_name}</h2>
@@ -114,21 +127,12 @@ function ScheduleModal({ team, gameData, captainPicks, userId, currentWeek, onCl
 
                 {/* Opponent logo */}
                 <div className="flex-shrink-0 flex items-center justify-center w-10 h-10 mt-0.5">
-                  {oppLogo ? (
-                    <img
-                      src={oppLogo}
-                      alt={game.opponent}
-                      className="w-10 h-10 object-contain"
-                      onError={e => {
-                        const el = e.target as HTMLImageElement;
-                        el.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(game.opponent)}&background=1a2e1a&color=4ade80&size=40`;
-                      }}
-                    />
-                  ) : (
-                    <div className="w-10 h-10 rounded-full bg-turf-800 flex items-center justify-center text-turf-500 text-xs font-bold">
-                      {game.opponent.slice(0, 2).toUpperCase()}
-                    </div>
-                  )}
+                  <img
+                    src={oppLogo ?? teamLogoFallback(game.opponent)}
+                    alt={game.opponent}
+                    className="w-10 h-10 object-contain"
+                    onError={e => { (e.target as HTMLImageElement).src = teamLogoFallback(game.opponent); }}
+                  />
                 </div>
 
                 {/* Main game info */}
@@ -318,18 +322,20 @@ export function RosterView({
                 return (
                   <div
                     key={entry.team_id}
-                    className={`card p-4 transition-all ${isCaptain ? 'border-gold-500/50 bg-amber-950/20' : ''}`}
+                    className={`card p-4 transition-all cursor-pointer hover:border-turf-600 ${isCaptain ? 'border-gold-500/50 bg-amber-950/20' : ''}`}
+                    onClick={() => setModalTeam(entry)}
+                    title="View full schedule"
                   >
                     <div className="flex items-start gap-3">
                       <img
                         src={entry.team_logo}
                         alt={entry.team_name}
                         className="w-10 h-10 object-contain rounded flex-shrink-0"
-                        onError={e => { (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(entry.team_name)}&background=166534&color=fff`; }}
+                        onError={e => { (e.target as HTMLImageElement).src = teamLogoFallback(entry.team_name); }}
                       />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="font-medium text-white truncate">{entry.team_name}</span>
+                          <span className="font-medium text-white truncate group-hover:text-field-300">{entry.team_name}</span>
                           {isCaptain && (
                             <span className="badge-gold text-xs">
                               <Star className="w-2.5 h-2.5 fill-current" /> Captain
@@ -348,14 +354,12 @@ export function RosterView({
                     {game ? (
                       <div className="mt-3 flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2 min-w-0">
-                          {oppLogo && (
-                            <img
-                              src={oppLogo}
-                              alt={game.opponent}
-                              className="w-6 h-6 object-contain flex-shrink-0"
-                              onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                            />
-                          )}
+                          <img
+                            src={oppLogo ?? teamLogoFallback(game.opponent)}
+                            alt={game.opponent}
+                            className="w-6 h-6 object-contain flex-shrink-0"
+                            onError={e => { (e.target as HTMLImageElement).src = teamLogoFallback(game.opponent); }}
+                          />
                           <div className="text-xs text-turf-400 truncate">
                             {game.result ? (
                               <span className="flex items-center gap-1">
@@ -388,7 +392,7 @@ export function RosterView({
 
                     {isOwner && onSetCaptain && (
                       <button
-                        onClick={() => onSetCaptain(currentWeek, entry.team_id)}
+                        onClick={e => { e.stopPropagation(); onSetCaptain(currentWeek, entry.team_id); }}
                         disabled={!canBeCaptain && !isCaptain}
                         className={`mt-3 w-full text-xs py-1.5 rounded-md transition-all border ${
                           isCaptain
@@ -497,27 +501,13 @@ export function RosterView({
                               {game ? (
                                 <div className="space-y-1 flex flex-col items-center">
                                   {/* Opponent logo */}
-                                  {oppLogo ? (
-                                    <img
-                                      src={oppLogo}
-                                      alt={game.opponent}
-                                      className="w-7 h-7 object-contain"
-                                      title={`${isHome ? 'vs' : 'at'} ${game.opponent}${game.opponent_rank ? ` (#${game.opponent_rank})` : ''}`}
-                                      onError={e => {
-                                        const el = e.target as HTMLImageElement;
-                                        el.style.display = 'none';
-                                        el.nextElementSibling?.classList.remove('hidden');
-                                      }}
-                                    />
-                                  ) : null}
-
-                                  {/* Fallback: short name */}
-                                  <span
-                                    className={`${oppLogo ? 'hidden' : ''} text-turf-400 truncate text-xs max-w-[4rem] block`}
-                                    title={`${isHome ? 'vs' : 'at'} ${game.opponent}`}
-                                  >
-                                    {game.opponent.split(' ').slice(-1)[0]}
-                                  </span>
+                                  <img
+                                    src={oppLogo ?? teamLogoFallback(game.opponent)}
+                                    alt={game.opponent}
+                                    className="w-7 h-7 object-contain"
+                                    title={`${isHome ? 'vs' : 'at'} ${game.opponent}${game.opponent_rank ? ` (#${game.opponent_rank})` : ''}`}
+                                    onError={e => { (e.target as HTMLImageElement).src = teamLogoFallback(game.opponent); }}
+                                  />
 
                                   {/* Home/Away indicator + rank */}
                                   <span className="text-turf-600 text-xs leading-none">
@@ -581,4 +571,3 @@ export function RosterView({
     </>
   );
 }
-
