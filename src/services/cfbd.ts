@@ -1,12 +1,21 @@
 import type { CfbTeam, GameData, GameResult, APRanking, TeamSeasonStats } from '../types';
 
-const BASE = 'https://api.collegefootballdata.com';
-const KEY  = import.meta.env.VITE_CFBD_KEY as string;
+// All CFBD API calls are routed through a Netlify serverless proxy to avoid
+// CORS issues when fetching from the browser. The proxy adds the API key
+// server-side (stored as CFBD_KEY in Netlify env vars — NOT in the bundle).
+const PROXY = '/.netlify/functions/cfbd-proxy';
 
-const headers = {
-  Authorization: `Bearer ${KEY}`,
-  'Content-Type': 'application/json',
-};
+// Build a proxied URL: instead of calling CFBD directly, we call our function
+// which forwards the request with the API key attached server-side.
+function proxyUrl(path: string, params: Record<string, string | number> = {}): string {
+  const qs = new URLSearchParams({ path, ...Object.fromEntries(Object.entries(params).map(([k,v]) => [k, String(v)])) });
+  return `${PROXY}?${qs.toString()}`;
+}
+
+// Drop-in replacement for fetch({BASE}{path}?{params}, { headers })
+async function cfbdFetch(path: string, params: Record<string, string | number> = {}): Promise<Response> {
+  return fetch(proxyUrl(path, params));
+}
 
 const P4_CONFERENCES = new Set(['SEC', 'Big Ten', 'Big 12', 'ACC', 'FBS Independents', 'Pac-12']);
 
@@ -29,10 +38,17 @@ function getCurrentSeasonYear(): number {
 // For non-game endpoints (rankings, records, stats): fall back to prior year
 // if the current year returns nothing — those endpoints are empty pre-season.
 async function fetchWithFallback(path: string, year: number): Promise<any[]> {
-  const res = await fetch(`${BASE}${path}?year=${year}`, { headers });
+  const res = await cfbdFetch(path, { year });
+  if (!res.ok) {
+    const res2 = await cfbdFetch(path, { year: year - 1 });
+    if (!res2.ok) return [];
+    const data2 = await res2.json();
+    return Array.isArray(data2) ? data2 : [];
+  }
   const data = await res.json();
   if (!Array.isArray(data) || data.length === 0) {
-    const res2 = await fetch(`${BASE}${path}?year=${year - 1}`, { headers });
+    const res2 = await cfbdFetch(path, { year: year - 1 });
+    if (!res2.ok) return [];
     const data2 = await res2.json();
     return Array.isArray(data2) ? data2 : [];
   }
@@ -43,29 +59,26 @@ async function fetchWithFallback(path: string, year: number): Promise<any[]> {
 // truly empty (not just unplayed). The 2026 schedule exists pre-season with
 // no scores — that is valid data, not an empty response.
 async function fetchGames(year: number, seasonType = 'regular'): Promise<any[]> {
-  const url = `${BASE}/games?year=${year}&seasonType=${seasonType}`;
-  console.log('[CFBD] fetchGames ->', url);
-  const res = await fetch(url, { headers });
-  console.log('[CFBD] fetchGames status:', res.status, res.statusText);
+  console.log('[CFBD] fetchGames year=', year, 'seasonType=', seasonType);
+  const res = await cfbdFetch('/games', { year, seasonType });
+  console.log('[CFBD] fetchGames status:', res.status);
   if (!res.ok) {
     const errText = await res.text();
-    console.error('[CFBD] fetchGames error body:', errText);
+    console.error('[CFBD] fetchGames error:', errText);
     return [];
   }
   const data = await res.json();
-  console.log('[CFBD] fetchGames result: isArray=', Array.isArray(data), '| length=', Array.isArray(data) ? data.length : 'N/A', '| type=', typeof data);
+  console.log('[CFBD] fetchGames got', Array.isArray(data) ? data.length : typeof data, 'games');
   if (Array.isArray(data) && data.length > 0) {
     console.log('[CFBD] fetchGames sample keys:', Object.keys(data[0]));
-    console.log('[CFBD] fetchGames sample game:', JSON.stringify(data[0]).slice(0, 400));
     return data;
   }
   // Fall back to prior year only if truly empty
-  console.warn('[CFBD] fetchGames: empty for year', year, '- falling back to', year - 1);
-  const url2 = `${BASE}/games?year=${year - 1}&seasonType=${seasonType}`;
-  const res2 = await fetch(url2, { headers });
+  console.warn('[CFBD] fetchGames empty for', year, '- trying', year - 1);
+  const res2 = await cfbdFetch('/games', { year: year - 1, seasonType });
   if (!res2.ok) return [];
   const data2 = await res2.json();
-  console.log('[CFBD] fetchGames fallback result: length=', Array.isArray(data2) ? data2.length : 'N/A');
+  console.log('[CFBD] fetchGames fallback got', Array.isArray(data2) ? data2.length : typeof data2);
   return Array.isArray(data2) ? data2 : [];
 }
 
@@ -93,10 +106,10 @@ export async function fetchSeasonData(teams: CfbTeam[]): Promise<GameData> {
 
   let rankHistory: any[] = [];
   try {
-    const rRes = await fetch(`${BASE}/rankings?year=${year}&seasonType=regular`, { headers });
+    const rRes = await cfbdFetch('/rankings', { year, seasonType: 'regular' });
     rankHistory = rRes.ok ? await rRes.json() : [];
     if (!Array.isArray(rankHistory) || !rankHistory.length) {
-      const rRes2 = await fetch(`${BASE}/rankings?year=${year - 1}&seasonType=regular`, { headers });
+      const rRes2 = await cfbdFetch('/rankings', { year: year - 1, seasonType: 'regular' });
       rankHistory = rRes2.ok ? await rRes2.json() : [];
     }
   } catch { /* rankings optional */ }
@@ -195,10 +208,10 @@ export async function fetchRankings(teams: CfbTeam[]): Promise<APRanking[]> {
   const year = getCurrentSeasonYear();
   let data: any[] = [];
   try {
-    const res = await fetch(`${BASE}/rankings?year=${year}&seasonType=regular`, { headers });
+    const res = await cfbdFetch('/rankings', { year, seasonType: 'regular' });
     data = res.ok ? await res.json() : [];
     if (!Array.isArray(data) || !data.length) {
-      const res2 = await fetch(`${BASE}/rankings?year=${year - 1}&seasonType=regular`, { headers });
+      const res2 = await cfbdFetch('/rankings', { year: year - 1, seasonType: 'regular' });
       data = res2.ok ? await res2.json() : [];
     }
   } catch { return []; }
@@ -240,10 +253,10 @@ export async function fetchTeamRecords(): Promise<Map<string, { wins: number; lo
   const year = getCurrentSeasonYear();
   const map = new Map<string, { wins: number; losses: number }>();
   try {
-    let res = await fetch(`${BASE}/records?year=${year}`, { headers });
+    let res = await cfbdFetch('/records', { year });
     let data = await res.json();
     if (!Array.isArray(data) || !data.length) {
-      res = await fetch(`${BASE}/records?year=${year - 1}`, { headers });
+      res = await cfbdFetch('/records', { year: year - 1 });
       data = await res.json();
     }
     data?.forEach((r: any) => {
@@ -269,9 +282,9 @@ export async function fetchSeasonStats(teams: CfbTeam[]): Promise<Map<string, Te
 
   try {
     const [passingRes, rushingRes, defensiveRes] = await Promise.all([
-      fetch(`${BASE}/stats/season?year=${year}&statType=passing`, { headers }).then(r => r.ok ? r.json() : []),
-      fetch(`${BASE}/stats/season?year=${year}&statType=rushing`, { headers }).then(r => r.ok ? r.json() : []),
-      fetch(`${BASE}/stats/season?year=${year}&statType=defensive`, { headers }).then(r => r.ok ? r.json() : []),
+      cfbdFetch('/stats/season', { year, statType: 'passing' }).then(r => r.ok ? r.json() : []),
+      cfbdFetch('/stats/season', { year, statType: 'rushing' }).then(r => r.ok ? r.json() : []),
+      cfbdFetch('/stats/season', { year, statType: 'defensive' }).then(r => r.ok ? r.json() : []),
     ]);
 
     const qbrMap   = new Map<string, number>();
