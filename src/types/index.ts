@@ -248,12 +248,19 @@ export interface CfbTeam {
 export interface GameResult {
   week: number;
   opponent: string;
+  opponent_id: string;
   opponent_rank: number | null;
+  opponent_logo: string | null;
   result: 'W' | 'L' | null;
   is_g5_opponent: boolean;
   home_score: number | null;
   away_score: number | null;
   completed: boolean;
+  // Schedule detail fields
+  start_date: string | null;
+  is_home: boolean;
+  venue: string | null;
+  tv: string | null;
 }
 
 export type GameData = Record<string, Record<number, GameResult>>;
