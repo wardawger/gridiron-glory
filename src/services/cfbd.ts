@@ -111,13 +111,51 @@ export async function fetchSeasonData(teams: CfbTeam[]): Promise<GameData> {
     return entry?.rank ?? null;
   };
 
-  // Fetch regular season and postseason games for the current year
-  const [regGames, postGames] = await Promise.all([
+  // Build a name→logo map from the FBS teams list for opponent logo lookup
+  const teamNameToLogo = new Map(teams.map(t => [t.name, t.logo]));
+
+  // Fetch games, media (TV), and venues in parallel
+  const [regGames, postGames, mediaRaw, venuesRaw] = await Promise.all([
     fetchGames(year, 'regular'),
     fetchGames(year, 'postseason'),
+    cfbdFetch('/games/media', { year, seasonType: 'regular' })
+      .then(r => r.ok ? r.json() : []).catch(() => []),
+    cfbdFetch('/venues', {})
+      .then(r => r.ok ? r.json() : []).catch(() => []),
   ]);
 
+  // Build gameId → TV outlet map
+  const mediaMap = new Map<string, string>();
+  if (Array.isArray(mediaRaw)) {
+    for (const m of mediaRaw) {
+      const id = String(m.id ?? m.gameId ?? '');
+      const outlet = m.outlet ?? m.network ?? m.mediaType ?? null;
+      if (id && outlet) mediaMap.set(id, outlet);
+    }
+  }
+
+  // Build gameId → venue string map using venueId on the game
+  const venueById = new Map<string, any>();
+  if (Array.isArray(venuesRaw)) {
+    for (const v of venuesRaw) {
+      if (v.id) venueById.set(String(v.id), v);
+    }
+  }
+
   const allGames = [...regGames, ...postGames];
+
+  // Build gameId → venue string after we have games
+  const venueMap = new Map<string, string>();
+  for (const g of allGames) {
+    const gameId = String(g.id ?? g.gameId ?? '');
+    const venueId = String(g.venueId ?? g.venue_id ?? '');
+    if (!gameId) continue;
+    const v = venueById.get(venueId);
+    if (v) {
+      const parts = [v.name, v.city, v.state].filter(Boolean);
+      venueMap.set(gameId, parts.join(', '));
+    }
+  }
 
   for (const g of allGames) {
     // CFBD API returns camelCase (homeId, awayId) in some contexts and
@@ -153,32 +191,52 @@ export async function fetchSeasonData(teams: CfbTeam[]): Promise<GameData> {
     const completed = g.completed || (homePoints != null && awayPoints != null);
 
     if (home) {
-      const oppRank  = getRankAtWeek(awayTeam, week);
-      const isG5Opp  = away ? away.is_g5 : !P4_CONFERENCES.has(awayConference);
+      const oppRank    = getRankAtWeek(awayTeam, week);
+      const isG5Opp    = away ? away.is_g5 : !P4_CONFERENCES.has(awayConference);
+      const oppLogo    = away?.logo ?? teamNameToLogo.get(awayTeam) ?? null;
+      const oppId      = awayId;
+      const venue      = venueMap.get(g.id ?? g.gameId ?? '') ?? null;
+      const tv         = mediaMap.get(g.id ?? g.gameId ?? '') ?? null;
       gameData[home.id][week] = {
         week,
-        opponent:      awayTeam,
-        opponent_rank: oppRank,
-        result:        completed ? (homePoints > awayPoints ? 'W' : 'L') : null,
-        is_g5_opponent: isG5Opp,
-        home_score:    homePoints,
-        away_score:    awayPoints,
+        opponent:        awayTeam,
+        opponent_id:     oppId,
+        opponent_logo:   oppLogo,
+        opponent_rank:   oppRank,
+        result:          completed ? (homePoints > awayPoints ? 'W' : 'L') : null,
+        is_g5_opponent:  isG5Opp,
+        home_score:      homePoints,
+        away_score:      awayPoints,
         completed,
+        start_date:      startDate,
+        is_home:         true,
+        venue,
+        tv,
       };
     }
 
     if (away) {
-      const oppRank  = getRankAtWeek(homeTeam, week);
-      const isG5Opp  = home ? home.is_g5 : !P4_CONFERENCES.has(homeConference);
+      const oppRank    = getRankAtWeek(homeTeam, week);
+      const isG5Opp    = home ? home.is_g5 : !P4_CONFERENCES.has(homeConference);
+      const oppLogo    = home?.logo ?? teamNameToLogo.get(homeTeam) ?? null;
+      const oppId      = homeId;
+      const venue      = venueMap.get(g.id ?? g.gameId ?? '') ?? null;
+      const tv         = mediaMap.get(g.id ?? g.gameId ?? '') ?? null;
       gameData[away.id][week] = {
         week,
-        opponent:      homeTeam,
-        opponent_rank: oppRank,
-        result:        completed ? (awayPoints > homePoints ? 'W' : 'L') : null,
-        is_g5_opponent: isG5Opp,
-        home_score:    homePoints,
-        away_score:    awayPoints,
+        opponent:        homeTeam,
+        opponent_id:     oppId,
+        opponent_logo:   oppLogo,
+        opponent_rank:   oppRank,
+        result:          completed ? (awayPoints > homePoints ? 'W' : 'L') : null,
+        is_g5_opponent:  isG5Opp,
+        home_score:      homePoints,
+        away_score:      awayPoints,
         completed,
+        start_date:      startDate,
+        is_home:         false,
+        venue,
+        tv,
       };
     }
   }
