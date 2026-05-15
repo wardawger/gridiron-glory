@@ -43,14 +43,29 @@ async function fetchWithFallback(path: string, year: number): Promise<any[]> {
 // truly empty (not just unplayed). The 2026 schedule exists pre-season with
 // no scores — that is valid data, not an empty response.
 async function fetchGames(year: number, seasonType = 'regular'): Promise<any[]> {
-  const res = await fetch(`${BASE}/games?year=${year}&seasonType=${seasonType}`, { headers });
-  if (!res.ok) return [];
+  const url = `${BASE}/games?year=${year}&seasonType=${seasonType}`;
+  console.log('[CFBD] fetchGames ->', url);
+  const res = await fetch(url, { headers });
+  console.log('[CFBD] fetchGames status:', res.status, res.statusText);
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error('[CFBD] fetchGames error body:', errText);
+    return [];
+  }
   const data = await res.json();
-  if (Array.isArray(data) && data.length > 0) return data;
-  // Only fall back if truly nothing returned
-  const res2 = await fetch(`${BASE}/games?year=${year - 1}&seasonType=${seasonType}`, { headers });
+  console.log('[CFBD] fetchGames result: isArray=', Array.isArray(data), '| length=', Array.isArray(data) ? data.length : 'N/A', '| type=', typeof data);
+  if (Array.isArray(data) && data.length > 0) {
+    console.log('[CFBD] fetchGames sample keys:', Object.keys(data[0]));
+    console.log('[CFBD] fetchGames sample game:', JSON.stringify(data[0]).slice(0, 400));
+    return data;
+  }
+  // Fall back to prior year only if truly empty
+  console.warn('[CFBD] fetchGames: empty for year', year, '- falling back to', year - 1);
+  const url2 = `${BASE}/games?year=${year - 1}&seasonType=${seasonType}`;
+  const res2 = await fetch(url2, { headers });
   if (!res2.ok) return [];
   const data2 = await res2.json();
+  console.log('[CFBD] fetchGames fallback result: length=', Array.isArray(data2) ? data2.length : 'N/A');
   return Array.isArray(data2) ? data2 : [];
 }
 
@@ -102,7 +117,11 @@ export async function fetchSeasonData(teams: CfbTeam[]): Promise<GameData> {
     fetchGames(year, 'postseason'),
   ]);
 
-  for (const g of [...regGames, ...postGames]) {
+  const allGames = [...regGames, ...postGames];
+  console.log('[CFBD] fetchSeasonData: year=', year, '| regGames=', regGames.length, '| postGames=', postGames.length, '| total=', allGames.length);
+  console.log('[CFBD] fetchSeasonData: teamMap size=', teamMap.size, '| sample teamMap keys=', [...teamMap.keys()].slice(0, 5));
+
+  for (const g of allGames) {
     // CFBD API returns camelCase (homeId, awayId) in some contexts and
     // snake_case (home_id, away_id) in others — handle both defensively.
     const rawHomeId = g.home_id ?? g.homeId;
@@ -114,6 +133,9 @@ export async function fetchSeasonData(teams: CfbTeam[]): Promise<GameData> {
 
     const home = teamMap.get(homeId);
     const away = teamMap.get(awayId);
+    if (home || away) {
+      console.log('[CFBD] MATCH found: homeId=', homeId, 'awayId=', awayId, 'home=', home?.name, 'away=', away?.name);
+    }
     if (!home && !away) continue;   // neither team was drafted, skip
 
     // Normalize field names — API returns both camelCase and snake_case
