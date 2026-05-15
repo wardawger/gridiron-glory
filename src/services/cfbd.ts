@@ -103,51 +103,64 @@ export async function fetchSeasonData(teams: CfbTeam[]): Promise<GameData> {
   ]);
 
   for (const g of [...regGames, ...postGames]) {
-    // CFBD uses home_id/away_id (snake_case) in the /games endpoint
-    const homeId = String(g.home_id ?? g.homeId ?? '');
-    const awayId = String(g.away_id ?? g.awayId ?? '');
-    if (!homeId || !awayId) continue;
+    // CFBD API returns camelCase (homeId, awayId) in some contexts and
+    // snake_case (home_id, away_id) in others — handle both defensively.
+    const rawHomeId = g.home_id ?? g.homeId;
+    const rawAwayId = g.away_id ?? g.awayId;
+    if (rawHomeId == null || rawAwayId == null) continue;
+    const homeId = String(rawHomeId);
+    const awayId = String(rawAwayId);
+    if (!homeId || !awayId || homeId === 'undefined' || awayId === 'undefined') continue;
 
     const home = teamMap.get(homeId);
     const away = teamMap.get(awayId);
     if (!home && !away) continue;   // neither team was drafted, skip
 
+    // Normalize field names — API returns both camelCase and snake_case
+    const homeTeam       = g.home_team       ?? g.homeTeam       ?? '';
+    const awayTeam       = g.away_team       ?? g.awayTeam       ?? '';
+    const homeConference = g.home_conference ?? g.homeConference ?? '';
+    const awayConference = g.away_conference ?? g.awayConference ?? '';
+    const homePoints     = g.home_points     ?? g.homePoints     ?? null;
+    const awayPoints     = g.away_points     ?? g.awayPoints     ?? null;
+    const startDate      = g.start_date      ?? g.startDate      ?? '';
+
     // Week 0 detection: CFBD returns week=1 for "Week Zero" games played
     // in late August. Reclassify if game date is before Aug 28.
     let week = g.week ?? 0;
-    if (week === 1) {
-      const d = new Date(g.start_date);
+    if (week === 1 && startDate) {
+      const d = new Date(startDate);
       if (d.getMonth() === 7 && d.getDate() < 28) week = 0;
     }
 
-    const completed = g.completed || (g.home_points != null && g.away_points != null);
+    const completed = g.completed || (homePoints != null && awayPoints != null);
 
     if (home) {
-      const oppRank  = getRankAtWeek(g.away_team, week);
-      const isG5Opp  = away ? away.is_g5 : !P4_CONFERENCES.has(g.away_conference ?? '');
+      const oppRank  = getRankAtWeek(awayTeam, week);
+      const isG5Opp  = away ? away.is_g5 : !P4_CONFERENCES.has(awayConference);
       gameData[home.id][week] = {
         week,
-        opponent:      g.away_team,
+        opponent:      awayTeam,
         opponent_rank: oppRank,
-        result:        completed ? (g.home_points > g.away_points ? 'W' : 'L') : null,
+        result:        completed ? (homePoints > awayPoints ? 'W' : 'L') : null,
         is_g5_opponent: isG5Opp,
-        home_score:    g.home_points ?? null,
-        away_score:    g.away_points ?? null,
+        home_score:    homePoints,
+        away_score:    awayPoints,
         completed,
       };
     }
 
     if (away) {
-      const oppRank  = getRankAtWeek(g.home_team, week);
-      const isG5Opp  = home ? home.is_g5 : !P4_CONFERENCES.has(g.home_conference ?? '');
+      const oppRank  = getRankAtWeek(homeTeam, week);
+      const isG5Opp  = home ? home.is_g5 : !P4_CONFERENCES.has(homeConference);
       gameData[away.id][week] = {
         week,
-        opponent:      g.home_team,
+        opponent:      homeTeam,
         opponent_rank: oppRank,
-        result:        completed ? (g.away_points > g.home_points ? 'W' : 'L') : null,
+        result:        completed ? (awayPoints > homePoints ? 'W' : 'L') : null,
         is_g5_opponent: isG5Opp,
-        home_score:    g.home_points ?? null,
-        away_score:    g.away_points ?? null,
+        home_score:    homePoints,
+        away_score:    awayPoints,
         completed,
       };
     }
