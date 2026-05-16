@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Leaderboard } from '../components/league/Leaderboard';
-import type { League, LeagueMember, CaptainPick, GameData, ManualBonus, DraftPick, TeamSeasonStats, APRanking } from '../types';
+import type { League, LeagueMember, CaptainPick, GameData, ManualBonus, DraftPick, TeamSeasonStats, APRanking, SpreadPick } from '../types';
 import { buildLeaderboard } from '../services/scoring';
 
 interface Props {
@@ -10,6 +10,7 @@ interface Props {
   draftPicks: DraftPick[];
   captainPicks: CaptainPick[];
   manualBonuses: ManualBonus[];
+  spreadPicks: SpreadPick[];
   gameData: GameData;
   seasonStats: Map<string, TeamSeasonStats>;
   rankings: APRanking[];
@@ -18,7 +19,7 @@ interface Props {
 }
 
 export function HomePage({
-  league, members, draftPicks, captainPicks, manualBonuses,
+  league, members, draftPicks, captainPicks, manualBonuses, spreadPicks,
   gameData, seasonStats, rankings, userId, cfbLoading,
 }: Props) {
   const rosters = useMemo(() => {
@@ -38,9 +39,9 @@ export function HomePage({
   const leaderboard = useMemo(
     () => buildLeaderboard(
       members, rosters, captainPicks, gameData,
-      league.scoring, manualBonuses, seasonStats, confChampComplete
+      league.scoring, manualBonuses, seasonStats, confChampComplete, spreadPicks
     ),
-    [members, rosters, captainPicks, gameData, league.scoring, manualBonuses, seasonStats, confChampComplete]
+    [members, rosters, captainPicks, gameData, league.scoring, manualBonuses, seasonStats, confChampComplete, spreadPicks]
   );
 
   return (
@@ -56,6 +57,14 @@ export function HomePage({
           <span className="text-amber-400">📊</span>
           <span className="text-amber-300">
             Statistical ranking bonuses are shown as a live preview (◎). Points lock in after conference championship week.
+          </span>
+        </div>
+      )}
+      {league.scoring.spread_enabled && (
+        <div className="card p-4 flex items-center gap-3 text-sm border-blue-800/40 bg-blue-950/20">
+          <span className="text-blue-400">📊</span>
+          <span className="text-blue-300">
+            Spread betting is active this season. Visit My Roster to make your weekly spread picks.
           </span>
         </div>
       )}
