@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Shield, UserPlus, Copy, Check, Trash2, Plus, Mail, Settings, Gift, RotateCcw, AlertTriangle } from 'lucide-react';
 import type {
-  League, LeagueMember, ManualBonus,
+  League, LeagueMember, ManualBonus, DraftPick,
   BonusType, ScoringSettings,
 } from '../../types';
 import { BONUS_LABELS, BONUS_DEFAULT_POINTS } from '../../types';
@@ -9,6 +9,7 @@ import { BONUS_LABELS, BONUS_DEFAULT_POINTS } from '../../types';
 interface Props {
   league: League;
   members: LeagueMember[];
+  draftPicks: DraftPick[];
   manualBonuses: ManualBonus[];
   isCommissioner: boolean;
   onSendInvite: (email: string) => Promise<{ token?: string; error?: string }>;
@@ -23,7 +24,7 @@ interface Props {
 type Tab = 'members' | 'scoring' | 'bonuses';
 
 export function AdminPanel({
-  league, members, manualBonuses, isCommissioner,
+  league, members, draftPicks, manualBonuses, isCommissioner,
   onSendInvite, onUpdateWeek, onUpdateScoring, onAddBonus, onRemoveBonus, onResetDraft,
 }: Props) {
   const [tab, setTab]           = useState<Tab>('members');
@@ -40,6 +41,28 @@ export function AdminPanel({
   const [bonusTeamName, setBonusTeamName] = useState('');
   const [bonusPoints, setBonusPoints]     = useState<number>(5);
   const [bonusNote, setBonusNote]         = useState('');
+
+  // Teams drafted by the currently selected user
+  const userTeams = useMemo(() => {
+    if (!bonusUserId) return [];
+    return draftPicks
+      .filter(p => p.user_id === bonusUserId)
+      .sort((a, b) => a.team_name.localeCompare(b.team_name));
+  }, [draftPicks, bonusUserId]);
+
+  // When user changes, reset team selection
+  const handleUserChange = (uid: string) => {
+    setBonusUser(uid);
+    setBonusTeamId('');
+    setBonusTeamName('');
+  };
+
+  // When team selection changes, populate both id and name
+  const handleTeamChange = (teamId: string) => {
+    const pick = draftPicks.find(p => p.team_id === teamId && p.user_id === bonusUserId);
+    setBonusTeamId(teamId);
+    setBonusTeamName(pick?.team_name ?? '');
+  };
 
   if (!isCommissioner) {
     return (
@@ -273,13 +296,17 @@ export function AdminPanel({
           <div className="card p-5 space-y-4">
             <p className="text-sm text-turf-400">Award postseason bonuses manually (bowls, CFP, Heisman, etc.).</p>
             <div className="grid grid-cols-2 gap-4">
+
+              {/* Player selector */}
               <div>
                 <label className="label">Player</label>
-                <select className="input" value={bonusUserId} onChange={e => setBonusUser(e.target.value)}>
+                <select className="input" value={bonusUserId} onChange={e => handleUserChange(e.target.value)}>
                   <option value="">Select player…</option>
                   {members.map(m => <option key={m.user_id} value={m.user_id}>{m.display_name}</option>)}
                 </select>
               </div>
+
+              {/* Bonus type */}
               <div>
                 <label className="label">Bonus Type</label>
                 <select
@@ -296,31 +323,57 @@ export function AdminPanel({
                   ))}
                 </select>
               </div>
+
+              {/* Team — populated from that user's draft picks */}
               <div>
-                <label className="label">Team Name</label>
-                <input className="input" placeholder="e.g. Georgia" value={bonusTeamName}
-                  onChange={e => setBonusTeamName(e.target.value)} />
+                <label className="label">Team</label>
+                {bonusUserId ? (
+                  userTeams.length > 0 ? (
+                    <select
+                      className="input"
+                      value={bonusTeamId}
+                      onChange={e => handleTeamChange(e.target.value)}
+                    >
+                      <option value="">Select team…</option>
+                      {userTeams.map(p => (
+                        <option key={p.team_id} value={p.team_id}>
+                          {p.team_name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div className="input text-turf-600 cursor-default">No teams drafted yet</div>
+                  )
+                ) : (
+                  <div className="input text-turf-600 cursor-default">Select a player first</div>
+                )}
               </div>
+
+              {/* Points */}
               <div>
                 <label className="label">Points</label>
                 <input className="input font-mono" type="number" value={bonusPoints}
                   onChange={e => setBonusPoints(parseInt(e.target.value) || 0)} />
               </div>
+
+              {/* Note */}
               <div className="col-span-2">
                 <label className="label">Note (optional)</label>
                 <input className="input" placeholder="e.g. SEC Championship win" value={bonusNote}
                   onChange={e => setBonusNote(e.target.value)} />
               </div>
             </div>
+
             <button
               onClick={handleAddBonus}
-              disabled={!bonusUserId || !bonusTeamName}
+              disabled={!bonusUserId || !bonusTeamId}
               className="btn-gold"
             >
               <Plus className="w-4 h-4" /> Award Bonus
             </button>
           </div>
 
+          {/* Awarded bonuses list */}
           {manualBonuses.length > 0 && (
             <div className="card divide-y divide-turf-800">
               {manualBonuses.map(b => {
