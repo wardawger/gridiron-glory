@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
-import { Shield, TrendingUp, TrendingDown, Minus, Star, Calendar, List, X, MapPin, Tv, Clock, Zap, Dices } from 'lucide-react';
+import { Shield, TrendingUp, TrendingDown, Minus, Star, Calendar, List, X, MapPin, Tv, Clock, Zap, Coins } from 'lucide-react';
 import type { RosterEntry, CaptainPick, GameData, ScoringSettings, LeagueMember, WeeklyScore, GameResult, SpreadPick, SpreadData } from '../../types';
 import { calcWeeklyScore, scoreGame, didCoverSpread } from '../../services/scoring';
 import { Tooltip } from '../ui/Tooltip';
@@ -674,7 +674,7 @@ export function RosterView({
                           {/* Line display */}
                           <div className="flex items-center justify-between text-xs">
                             <span className="text-turf-500 flex items-center gap-1">
-                              <Dices className="w-3 h-3" /> <span>Spread</span>
+                              <Coins className="w-3 h-3" /> <span>Spread</span>
                             </span>
                             {spreadsLoading && !weekSpread ? (
                               <span className="text-turf-600 italic">Loading line…</span>
@@ -706,7 +706,7 @@ export function RosterView({
                                 onClick={() => onRemoveSpread(currentWeek, entry.team_id)}
                                 className="mt-0.5 w-full text-xs py-1.5 rounded-md transition-all border bg-blue-900/20 border-blue-700 text-blue-300 hover:bg-red-900/20 hover:border-red-700 hover:text-red-300 flex items-center justify-center gap-1.5"
                               >
-                                <Dices className="w-3 h-3" />
+                                <Coins className="w-3 h-3" />
                                 Spread Locked {formatSpread(existingPick.locked_spread)} — Remove
                               </button>
                             ) : (
@@ -716,7 +716,7 @@ export function RosterView({
                                 spreadResult === 'missed'  ? 'bg-red-900/20 border-red-800 text-red-300' :
                                 'bg-blue-900/20 border-blue-700 text-blue-300'
                               }`}>
-                                <Dices className="w-3 h-3" />
+                                <Coins className="w-3 h-3" />
                                 {spreadResult === 'covered' ? `✓ Covered ${formatSpread(existingPick.locked_spread)}` :
                                  spreadResult === 'missed'  ? `✗ Missed ${formatSpread(existingPick.locked_spread)}` :
                                  `Spread Locked ${formatSpread(existingPick.locked_spread)}`}
@@ -736,7 +736,7 @@ export function RosterView({
                                   : 'border-turf-800 text-turf-700 cursor-not-allowed'
                               }`}
                             >
-                              <Dices className="w-3 h-3" />
+                              <Coins className="w-3 h-3" />
                               {kickedOff    ? 'Game in progress' :
                                stackBlocked ? 'Captain stack disabled' :
                                atTeamLimit  ? `Team limit (${scoring.spread_max_per_team}/season)` :
@@ -758,7 +758,7 @@ export function RosterView({
         {view === 'schedule' && scoring.spread_enabled && (
           <div className="flex items-center justify-between px-1">
             <p className="text-xs text-turf-500 flex items-center gap-1.5">
-              <Dices className="w-3.5 h-3.5 flex-shrink-0" />
+              <Coins className="w-3.5 h-3.5 flex-shrink-0" />
               Spread picks available — click opponent logo to view scoring, use team row to pick spreads
             </p>
             <button
@@ -968,12 +968,12 @@ export function RosterView({
                                             className="hover:text-red-400 transition-colors border border-current/20 hover:border-red-800 rounded px-0.5 flex items-center gap-0.5"
                                             title="Remove spread pick"
                                           >
-                                            <Dices className="w-2.5 h-2.5" />{formatSpread(sp.locked_spread)}
+                                            <Coins className="w-2.5 h-2.5" />{formatSpread(sp.locked_spread)}
                                             {sp.result === 'covered' ? '✓' : sp.result === 'missed' ? '✗' : ' ✕'}
                                           </button>
                                         ) : (
                                           <span className="flex items-center gap-0.5">
-                                            <Dices className="w-2.5 h-2.5" />{formatSpread(sp.locked_spread)}
+                                            <Coins className="w-2.5 h-2.5" />{formatSpread(sp.locked_spread)}
                                             {sp.result === 'covered' && '✓'}
                                             {sp.result === 'missed' && '✗'}
                                           </span>
@@ -990,7 +990,7 @@ export function RosterView({
                                         }}
                                         className="text-blue-600 hover:text-blue-400 text-xs transition-colors mt-0.5 border border-blue-900/40 hover:border-blue-700 rounded px-1 flex items-center gap-0.5"
                                       >
-                                        <Dices className="w-2.5 h-2.5" />{formatSpread(weekSpread)}
+                                        <Coins className="w-2.5 h-2.5" />{formatSpread(weekSpread)}
                                       </button>
                                     );
                                     return null;
