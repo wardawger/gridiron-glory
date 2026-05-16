@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Shield, TrendingUp, TrendingDown, Minus, Star, Calendar, List, X, MapPin, Tv, Clock, Zap } from 'lucide-react';
 import type { RosterEntry, CaptainPick, GameData, ScoringSettings, LeagueMember, WeeklyScore, GameResult, SpreadPick, SpreadData } from '../../types';
 import { calcWeeklyScore, scoreGame, didCoverSpread } from '../../services/scoring';
@@ -401,10 +401,19 @@ export function RosterView({
   const [view, setView] = useState<'week' | 'schedule'>('week');
   const [modalTeam, setModalTeam] = useState<RosterEntry | null>(null);
   const [spreadError, setSpreadError] = useState<string | null>(null);
+  const [spreadsLoading, setSpreadsLoading] = useState(false);
   const [gameScoreModal, setGameScoreModal] = useState<{
     game: GameResult; teamName: string; teamLogo: string;
     week: number; isCaptain: boolean;
   } | null>(null);
+
+  // Auto-fetch spreads when feature is on and we don't have data for this week
+  useEffect(() => {
+    if (!scoring.spread_enabled) return;
+    if (spreadData[currentWeek] !== undefined) return;
+    setSpreadsLoading(true);
+    onRefreshSpreads(currentWeek).finally(() => setSpreadsLoading(false));
+  }, [scoring.spread_enabled, currentWeek]);
 
   const currentScore = useMemo(
     () => calcWeeklyScore(member.user_id, currentWeek, roster, captainPicks, gameData, scoring, spreadPicks),
@@ -643,8 +652,8 @@ export function RosterView({
                       </button>
                     )}
 
-                    {/* Spread pick button — only shown when feature is enabled */}
-                    {scoring.spread_enabled && isOwner && onSetSpread && onRemoveSpread && (() => {
+                    {/* Spread pick — shown when feature is enabled and team has a game */}
+                    {scoring.spread_enabled && game && (() => {
                       const weekSpread = spreadData[currentWeek]?.[entry.team_id] ?? null;
                       const existingPick = spreadPicks.find(
                         p => p.team_id === entry.team_id && p.week === currentWeek
@@ -655,42 +664,61 @@ export function RosterView({
                       const atTeamLimit = !existingPick && teamSeasonUses >= scoring.spread_max_per_team;
                       const kickedOff = isGameKickedOff((game as any)?.start_date);
                       const stackBlocked = !scoring.spread_allow_captain_stack && isCaptain && !existingPick;
-                      const canPick = !atWeekLimit && !atTeamLimit && !kickedOff && !stackBlocked;
+                      const canPick = isOwner && !!onSetSpread && !atWeekLimit && !atTeamLimit && !kickedOff && !stackBlocked;
                       const spreadResult = existingPick?.result ?? null;
 
-                      if (!game) return null;
-
+                      // Spread line row — always visible when feature on + has game
                       return (
-                        <div className="mt-2">
+                        <div className="mt-2 border-t border-turf-800/60 pt-2 space-y-1.5">
+                          {/* Line display */}
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-turf-500 flex items-center gap-1">
+                              📊 <span>Spread</span>
+                            </span>
+                            {spreadsLoading && !weekSpread ? (
+                              <span className="text-turf-600 italic">Loading line…</span>
+                            ) : weekSpread !== null ? (
+                              <span className={`font-mono font-medium ${
+                                existingPick ? 'text-blue-300' : 'text-turf-200'
+                              }`}>
+                                {formatSpread(weekSpread)}
+                                <span className="text-turf-500 font-normal ml-1.5">
+                                  ({weekSpread < 0 ? 'favored' : weekSpread > 0 ? 'underdog' : "pick 'em"})
+                                </span>
+                              </span>
+                            ) : (
+                              <span className="text-turf-600">No line yet</span>
+                            )}
+                          </div>
+
+                          {/* Season usage */}
+                          <div className="flex items-center justify-between text-xs text-turf-600">
+                            <span>{teamSeasonUses}/{scoring.spread_max_per_team} season uses</span>
+                            <span>{weekPicks.length}/{scoring.spread_max_per_week} this week</span>
+                          </div>
+
+                          {/* Pick/status button — matches captain button style */}
                           {existingPick ? (
-                            <div className={`rounded-md border px-2 py-1.5 flex items-center justify-between ${
-                              spreadResult === 'covered' ? 'border-field-700 bg-field-900/20' :
-                              spreadResult === 'missed'  ? 'border-red-800 bg-red-900/20' :
-                              'border-blue-800 bg-blue-900/20'
+                            <div className={`w-full text-xs py-1.5 rounded-md border flex items-center justify-between px-3 ${
+                              spreadResult === 'covered' ? 'bg-field-900/30 border-field-700 text-field-300' :
+                              spreadResult === 'missed'  ? 'bg-red-900/20 border-red-800 text-red-300' :
+                              'bg-blue-900/20 border-blue-700 text-blue-300'
                             }`}>
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-xs">📊</span>
-                                <div>
-                                  <span className="text-xs font-mono font-medium text-white">
-                                    {formatSpread(existingPick.locked_spread)}
-                                  </span>
-                                  <span className="text-xs text-turf-500 ml-1">spread locked</span>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                {spreadResult === 'covered' && <span className="text-xs text-field-400">✓ Covered</span>}
-                                {spreadResult === 'missed'  && <span className="text-xs text-red-400">✗ Missed</span>}
-                                {!spreadResult && !kickedOff && (
-                                  <button
-                                    onClick={e => { e.stopPropagation(); onRemoveSpread(currentWeek, entry.team_id); }}
-                                    className="text-xs text-turf-600 hover:text-red-400 transition-colors px-1"
-                                  >
-                                    ✕
-                                  </button>
-                                )}
-                              </div>
+                              <span>
+                                {spreadResult === 'covered' ? '✓ Covered the spread' :
+                                 spreadResult === 'missed'  ? '✗ Missed the spread' :
+                                 `📊 Spread locked at ${formatSpread(existingPick.locked_spread)}`}
+                              </span>
+                              {!spreadResult && !kickedOff && isOwner && onRemoveSpread && (
+                                <button
+                                  onClick={e => { e.stopPropagation(); onRemoveSpread(currentWeek, entry.team_id); }}
+                                  className="text-blue-500 hover:text-red-400 transition-colors ml-2"
+                                >
+                                  ✕ Remove
+                                </button>
+                              )}
                             </div>
-                          ) : weekSpread !== null ? (
+                          ) : weekSpread !== null && isOwner && onSetSpread ? (
                             <button
                               onClick={async e => {
                                 e.stopPropagation();
@@ -699,24 +727,19 @@ export function RosterView({
                                 if (result.error) setSpreadError(result.error);
                               }}
                               disabled={!canPick}
-                              className={`w-full text-xs py-1.5 rounded-md transition-all border flex items-center justify-between px-2 ${
+                              className={`mt-0.5 w-full text-xs py-1.5 rounded-md transition-all border ${
                                 canPick
-                                  ? 'border-blue-700/50 text-blue-300 hover:bg-blue-900/20'
+                                  ? 'border-blue-600 text-blue-300 hover:bg-blue-900/30 hover:border-blue-500'
                                   : 'border-turf-800 text-turf-700 cursor-not-allowed'
                               }`}
-                              title={
-                                kickedOff ? 'Game has kicked off' :
-                                stackBlocked ? 'Captain stacking disabled' :
-                                atTeamLimit ? `Team spread limit reached (${scoring.spread_max_per_team}/season)` :
-                                atWeekLimit ? `Week spread limit reached (${scoring.spread_max_per_week}/week)` : ''
-                              }
                             >
-                              <span>📊 Pick Spread</span>
-                              <span className="font-mono">{formatSpread(weekSpread)}</span>
+                              {kickedOff        ? '🔒 Game in progress' :
+                               stackBlocked     ? '🚫 Captain stack disabled' :
+                               atTeamLimit      ? `🚫 Team limit (${scoring.spread_max_per_team}/season)` :
+                               atWeekLimit      ? `🚫 Week limit (${scoring.spread_max_per_week}/week)` :
+                               `📊 Pick Spread (${formatSpread(weekSpread)})`}
                             </button>
-                          ) : (
-                            <div className="text-xs text-turf-700 text-center py-1">No line available</div>
-                          )}
+                          ) : null}
                         </div>
                       );
                     })()}
