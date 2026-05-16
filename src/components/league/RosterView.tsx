@@ -549,8 +549,8 @@ export function RosterView({
                     className={`card p-4 transition-all ${isCaptain ? 'border-gold-500/50 bg-amber-950/20' : ''}`}
                   >
                     {/* Clickable header — opens schedule modal */}
-                    <button
-                      className="w-full flex items-start gap-3 text-left hover:opacity-90 transition-opacity"
+                    <div
+                      className="flex items-start gap-3 cursor-pointer hover:opacity-90 transition-opacity"
                       onClick={() => setModalTeam(entry)}
                     >
                       <img
@@ -575,7 +575,7 @@ export function RosterView({
                           {weekBreak.points > 0 ? '+' : ''}{weekBreak.points}
                         </div>
                       )}
-                    </button>
+                    </div>
 
                     {game ? (
                       <div
