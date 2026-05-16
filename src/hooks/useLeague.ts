@@ -3,7 +3,7 @@ import type { User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import type {
   League, LeagueMember, DraftPick, CaptainPick,
-  ManualBonus, RosterEntry,
+  ManualBonus, RosterEntry, SpreadPick,
 } from '../types';
 
 export function useLeague(user: User | null) {
@@ -13,6 +13,7 @@ export function useLeague(user: User | null) {
   const [draftPicks, setDraftPicks]     = useState<DraftPick[]>([]);
   const [captainPicks, setCaptainPicks] = useState<CaptainPick[]>([]);
   const [manualBonuses, setManualBonuses] = useState<ManualBonus[]>([]);
+  const [spreadPicks, setSpreadPicks]   = useState<SpreadPick[]>([]);
   const [loading, setLoading]           = useState(true);
   const [error, setError]               = useState<string | null>(null);
 
@@ -33,7 +34,6 @@ export function useLeague(user: User | null) {
   const myMembership = members.find(m => m.user_id === user?.id);
   const isCommissioner = myMembership?.role === 'commissioner';
 
-  // Load all leagues this user belongs to
   const loadAllLeagues = useCallback(async () => {
     if (!user) { setLoading(false); return; }
     setLoading(true);
@@ -56,7 +56,6 @@ export function useLeague(user: User | null) {
       const leagues = memberships.map((m: any) => m.leagues as League);
       setAllLeagues(leagues);
 
-      // Select stored league or default to first
       const stored = localStorage.getItem(`gridiron_league_${user.id}`);
       const toSelect = stored && leagues.find(l => l.id === stored)
         ? stored
@@ -70,19 +69,20 @@ export function useLeague(user: User | null) {
     }
   }, [user]);
 
-  // Load data for the selected league
   const loadLeagueData = useCallback(async (leagueId: string) => {
-    const [membersRes, picksRes, captainRes, bonusRes] = await Promise.all([
+    const [membersRes, picksRes, captainRes, bonusRes, spreadRes] = await Promise.all([
       supabase.from('league_members').select('*').eq('league_id', leagueId),
       supabase.from('draft_picks').select('*').eq('league_id', leagueId).order('pick_number'),
       supabase.from('captain_picks').select('*').eq('league_id', leagueId),
       supabase.from('manual_bonuses').select('*').eq('league_id', leagueId),
+      supabase.from('spread_picks').select('*').eq('league_id', leagueId),
     ]);
 
     if (membersRes.data)  setMembers(membersRes.data);
     if (picksRes.data)    setDraftPicks(picksRes.data);
     if (captainRes.data)  setCaptainPicks(captainRes.data);
     if (bonusRes.data)    setManualBonuses(bonusRes.data);
+    if (spreadRes.data)   setSpreadPicks(spreadRes.data);
   }, []);
 
   useEffect(() => { loadAllLeagues(); }, [loadAllLeagues]);
@@ -92,19 +92,18 @@ export function useLeague(user: User | null) {
     loadLeagueData(selectedLeagueId);
   }, [selectedLeagueId, loadLeagueData]);
 
-  // Switch to a different league
   const switchLeague = (leagueId: string) => {
     if (!user) return;
     setSelectedLeagueId(leagueId);
     localStorage.setItem(`gridiron_league_${user.id}`, leagueId);
-    // Clear current league data while loading new one
     setMembers([]);
     setDraftPicks([]);
     setCaptainPicks([]);
     setManualBonuses([]);
+    setSpreadPicks([]);
   };
 
-  // Real-time subscription for the selected league
+  // Real-time subscriptions
   useEffect(() => {
     if (!league) return;
     const channel = supabase
@@ -132,6 +131,13 @@ export function useLeague(user: User | null) {
         supabase.from('captain_picks').select('*').eq('league_id', league.id)
           .then(({ data }) => { if (data) setCaptainPicks(data); });
       })
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'spread_picks',
+        filter: `league_id=eq.${league.id}`,
+      }, () => {
+        supabase.from('spread_picks').select('*').eq('league_id', league.id)
+          .then(({ data }) => { if (data) setSpreadPicks(data); });
+      })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
@@ -153,6 +159,8 @@ export function useLeague(user: User | null) {
         draft_current_pick: 1,
         scoring: {
           win: 1, win_ranked: 1, win_top15: 2, win_top5: 3, loss: -1, loss_g5: -5,
+          spread_enabled: false, spread_points: 2, spread_is_multiplier: false,
+          spread_max_per_week: 2, spread_max_per_team: 3, spread_allow_captain_stack: false,
         },
       })
       .select()
@@ -169,7 +177,6 @@ export function useLeague(user: User | null) {
 
     if (memErr) return { error: memErr.message };
 
-    // Add new league to list and switch to it
     setAllLeagues(prev => [...prev, lg]);
     setSelectedLeagueId(lg.id);
     localStorage.setItem(`gridiron_league_${user.id}`, lg.id);
@@ -230,20 +237,16 @@ export function useLeague(user: User | null) {
     if (!league) return { error: 'No league' };
 
     const { error: deleteErr } = await supabase
-      .from('draft_picks')
-      .delete()
-      .eq('league_id', league.id);
+      .from('draft_picks').delete().eq('league_id', league.id);
 
     if (deleteErr) return { error: deleteErr.message };
 
     const { error: updateErr } = await supabase
-      .from('leagues')
-      .update({
+      .from('leagues').update({
         draft_status: 'pending',
         draft_current_pick: 1,
         draft_order: [],
-      })
-      .eq('id', league.id);
+      }).eq('id', league.id);
 
     if (updateErr) return { error: updateErr.message };
 
@@ -266,6 +269,97 @@ export function useLeague(user: User | null) {
         week,
       }, { onConflict: 'league_id,user_id,week' });
     }
+  };
+
+  // ── Spread pick actions ──────────────────────────────────────────────────
+
+  const setSpreadPick = async (
+    week: number,
+    teamId: string,
+    lockedSpread: number,
+  ): Promise<{ error?: string }> => {
+    if (!league || !user) return { error: 'Not ready' };
+    const settings = league.scoring;
+
+    // Validate: check season usage for this team
+    const teamSeasonPicks = spreadPicks.filter(
+      p => p.user_id === user.id && p.team_id === teamId
+    );
+    const alreadyThisWeek = teamSeasonPicks.find(p => p.week === week);
+    if (!alreadyThisWeek && teamSeasonPicks.length >= settings.spread_max_per_team) {
+      return { error: `This team has reached the season spread limit (${settings.spread_max_per_team})` };
+    }
+
+    // Validate: max picks per week
+    const weekPicks = spreadPicks.filter(
+      p => p.user_id === user.id && p.week === week && p.team_id !== teamId
+    );
+    if (!alreadyThisWeek && weekPicks.length >= settings.spread_max_per_week) {
+      return { error: `You can only make ${settings.spread_max_per_week} spread picks per week` };
+    }
+
+    // Validate: captain stack rule
+    if (!settings.spread_allow_captain_stack) {
+      const captainThisWeek = captainPicks.find(
+        p => p.user_id === user.id && p.week === week
+      );
+      if (captainThisWeek?.team_id === teamId) {
+        return { error: 'Captain stacking is not allowed — pick a different team for the spread' };
+      }
+    }
+
+    const { error: err } = await supabase.from('spread_picks').upsert({
+      league_id:    league.id,
+      user_id:      user.id,
+      team_id:      teamId,
+      week,
+      locked_spread: lockedSpread,
+      picked_at:    new Date().toISOString(),
+      result:       null,
+      points:       null,
+      commissioner_override: false,
+    }, { onConflict: 'league_id,user_id,team_id,week' });
+
+    if (err) return { error: err.message };
+    return {};
+  };
+
+  const removeSpreadPick = async (week: number, teamId: string): Promise<{ error?: string }> => {
+    if (!league || !user) return { error: 'Not ready' };
+    const pick = spreadPicks.find(
+      p => p.user_id === user.id && p.week === week && p.team_id === teamId
+    );
+    if (!pick) return {};
+    const { error: err } = await supabase
+      .from('spread_picks').delete().eq('id', pick.id);
+    if (err) return { error: err.message };
+    return {};
+  };
+
+  // Commissioner: override spread result
+  const overrideSpreadResult = async (
+    pickId: string,
+    result: 'covered' | 'missed',
+    points: number,
+  ): Promise<{ error?: string }> => {
+    if (!league || !isCommissioner) return { error: 'Not authorized' };
+    const { error: err } = await supabase
+      .from('spread_picks')
+      .update({ result, points, commissioner_override: true })
+      .eq('id', pickId);
+    if (err) return { error: err.message };
+    return {};
+  };
+
+  // Commissioner: clear override and let auto-scoring handle it
+  const clearSpreadOverride = async (pickId: string): Promise<{ error?: string }> => {
+    if (!league || !isCommissioner) return { error: 'Not authorized' };
+    const { error: err } = await supabase
+      .from('spread_picks')
+      .update({ result: null, points: null, commissioner_override: false })
+      .eq('id', pickId);
+    if (err) return { error: err.message };
+    return {};
   };
 
   const addManualBonus = async (bonus: Omit<ManualBonus, 'id' | 'awarded_at' | 'awarded_by' | 'league_id'>) => {
@@ -305,10 +399,11 @@ export function useLeague(user: User | null) {
 
   return {
     league, allLeagues, selectedLeagueId,
-    members, draftPicks, captainPicks, manualBonuses,
+    members, draftPicks, captainPicks, manualBonuses, spreadPicks,
     rosters, myMembership, isCommissioner, loading, error,
     switchLeague, createLeague, sendInvite, startDraft, makeDraftPick, resetDraft,
     setCaptain, addManualBonus, removeManualBonus,
+    setSpreadPick, removeSpreadPick, overrideSpreadResult, clearSpreadOverride,
     updateWeek, updateScoring, removeFromRoster, reload: loadAllLeagues,
   };
 }
