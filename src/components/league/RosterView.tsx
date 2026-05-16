@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
-import { Shield, TrendingUp, TrendingDown, Minus, Star, Calendar, List, X, MapPin, Tv, Clock, Zap } from 'lucide-react';
+import { Shield, TrendingUp, TrendingDown, Minus, Star, Calendar, List, X, MapPin, Tv, Clock, Zap, BarChart2 } from 'lucide-react';
 import type { RosterEntry, CaptainPick, GameData, ScoringSettings, LeagueMember, WeeklyScore, GameResult, SpreadPick, SpreadData } from '../../types';
 import { calcWeeklyScore, scoreGame, didCoverSpread } from '../../services/scoring';
 import { Tooltip } from '../ui/Tooltip';
@@ -698,27 +698,30 @@ export function RosterView({
                             <span>{weekPicks.length}/{scoring.spread_max_per_week} this week</span>
                           </div>
 
-                          {/* Pick/status button — matches captain button style */}
+                          {/* Pick/status button — full-width, same style as captain button */}
                           {existingPick ? (
-                            <div className={`w-full text-xs py-1.5 rounded-md border flex items-center justify-between px-3 ${
-                              spreadResult === 'covered' ? 'bg-field-900/30 border-field-700 text-field-300' :
-                              spreadResult === 'missed'  ? 'bg-red-900/20 border-red-800 text-red-300' :
-                              'bg-blue-900/20 border-blue-700 text-blue-300'
-                            }`}>
-                              <span>
-                                {spreadResult === 'covered' ? '✓ Covered the spread' :
-                                 spreadResult === 'missed'  ? '✗ Missed the spread' :
-                                 `📊 Spread locked at ${formatSpread(existingPick.locked_spread)}`}
-                              </span>
-                              {!spreadResult && !kickedOff && isOwner && onRemoveSpread && (
-                                <button
-                                  onClick={() => onRemoveSpread(currentWeek, entry.team_id)}
-                                  className="text-blue-500 hover:text-red-400 transition-colors ml-2"
-                                >
-                                  ✕ Remove
-                                </button>
-                              )}
-                            </div>
+                            // Spread is locked — full button click removes it (if allowed)
+                            !spreadResult && !kickedOff && isOwner && onRemoveSpread ? (
+                              <button
+                                onClick={() => onRemoveSpread(currentWeek, entry.team_id)}
+                                className="mt-0.5 w-full text-xs py-1.5 rounded-md transition-all border bg-blue-900/20 border-blue-700 text-blue-300 hover:bg-red-900/20 hover:border-red-700 hover:text-red-300 flex items-center justify-center gap-1.5"
+                              >
+                                <BarChart2 className="w-3 h-3" />
+                                Spread Locked {formatSpread(existingPick.locked_spread)} — Remove
+                              </button>
+                            ) : (
+                              // Game in progress or result known — non-clickable status
+                              <div className={`mt-0.5 w-full text-xs py-1.5 rounded-md border flex items-center justify-center gap-1.5 ${
+                                spreadResult === 'covered' ? 'bg-field-900/30 border-field-700 text-field-300' :
+                                spreadResult === 'missed'  ? 'bg-red-900/20 border-red-800 text-red-300' :
+                                'bg-blue-900/20 border-blue-700 text-blue-300'
+                              }`}>
+                                <BarChart2 className="w-3 h-3" />
+                                {spreadResult === 'covered' ? `✓ Covered ${formatSpread(existingPick.locked_spread)}` :
+                                 spreadResult === 'missed'  ? `✗ Missed ${formatSpread(existingPick.locked_spread)}` :
+                                 `Spread Locked ${formatSpread(existingPick.locked_spread)}`}
+                              </div>
+                            )
                           ) : weekSpread !== null && isOwner && onSetSpread ? (
                             <button
                               onClick={async () => {
@@ -727,17 +730,18 @@ export function RosterView({
                                 if (result.error) setSpreadError(result.error);
                               }}
                               disabled={!canPick}
-                              className={`mt-0.5 w-full text-xs py-1.5 rounded-md transition-all border ${
+                              className={`mt-0.5 w-full text-xs py-1.5 rounded-md transition-all border flex items-center justify-center gap-1.5 ${
                                 canPick
                                   ? 'border-blue-600 text-blue-300 hover:bg-blue-900/30 hover:border-blue-500'
                                   : 'border-turf-800 text-turf-700 cursor-not-allowed'
                               }`}
                             >
-                              {kickedOff        ? '🔒 Game in progress' :
-                               stackBlocked     ? '🚫 Captain stack disabled' :
-                               atTeamLimit      ? `🚫 Team limit (${scoring.spread_max_per_team}/season)` :
-                               atWeekLimit      ? `🚫 Week limit (${scoring.spread_max_per_week}/week)` :
-                               `📊 Pick Spread (${formatSpread(weekSpread)})`}
+                              <BarChart2 className="w-3 h-3" />
+                              {kickedOff    ? 'Game in progress' :
+                               stackBlocked ? 'Captain stack disabled' :
+                               atTeamLimit  ? `Team limit (${scoring.spread_max_per_team}/season)` :
+                               atWeekLimit  ? `Week limit (${scoring.spread_max_per_week}/week)` :
+                               `Pick Spread (${formatSpread(weekSpread)})`}
                             </button>
                           ) : null}
                         </div>
