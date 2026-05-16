@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
-import { Shield, TrendingUp, TrendingDown, Minus, Star, Calendar, List, X, MapPin, Tv, Clock } from 'lucide-react';
-import type { RosterEntry, CaptainPick, GameData, ScoringSettings, LeagueMember, WeeklyScore } from '../../types';
-import { calcWeeklyScore } from '../../services/scoring';
+import { Shield, TrendingUp, TrendingDown, Minus, Star, Calendar, List, X, MapPin, Tv, Clock, Zap } from 'lucide-react';
+import type { RosterEntry, CaptainPick, GameData, ScoringSettings, LeagueMember, WeeklyScore, GameResult } from '../../types';
+import { calcWeeklyScore, scoreGame } from '../../services/scoring';
 import { Tooltip } from '../ui/Tooltip';
 
 interface Props {
@@ -41,6 +41,172 @@ function formatGameDate(startDate: string | null | undefined): { date: string; t
     ? 'TBD'
     : d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
   return { date, time };
+}
+
+// ── Game Score Breakdown Modal ───────────────────────────────────────────────
+
+interface GameScoreModalProps {
+  game: GameResult;
+  teamName: string;
+  teamLogo: string;
+  week: number;
+  isCaptain: boolean;
+  scoring: ScoringSettings;
+  onClose: () => void;
+}
+
+function GameScoreModal({ game, teamName, teamLogo, week, isCaptain, scoring, onClose }: GameScoreModalProps) {
+  const isWin      = game.result === 'W';
+  const isLoss     = game.result === 'L';
+  const isComplete = game.completed;
+  const isHome     = (game as any).is_home ?? true;
+  const oppLogo    = (game as any).opponent_logo ?? null;
+
+  // Build individual scoring line items
+  const lines: { label: string; pts: number; active: boolean; color: string }[] = [];
+
+  if (isComplete && game.result) {
+    if (isWin) {
+      lines.push({ label: 'Win',                   pts: scoring.win,       active: true,                              color: 'text-field-400' });
+      lines.push({ label: 'Win vs Ranked',          pts: scoring.win_ranked, active: game.opponent_rank != null,       color: 'text-field-400' });
+      lines.push({ label: 'Win vs Top 15',          pts: scoring.win_top15,  active: (game.opponent_rank ?? 99) <= 15, color: 'text-field-400' });
+      lines.push({ label: 'Win vs Top 5',           pts: scoring.win_top5,   active: (game.opponent_rank ?? 99) <= 5,  color: 'text-field-400' });
+    } else {
+      lines.push({ label: 'Loss',                   pts: scoring.loss,      active: true,                              color: 'text-red-400' });
+      lines.push({ label: 'Loss to G5',             pts: scoring.loss_g5,   active: game.is_g5_opponent,               color: 'text-red-400' });
+    }
+  }
+
+  const basePoints  = scoreGame(game, scoring, false);
+  const totalPoints = scoreGame(game, scoring, isCaptain);
+  const captainBonus = totalPoints - basePoints;
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+      style={{ backgroundColor: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)' }}
+      onClick={onClose}
+    >
+      <div
+        className="relative w-full max-w-sm rounded-2xl border border-turf-700 bg-turf-950 shadow-2xl"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center gap-3 border-b border-turf-800 px-5 py-4">
+          {/* My team */}
+          <img
+            src={teamLogo}
+            alt={teamName}
+            className="h-9 w-9 object-contain flex-shrink-0"
+            onError={e => { (e.target as HTMLImageElement).src = teamLogoFallback(teamName); }}
+          />
+          <div className="flex-1 min-w-0 text-center">
+            <div className="text-xs text-turf-500 mb-0.5">Week {week}</div>
+            <div className="text-xs text-turf-400">{isHome ? 'vs' : 'at'}</div>
+          </div>
+          {/* Opponent */}
+          <div className="flex flex-col items-center gap-1">
+            <img
+              src={oppLogo ?? teamLogoFallback(game.opponent)}
+              alt={game.opponent}
+              className="h-9 w-9 object-contain flex-shrink-0"
+              onError={e => { (e.target as HTMLImageElement).src = teamLogoFallback(game.opponent); }}
+            />
+            <span className="text-xs text-turf-400 text-center leading-tight max-w-20 truncate">
+              {game.opponent_rank ? `#${game.opponent_rank} ` : ''}{game.opponent}
+            </span>
+          </div>
+          <button
+            onClick={onClose}
+            className="ml-2 rounded-lg border border-turf-700 p-1.5 text-turf-400 hover:border-turf-500 hover:text-white transition-colors flex-shrink-0"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+
+        {/* Result badge */}
+        {isComplete && game.result ? (
+          <div className={`mx-5 mt-4 rounded-lg px-4 py-2 flex items-center justify-between ${
+            isWin ? 'bg-field-900/40 border border-field-800/50' : 'bg-red-900/30 border border-red-800/50'
+          }`}>
+            <div className="flex items-center gap-2">
+              {isWin
+                ? <TrendingUp className="w-4 h-4 text-field-400" />
+                : <TrendingDown className="w-4 h-4 text-red-400" />
+              }
+              <span className={`font-bold text-sm ${isWin ? 'text-field-300' : 'text-red-300'}`}>
+                {game.result === 'W' ? 'WIN' : 'LOSS'}
+              </span>
+            </div>
+            {game.home_score != null && game.away_score != null && (
+              <span className="font-mono text-sm text-white">
+                {game.home_score}–{game.away_score}
+              </span>
+            )}
+          </div>
+        ) : (
+          <div className="mx-5 mt-4 rounded-lg px-4 py-2 bg-turf-800/50 border border-turf-700">
+            <p className="text-xs text-turf-400 text-center">Game not yet played</p>
+          </div>
+        )}
+
+        {/* Scoring breakdown */}
+        <div className="px-5 py-4 space-y-2">
+          <p className="text-xs text-turf-500 uppercase tracking-wide font-medium mb-3">Scoring Breakdown</p>
+
+          {lines.length === 0 && (
+            <p className="text-xs text-turf-600 text-center py-2">No points — game not completed</p>
+          )}
+
+          {lines.map(line => (
+            <div
+              key={line.label}
+              className={`flex items-center justify-between text-sm ${
+                line.active ? '' : 'opacity-25'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                  line.active ? (isWin ? 'bg-field-400' : 'bg-red-400') : 'bg-turf-700'
+                }`} />
+                <span className={line.active ? 'text-turf-200' : 'text-turf-600'}>{line.label}</span>
+              </div>
+              <span className={`font-mono font-medium ${
+                line.active
+                  ? line.pts >= 0 ? 'text-field-400' : 'text-red-400'
+                  : 'text-turf-700'
+              }`}>
+                {line.pts > 0 ? '+' : ''}{line.pts}
+              </span>
+            </div>
+          ))}
+
+          {/* Captain multiplier */}
+          {isCaptain && isComplete && game.result && (
+            <div className="mt-3 pt-3 border-t border-turf-800 flex items-center justify-between text-sm">
+              <div className="flex items-center gap-2">
+                <Zap className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+                <span className="text-amber-300">Captain ×2 bonus</span>
+              </div>
+              <span className="font-mono font-medium text-amber-400">
+                +{captainBonus}
+              </span>
+            </div>
+          )}
+
+          {/* Total */}
+          <div className="mt-3 pt-3 border-t border-turf-700 flex items-center justify-between">
+            <span className="font-semibold text-white text-sm">Total Points</span>
+            <span className={`font-mono font-bold text-lg ${
+              totalPoints > 0 ? 'text-field-400' : totalPoints < 0 ? 'text-red-400' : 'text-turf-500'
+            }`}>
+              {totalPoints > 0 ? '+' : ''}{totalPoints}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ── Schedule Detail Modal ─────────────────────────────────────────────────────
@@ -204,6 +370,10 @@ export function RosterView({
 }: Props) {
   const [view, setView] = useState<'week' | 'schedule'>('week');
   const [modalTeam, setModalTeam] = useState<RosterEntry | null>(null);
+  const [gameScoreModal, setGameScoreModal] = useState<{
+    game: GameResult; teamName: string; teamLogo: string;
+    week: number; isCaptain: boolean;
+  } | null>(null);
 
   const currentScore = useMemo(
     () => calcWeeklyScore(member.user_id, currentWeek, roster, captainPicks, gameData, scoring),
@@ -219,6 +389,19 @@ export function RosterView({
 
   return (
     <>
+      {/* Game Score Breakdown Modal */}
+      {gameScoreModal && (
+        <GameScoreModal
+          game={gameScoreModal.game}
+          teamName={gameScoreModal.teamName}
+          teamLogo={gameScoreModal.teamLogo}
+          week={gameScoreModal.week}
+          isCaptain={gameScoreModal.isCaptain}
+          scoring={scoring}
+          onClose={() => setGameScoreModal(null)}
+        />
+      )}
+
       {/* Schedule Detail Modal */}
       {modalTeam && (
         <ScheduleModal
@@ -353,40 +536,58 @@ export function RosterView({
                     </div>
 
                     {game ? (
-                      <div className="mt-3 flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <img
-                            src={oppLogo ?? teamLogoFallback(game.opponent)}
-                            alt={game.opponent}
-                            className="w-6 h-6 object-contain flex-shrink-0"
-                            onError={e => { (e.target as HTMLImageElement).src = teamLogoFallback(game.opponent); }}
-                          />
-                          <div className="text-xs text-turf-400 truncate">
-                            {game.result ? (
-                              <span className="flex items-center gap-1">
-                                {game.result === 'W'
-                                  ? <TrendingUp className="w-3 h-3 text-field-400 flex-shrink-0" />
-                                  : <TrendingDown className="w-3 h-3 text-red-400 flex-shrink-0" />
-                                }
-                                <span className={game.result === 'W' ? 'text-field-300' : 'text-red-300'}>
-                                  {game.result} {isHome ? 'vs' : 'at'} {game.opponent}
-                                  {game.opponent_rank && <span className="text-turf-500"> (#{game.opponent_rank})</span>}
+                      <button
+                        className="mt-3 w-full text-left group/game"
+                        onClick={e => {
+                          e.stopPropagation();
+                          setGameScoreModal({
+                            game,
+                            teamName: entry.team_name,
+                            teamLogo: entry.team_logo,
+                            week: currentWeek,
+                            isCaptain,
+                          });
+                        }}
+                        title=""
+                      >
+                        <div className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-turf-800/60 transition-colors">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <img
+                              src={oppLogo ?? teamLogoFallback(game.opponent)}
+                              alt={game.opponent}
+                              className="w-6 h-6 object-contain flex-shrink-0"
+                              onError={e => { (e.target as HTMLImageElement).src = teamLogoFallback(game.opponent); }}
+                            />
+                            <div className="text-xs text-turf-400 truncate">
+                              {game.result ? (
+                                <span className="flex items-center gap-1">
+                                  {game.result === 'W'
+                                    ? <TrendingUp className="w-3 h-3 text-field-400 flex-shrink-0" />
+                                    : <TrendingDown className="w-3 h-3 text-red-400 flex-shrink-0" />
+                                  }
+                                  <span className={game.result === 'W' ? 'text-field-300' : 'text-red-300'}>
+                                    {game.result} {isHome ? 'vs' : 'at'} {game.opponent}
+                                    {game.opponent_rank && <span className="text-turf-500"> (#{game.opponent_rank})</span>}
+                                  </span>
                                 </span>
-                              </span>
-                            ) : (
-                              <span className="flex items-center gap-1 text-turf-500">
-                                <Minus className="w-3 h-3 flex-shrink-0" />
-                                {isHome ? 'vs' : 'at'} {game.opponent} — TBD
+                              ) : (
+                                <span className="flex items-center gap-1 text-turf-500">
+                                  <Minus className="w-3 h-3 flex-shrink-0" />
+                                  {isHome ? 'vs' : 'at'} {game.opponent} — TBD
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            {game.home_score != null && game.away_score != null && (
+                              <span className="font-mono text-xs text-turf-500">
+                                {game.home_score}–{game.away_score}
                               </span>
                             )}
+                            <span className="text-turf-700 group-hover/game:text-turf-500 transition-colors text-xs">↗</span>
                           </div>
                         </div>
-                        {game.home_score != null && game.away_score != null && (
-                          <span className="font-mono text-xs text-turf-500 flex-shrink-0">
-                            {game.home_score}–{game.away_score}
-                          </span>
-                        )}
-                      </div>
+                      </button>
                     ) : (
                       <p className="mt-2 text-xs text-turf-600">No game this week</p>
                     )}
@@ -502,18 +703,33 @@ export function RosterView({
                             >
                               {game ? (
                                 <div className="space-y-1 flex flex-col items-center">
-                                  {/* Opponent logo */}
+                                  {/* Opponent logo — click to open score breakdown */}
                                   <Tooltip
-                                    content={`${isHome ? 'vs' : 'at'} ${game.opponent}${game.opponent_rank ? ` (#${game.opponent_rank})` : ''}`}
+                                    content={`${isHome ? 'vs' : 'at'} ${game.opponent}${game.opponent_rank ? ` (#${game.opponent_rank})` : ''} · Click for scoring details`}
                                     position="bottom"
-                                    width="w-40"
+                                    width="w-44"
                                   >
-                                  <img
-                                    src={oppLogo ?? teamLogoFallback(game.opponent)}
-                                    alt={game.opponent}
-                                    className="w-7 h-7 object-contain"
-                                    onError={e => { (e.target as HTMLImageElement).src = teamLogoFallback(game.opponent); }}
-                                  />
+                                  <button
+                                    className="rounded hover:ring-1 hover:ring-field-500/50 transition-all"
+                                    onClick={e => {
+                                      e.stopPropagation();
+                                      const isCaptainThisWeek = getCaptainForWeek(w) === entry.team_id;
+                                      setGameScoreModal({
+                                        game,
+                                        teamName: entry.team_name,
+                                        teamLogo: entry.team_logo,
+                                        week: w,
+                                        isCaptain: isCaptainThisWeek,
+                                      });
+                                    }}
+                                  >
+                                    <img
+                                      src={oppLogo ?? teamLogoFallback(game.opponent)}
+                                      alt={game.opponent}
+                                      className="w-7 h-7 object-contain"
+                                      onError={e => { (e.target as HTMLImageElement).src = teamLogoFallback(game.opponent); }}
+                                    />
+                                  </button>
                                   </Tooltip>
 
                                   {/* Home/Away indicator + rank */}
@@ -538,7 +754,7 @@ export function RosterView({
                                   )}
                                   {canSetCap && !isCap && (
                                     <button
-                                      onClick={() => onSetCaptain!(w, entry.team_id)}
+                                      onClick={e => { e.stopPropagation(); onSetCaptain!(w, entry.team_id); }}
                                       className="text-turf-600 hover:text-gold-400 transition-colors text-xs border border-turf-700 hover:border-gold-600 rounded px-1 py-0.5 w-full"
                                     >
                                       + Cap
