@@ -90,6 +90,7 @@ export default function App() {
                 draftPicks={league.draftPicks}
                 captainPicks={league.captainPicks}
                 manualBonuses={league.manualBonuses}
+                spreadPicks={league.spreadPicks}
                 gameData={cfb.gameData}
                 seasonStats={cfb.seasonStats}
                 rankings={cfb.rankings}
