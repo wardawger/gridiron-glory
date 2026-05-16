@@ -901,10 +901,22 @@ export function RosterView({
                                     </div>
                                   )}
 
-                                  {/* Captain badge / button */}
-                                  {isCap && (
-                                    <div className="text-amber-400 font-bold text-xs">★</div>
-                                  )}
+                                  {/* Captain badge — clickable to remove if owner and game not started */}
+                                  {isCap && (() => {
+                                    const kicked = isGameKickedOff((game as any)?.start_date);
+                                    const canRemove = isOwner && onSetCaptain && !kicked && !isPast;
+                                    return canRemove ? (
+                                      <button
+                                        onClick={e => { e.stopPropagation(); onSetCaptain!(w, entry.team_id); }}
+                                        className="text-amber-400 font-bold text-xs hover:text-red-400 transition-colors border border-amber-900/40 hover:border-red-800 rounded px-1"
+                                        title="Remove captain"
+                                      >
+                                        ★ ✕
+                                      </button>
+                                    ) : (
+                                      <div className="text-amber-400 font-bold text-xs">★</div>
+                                    );
+                                  })()}
                                   {canSetCap && !isCap && (
                                     <button
                                       onClick={e => { e.stopPropagation(); onSetCaptain!(w, entry.team_id); }}
@@ -917,7 +929,7 @@ export function RosterView({
                                     <div className="text-turf-700 text-xs">max</div>
                                   )}
 
-                                  {/* Spread pick indicator in grid */}
+                                  {/* Spread pick indicator — clickable to remove if owner and game not started */}
                                   {scoring.spread_enabled && (() => {
                                     const sp = spreadPicks.find(
                                       p => p.team_id === entry.team_id && p.week === w
@@ -932,15 +944,35 @@ export function RosterView({
                                       && teamUses < scoring.spread_max_per_team
                                       && !stackBlocked
                                       && weekSpread !== null;
+                                    const canRemoveSpread = isOwner && onRemoveSpread && !!sp
+                                      && !sp.result && !kicked && !isPast;
 
                                     if (sp) return (
-                                      <div className={`text-xs font-mono mt-0.5 ${
+                                      <div className={`text-xs font-mono mt-0.5 flex items-center gap-0.5 ${
                                         sp.result === 'covered' ? 'text-field-400' :
                                         sp.result === 'missed'  ? 'text-red-400' : 'text-blue-400'
                                       }`}>
-                                        📊{formatSpread(sp.locked_spread)}
-                                        {sp.result === 'covered' && '✓'}
-                                        {sp.result === 'missed' && '✗'}
+                                        {canRemoveSpread ? (
+                                          <button
+                                            onClick={e => {
+                                              e.stopPropagation();
+                                              onRemoveSpread!(w, entry.team_id).then(r => {
+                                                if (r.error) setSpreadError(r.error);
+                                              });
+                                            }}
+                                            className="hover:text-red-400 transition-colors border border-current/20 hover:border-red-800 rounded px-0.5"
+                                            title="Remove spread pick"
+                                          >
+                                            📊{formatSpread(sp.locked_spread)}
+                                            {sp.result === 'covered' ? '✓' : sp.result === 'missed' ? '✗' : ' ✕'}
+                                          </button>
+                                        ) : (
+                                          <span>
+                                            📊{formatSpread(sp.locked_spread)}
+                                            {sp.result === 'covered' && '✓'}
+                                            {sp.result === 'missed' && '✗'}
+                                          </span>
+                                        )}
                                       </div>
                                     );
                                     if (canPickSpread) return (
