@@ -97,8 +97,8 @@ export default function App() {
                 cfbLoading={cfb.loading}
               />
             } />
-            <Route path="/roster"         element={<RosterPage league={lg} members={league.members} draftPicks={league.draftPicks} captainPicks={league.captainPicks} gameData={cfb.gameData} userId={auth.user.id} onSetCaptain={league.setCaptain} />} />
-            <Route path="/roster/:userId" element={<RosterPage league={lg} members={league.members} draftPicks={league.draftPicks} captainPicks={league.captainPicks} gameData={cfb.gameData} userId={auth.user.id} onSetCaptain={league.setCaptain} />} />
+            <Route path="/roster"         element={<RosterPage league={lg} members={league.members} draftPicks={league.draftPicks} captainPicks={league.captainPicks} gameData={cfb.gameData} spreadData={cfb.spreadData} spreadPicks={league.spreadPicks} userId={auth.user.id} onSetCaptain={league.setCaptain} onSetSpread={league.setSpreadPick} onRemoveSpread={league.removeSpreadPick} onRefreshSpreads={cfb.refreshSpreads} />} />
+            <Route path="/roster/:userId" element={<RosterPage league={lg} members={league.members} draftPicks={league.draftPicks} captainPicks={league.captainPicks} gameData={cfb.gameData} spreadData={cfb.spreadData} spreadPicks={league.spreadPicks} userId={auth.user.id} onSetCaptain={league.setCaptain} onSetSpread={league.setSpreadPick} onRemoveSpread={league.removeSpreadPick} onRefreshSpreads={cfb.refreshSpreads} />} />
             <Route path="/rankings" element={<RankingsPage rankings={cfb.rankings} teams={cfb.teams} records={cfb.records} />} />
             <Route path="/draft"          element={
               <DraftRoom
@@ -118,6 +118,7 @@ export default function App() {
                 members={league.members}
                 draftPicks={league.draftPicks}
                 manualBonuses={league.manualBonuses}
+                spreadPicks={league.spreadPicks}
                 isCommissioner={league.isCommissioner}
                 onSendInvite={league.sendInvite}
                 onUpdateWeek={league.updateWeek}
@@ -126,6 +127,8 @@ export default function App() {
                 onRemoveBonus={league.removeManualBonus}
                 onRemoveFromRoster={league.removeFromRoster}
                 onResetDraft={league.resetDraft}
+                onOverrideSpread={league.overrideSpreadResult}
+                onClearSpreadOverride={league.clearSpreadOverride}
               />
             } />
             <Route path="/create-league"  element={
