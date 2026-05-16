@@ -42,6 +42,13 @@ export interface ScoringSettings {
   win_top5: number;
   loss: number;
   loss_g5: number;
+  // Spread betting settings
+  spread_enabled: boolean;
+  spread_points: number;          // flat pts for covering, or multiplier base
+  spread_is_multiplier: boolean;  // true = multiply base game score, false = flat pts
+  spread_max_per_week: number;    // max spread picks per user per week
+  spread_max_per_team: number;    // max times one team can be spread-picked all season
+  spread_allow_captain_stack: boolean; // allow spread + captain on same team same week
 }
 
 export const DEFAULT_SCORING: ScoringSettings = {
@@ -51,6 +58,13 @@ export const DEFAULT_SCORING: ScoringSettings = {
   win_top5: 3,
   loss: -1,
   loss_g5: -5,
+  // Spread defaults — off until commissioner enables
+  spread_enabled: false,
+  spread_points: 2,
+  spread_is_multiplier: false,
+  spread_max_per_week: 2,
+  spread_max_per_team: 3,
+  spread_allow_captain_stack: false,
 };
 
 // ─── Draft ─────────────────────────────────────────────────────────────────
@@ -265,6 +279,25 @@ export interface GameResult {
 
 export type GameData = Record<string, Record<number, GameResult>>;
 
+// ─── Spread Betting ────────────────────────────────────────────────────────
+
+export interface SpreadPick {
+  id: string;
+  league_id: string;
+  user_id: string;
+  team_id: string;
+  week: number;
+  locked_spread: number;   // negative = team is favored, positive = underdog
+  picked_at: string;
+  result: 'covered' | 'missed' | null;
+  points: number | null;
+  commissioner_override: boolean;
+}
+
+// Map of teamId → spread point value (negative = favored, positive = underdog)
+// null means no line available for that team this week
+export type SpreadData = Record<string, number | null>;
+
 export interface APRanking {
   rank: number;
   team_name: string;
@@ -302,6 +335,7 @@ export interface WeeklyScore {
   week: number;
   points: number;
   captain_team_id: string | null;
+  spread_team_ids: string[];
   breakdown: ScoreBreakdown[];
 }
 
@@ -310,6 +344,7 @@ export interface ScoreBreakdown {
   team_name: string;
   points: number;
   is_captain: boolean;
+  spread_points: number;
   game: GameResult | null;
 }
 
