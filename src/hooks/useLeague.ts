@@ -271,16 +271,42 @@ export function useLeague(user: User | null) {
     if (!league || !user) { console.warn('[setCaptain] no league or user'); return; }
     const uses = captainPicks.filter(p => p.user_id === user.id && p.team_id === teamId).length;
     const existing = captainPicks.find(p => p.user_id === user.id && p.week === week);
+
     if (existing?.team_id === teamId) {
+      // Remove captain — update local state immediately
+      setCaptainPicks(prev => prev.filter(p => p.id !== existing.id));
       await supabase.from('captain_picks').delete().eq('id', existing.id);
     } else {
       if (!existing && uses >= 2) return;
-      await supabase.from('captain_picks').upsert({
+      // Replace or add captain — update local state immediately
+      const newPick: CaptainPick = {
+        id: existing?.id ?? `temp-${Date.now()}`,
         league_id: league.id,
         user_id:   user.id,
         team_id:   teamId,
         week,
-      }, { onConflict: 'league_id,user_id,week' });
+        picked_at: new Date().toISOString(),
+      };
+      if (existing) {
+        // Replace existing week pick
+        setCaptainPicks(prev => prev.map(p =>
+          p.id === existing.id ? { ...newPick, id: existing.id } : p
+        ));
+      } else {
+        setCaptainPicks(prev => [...prev, newPick]);
+      }
+      const { data } = await supabase.from('captain_picks').upsert({
+        league_id: league.id,
+        user_id:   user.id,
+        team_id:   teamId,
+        week,
+      }, { onConflict: 'league_id,user_id,week' }).select().single();
+      // Update with real ID from server
+      if (data) {
+        setCaptainPicks(prev => prev.map(p =>
+          p.id === newPick.id ? data as CaptainPick : p
+        ));
+      }
     }
   }, []);
 
@@ -338,6 +364,23 @@ export function useLeague(user: User | null) {
     }, { onConflict: 'league_id,user_id,team_id,week' });
 
     if (err) return { error: err.message };
+    // Update local state immediately
+    const newPick: SpreadPick = {
+      id: `temp-${Date.now()}`,
+      league_id: league.id,
+      user_id: user.id,
+      team_id: teamId,
+      week,
+      locked_spread: lockedSpread,
+      picked_at: new Date().toISOString(),
+      result: null,
+      points: null,
+      commissioner_override: false,
+    };
+    setSpreadPicks(prev => {
+      const without = prev.filter(p => !(p.user_id === user.id && p.team_id === teamId && p.week === week));
+      return [...without, newPick];
+    });
     return {};
   }, []);
 
@@ -350,9 +393,15 @@ export function useLeague(user: User | null) {
       p => p.user_id === user.id && p.week === week && p.team_id === teamId
     );
     if (!pick) return {};
+    // Update local state immediately
+    setSpreadPicks(prev => prev.filter(p => p.id !== pick.id));
     const { error: err } = await supabase
       .from('spread_picks').delete().eq('id', pick.id);
-    if (err) return { error: err.message };
+    if (err) {
+      // Revert on error
+      setSpreadPicks(prev => [...prev, pick]);
+      return { error: err.message };
+    }
     return {};
   }, []);
 
