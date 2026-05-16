@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import type {
@@ -33,6 +33,16 @@ export function useLeague(user: User | null) {
 
   const myMembership = members.find(m => m.user_id === user?.id);
   const isCommissioner = myMembership?.role === 'commissioner';
+
+  // Refs so action functions always have fresh values without stale closures
+  const leagueRef = useRef(league);
+  const userRef   = useRef(user);
+  const captainPicksRef = useRef(captainPicks);
+  const spreadPicksRef  = useRef(spreadPicks);
+  leagueRef.current       = league;
+  userRef.current         = user;
+  captainPicksRef.current = captainPicks;
+  spreadPicksRef.current  = spreadPicks;
 
   const loadAllLeagues = useCallback(async () => {
     if (!user) { setLoading(false); return; }
@@ -254,8 +264,11 @@ export function useLeague(user: User | null) {
     return {};
   };
 
-  const setCaptain = async (week: number, teamId: string) => {
-    if (!league || !user) return;
+  const setCaptain = useCallback(async (week: number, teamId: string) => {
+    const league = leagueRef.current;
+    const user   = userRef.current;
+    const captainPicks = captainPicksRef.current;
+    if (!league || !user) { console.warn('[setCaptain] no league or user'); return; }
     const uses = captainPicks.filter(p => p.user_id === user.id && p.team_id === teamId).length;
     const existing = captainPicks.find(p => p.user_id === user.id && p.week === week);
     if (existing?.team_id === teamId) {
@@ -269,15 +282,19 @@ export function useLeague(user: User | null) {
         week,
       }, { onConflict: 'league_id,user_id,week' });
     }
-  };
+  }, []);
 
   // ── Spread pick actions ──────────────────────────────────────────────────
 
-  const setSpreadPick = async (
+  const setSpreadPick = useCallback(async (
     week: number,
     teamId: string,
     lockedSpread: number,
   ): Promise<{ error?: string }> => {
+    const league = leagueRef.current;
+    const user   = userRef.current;
+    const spreadPicks = spreadPicksRef.current;
+    const captainPicks = captainPicksRef.current;
     if (!league || !user) return { error: 'Not ready' };
     const settings = league.scoring;
 
@@ -322,9 +339,12 @@ export function useLeague(user: User | null) {
 
     if (err) return { error: err.message };
     return {};
-  };
+  }, []);
 
-  const removeSpreadPick = async (week: number, teamId: string): Promise<{ error?: string }> => {
+  const removeSpreadPick = useCallback(async (week: number, teamId: string): Promise<{ error?: string }> => {
+    const league = leagueRef.current;
+    const user   = userRef.current;
+    const spreadPicks = spreadPicksRef.current;
     if (!league || !user) return { error: 'Not ready' };
     const pick = spreadPicks.find(
       p => p.user_id === user.id && p.week === week && p.team_id === teamId
@@ -334,7 +354,7 @@ export function useLeague(user: User | null) {
       .from('spread_picks').delete().eq('id', pick.id);
     if (err) return { error: err.message };
     return {};
-  };
+  }, []);
 
   // Commissioner: override spread result
   const overrideSpreadResult = async (
