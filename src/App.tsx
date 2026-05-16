@@ -99,7 +99,7 @@ export default function App() {
             } />
             <Route path="/roster"         element={<RosterPage league={lg} members={league.members} draftPicks={league.draftPicks} captainPicks={league.captainPicks} gameData={cfb.gameData} userId={auth.user.id} onSetCaptain={league.setCaptain} />} />
             <Route path="/roster/:userId" element={<RosterPage league={lg} members={league.members} draftPicks={league.draftPicks} captainPicks={league.captainPicks} gameData={cfb.gameData} userId={auth.user.id} onSetCaptain={league.setCaptain} />} />
-           <Route path="/rankings" element={<RankingsPage rankings={cfb.rankings} teams={cfb.teams} records={cfb.records} />} />
+            <Route path="/rankings" element={<RankingsPage rankings={cfb.rankings} teams={cfb.teams} records={cfb.records} />} />
             <Route path="/draft"          element={
               <DraftRoom
                 league={lg}
@@ -116,6 +116,7 @@ export default function App() {
               <AdminPanel
                 league={lg}
                 members={league.members}
+                draftPicks={league.draftPicks}
                 manualBonuses={league.manualBonuses}
                 isCommissioner={league.isCommissioner}
                 onSendInvite={league.sendInvite}
