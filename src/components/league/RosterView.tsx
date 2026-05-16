@@ -546,11 +546,13 @@ export function RosterView({
                 return (
                   <div
                     key={entry.team_id}
-                    className={`card p-4 transition-all cursor-pointer hover:border-turf-600 ${isCaptain ? 'border-gold-500/50 bg-amber-950/20' : ''}`}
-                    onClick={() => setModalTeam(entry)}
-                    title="View full schedule"
+                    className={`card p-4 transition-all ${isCaptain ? 'border-gold-500/50 bg-amber-950/20' : ''}`}
                   >
-                    <div className="flex items-start gap-3">
+                    {/* Clickable header — opens schedule modal */}
+                    <button
+                      className="w-full flex items-start gap-3 text-left hover:opacity-90 transition-opacity"
+                      onClick={() => setModalTeam(entry)}
+                    >
                       <img
                         src={entry.team_logo}
                         alt={entry.team_name}
@@ -559,7 +561,7 @@ export function RosterView({
                       />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="font-medium text-white truncate group-hover:text-field-300">{entry.team_name}</span>
+                          <span className="font-medium text-white truncate">{entry.team_name}</span>
                           {isCaptain && (
                             <span className="badge-gold text-xs">
                               <Star className="w-2.5 h-2.5 fill-current" /> Captain
@@ -573,7 +575,7 @@ export function RosterView({
                           {weekBreak.points > 0 ? '+' : ''}{weekBreak.points}
                         </div>
                       )}
-                    </div>
+                    </button>
 
                     {game ? (
                       <button
@@ -634,7 +636,7 @@ export function RosterView({
 
                     {isOwner && onSetCaptain && (
                       <button
-                        onClick={e => { e.stopPropagation(); onSetCaptain(currentWeek, entry.team_id); }}
+                        onClick={() => onSetCaptain(currentWeek, entry.team_id)}
                         disabled={!canBeCaptain && !isCaptain}
                         className={`mt-3 w-full text-xs py-1.5 rounded-md transition-all border ${
                           isCaptain
@@ -711,7 +713,7 @@ export function RosterView({
                               </span>
                               {!spreadResult && !kickedOff && isOwner && onRemoveSpread && (
                                 <button
-                                  onClick={e => { e.stopPropagation(); onRemoveSpread(currentWeek, entry.team_id); }}
+                                  onClick={() => onRemoveSpread(currentWeek, entry.team_id)}
                                   className="text-blue-500 hover:text-red-400 transition-colors ml-2"
                                 >
                                   ✕ Remove
@@ -720,8 +722,7 @@ export function RosterView({
                             </div>
                           ) : weekSpread !== null && isOwner && onSetSpread ? (
                             <button
-                              onClick={async e => {
-                                e.stopPropagation();
+                              onClick={async () => {
                                 if (!canPick) return;
                                 const result = await onSetSpread(currentWeek, entry.team_id, weekSpread);
                                 if (result.error) setSpreadError(result.error);
