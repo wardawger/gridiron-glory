@@ -180,9 +180,13 @@ export async function fetchSeasonData(teams: CfbTeam[]): Promise<GameData> {
     const awayPoints     = g.away_points     ?? g.awayPoints     ?? null;
     const startDate      = g.start_date      ?? g.startDate      ?? '';
 
-    // Trust CFBD's week number directly — it already returns week=0 for
-    // Week Zero games and week=1+ for regular season. No reclassification needed.
-    const week = g.week ?? 1;
+    // CFBD returns Week Zero games as week=1 with an August start date.
+    // Reclassify: if week=1 and the game is in August, it's actually week 0.
+    let week = g.week ?? 1;
+    if (week === 1 && startDate) {
+      const d = new Date(startDate);
+      if (d.getMonth() === 7) week = 0; // month 7 = August
+    }
 
     const completed = g.completed || (homePoints != null && awayPoints != null);
 
