@@ -2,6 +2,7 @@ import type {
   ScoringSettings, GameResult, WeeklyScore, ScoreBreakdown,
   LeaderboardEntry, LeagueMember, RosterEntry, CaptainPick,
   GameData, ManualBonus, TeamSeasonStats, StatRankingBonus,
+  SpreadPick,
 } from '../types';
 
 export { P4_CONFERENCES, DRAFT_CONF_MIN, DRAFT_CONF_MAX } from '../types';
@@ -29,6 +30,48 @@ export function scoreGame(
   return isCaptain ? pts * 2 : pts;
 }
 
+// ── Spread scoring ────────────────────────────────────────────────────────
+// Determines if a team covered the spread given the final score.
+// lockedSpread: negative = team is favored (must win by more than |spread|)
+//               positive = team is underdog (can lose by less than spread or win)
+// Returns true if covered, false if missed, null if game not complete.
+
+export function didCoverSpread(
+  game: GameResult,
+  lockedSpread: number,
+  isHome: boolean,
+): boolean | null {
+  if (!game.completed || game.home_score == null || game.away_score == null) return null;
+
+  const homeMargin = game.home_score - game.away_score;
+  const teamMargin = isHome ? homeMargin : -homeMargin;
+
+  // Team covers if: actual margin > -lockedSpread
+  // e.g. spread = -7 (favored by 7): must win by more than 7 → margin > 7
+  // e.g. spread = +3 (underdog by 3): can lose by less than 3 → margin > -3
+  return teamMargin > -lockedSpread;
+}
+
+export function scoreSpread(
+  game: GameResult,
+  settings: ScoringSettings,
+  lockedSpread: number,
+  isHome: boolean,
+  baseGamePoints: number, // pre-captain base points for multiplier mode
+): number {
+  const covered = didCoverSpread(game, lockedSpread, isHome);
+  if (covered === null) return 0; // game not complete yet
+
+  if (settings.spread_is_multiplier) {
+    // Multiplier mode: earn/lose a fraction of base game points
+    const bonus = Math.round(Math.abs(baseGamePoints) * (settings.spread_points - 1));
+    return covered ? bonus : -bonus;
+  } else {
+    // Flat points mode
+    return covered ? settings.spread_points : -settings.spread_points;
+  }
+}
+
 export function calcWeeklyScore(
   userId: string,
   week: number,
@@ -36,37 +79,61 @@ export function calcWeeklyScore(
   captainPicks: CaptainPick[],
   gameData: GameData,
   settings: ScoringSettings,
+  spreadPicks: SpreadPick[] = [],
 ): WeeklyScore {
   const captainPick = captainPicks.find(
     p => p.user_id === userId && p.week === week
   );
   const captainTeamId = captainPick?.team_id ?? null;
 
+  const weekSpreadPicks = spreadPicks.filter(
+    p => p.user_id === userId && p.week === week
+  );
+  const spreadTeamIds = weekSpreadPicks.map(p => p.team_id);
+
   const breakdown: ScoreBreakdown[] = roster.map(entry => {
-    const game = gameData[entry.team_id]?.[week] ?? null;
+    const game      = gameData[entry.team_id]?.[week] ?? null;
     const isCaptain = entry.team_id === captainTeamId;
-    const pts = game ? scoreGame(game, settings, isCaptain) : 0;
+    const gamePts   = game ? scoreGame(game, settings, isCaptain) : 0;
+
+    // Spread points for this team this week
+    let spreadPts = 0;
+    if (settings.spread_enabled && game) {
+      const spreadPick = weekSpreadPicks.find(p => p.team_id === entry.team_id);
+      if (spreadPick) {
+        // If commissioner already resolved it, use stored points
+        if (spreadPick.points !== null && spreadPick.result !== null) {
+          spreadPts = spreadPick.points;
+        } else {
+          // Auto-score from game data
+          const baseGamePts = game ? scoreGame(game, settings, false) : 0;
+          const isHome = (game as any).is_home ?? true;
+          spreadPts = scoreSpread(game, settings, spreadPick.locked_spread, isHome, baseGamePts);
+        }
+      }
+    }
+
     return {
-      team_id:    entry.team_id,
-      team_name:  entry.team_name,
-      points:     pts,
-      is_captain: isCaptain,
+      team_id:      entry.team_id,
+      team_name:    entry.team_name,
+      points:       gamePts + spreadPts,
+      is_captain:   isCaptain,
+      spread_points: spreadPts,
       game,
     };
   });
 
   return {
-    user_id: userId,
+    user_id:         userId,
     week,
-    points: breakdown.reduce((s, b) => s + b.points, 0),
+    points:          breakdown.reduce((s, b) => s + b.points, 0),
     captain_team_id: captainTeamId,
+    spread_team_ids: spreadTeamIds,
     breakdown,
   };
 }
 
 // ─── Stat ranking bonuses ─────────────────────────────────────────────────
-// Ranks ALL drafted teams (across all users) for each stat category.
-// Returns per-user bonus points based on where their teams rank.
 
 type StatKey = 'qbr' | 'rushing_tds' | 'receiving_tds' | 'def_ints' | 'sacks';
 
@@ -76,11 +143,10 @@ const BOT3_PTS  = -3;
 const TOP_N     = 3;
 
 export function calcStatRankingBonuses(
-  rosters: Map<string, RosterEntry[]>,  // userId → teams
+  rosters: Map<string, RosterEntry[]>,
   seasonStats: Map<string, TeamSeasonStats>,
   isPreview: boolean,
 ): Map<string, StatRankingBonus[]> {
-  // Collect all drafted team IDs across all users
   const allDraftedIds = new Set<string>();
   rosters.forEach(roster => roster.forEach(t => allDraftedIds.add(t.team_id)));
 
@@ -88,7 +154,6 @@ export function calcStatRankingBonuses(
   rosters.forEach((_, userId) => result.set(userId, []));
 
   for (const stat of STAT_KEYS) {
-    // Build ranked list of all drafted teams for this stat (highest first)
     const ranked = Array.from(allDraftedIds)
       .map(id => ({ id, val: seasonStats.get(id)?.[stat] ?? null }))
       .filter(x => x.val !== null)
@@ -96,7 +161,6 @@ export function calcStatRankingBonuses(
 
     const total = ranked.length;
 
-    // Assign bonuses
     ranked.forEach((entry, idx) => {
       const rank = idx + 1;
       const isTop = rank <= TOP_N;
@@ -105,7 +169,6 @@ export function calcStatRankingBonuses(
 
       const pts = isTop ? TOP3_PTS : BOT3_PTS;
 
-      // Find which user owns this team
       rosters.forEach((roster, userId) => {
         const team = roster.find(t => t.team_id === entry.id);
         if (!team) return;
@@ -135,9 +198,9 @@ export function buildLeaderboard(
   manualBonuses: ManualBonus[],
   seasonStats: Map<string, TeamSeasonStats>,
   confChampComplete: boolean,
+  spreadPicks: SpreadPick[] = [],
   totalWeeks = 17,
 ): LeaderboardEntry[] {
-  // Stat bonuses: if conf champ not complete, show as preview
   const statBonuses = calcStatRankingBonuses(rosters, seasonStats, !confChampComplete);
 
   return members
@@ -146,7 +209,9 @@ export function buildLeaderboard(
       const weekly: WeeklyScore[] = [];
 
       for (let w = 0; w <= totalWeeks; w++) {
-        weekly.push(calcWeeklyScore(member.user_id, w, roster, captainPicks, gameData, settings));
+        weekly.push(calcWeeklyScore(
+          member.user_id, w, roster, captainPicks, gameData, settings, spreadPicks
+        ));
       }
 
       const weeklyTotal = weekly.reduce((s, w) => s + w.points, 0);
