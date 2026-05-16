@@ -1,4 +1,4 @@
-import type { CfbTeam, GameData, GameResult, APRanking, TeamSeasonStats } from '../types';
+import type { CfbTeam, GameData, GameResult, APRanking, TeamSeasonStats, SpreadData } from '../types';
 
 // All CFBD API calls are routed through a Netlify serverless proxy to avoid
 // CORS issues when fetching from the browser. The proxy adds the API key
@@ -372,4 +372,66 @@ export async function fetchSeasonStats(teams: CfbTeam[]): Promise<Map<string, Te
   }
 
   return map;
+}
+
+// ── Spread / Betting Lines ─────────────────────────────────────────────────
+// Fetches point spreads for a given week from CFBD /lines endpoint.
+// Returns a map of teamId → spread (negative = favored, positive = underdog).
+// Uses DraftKings as primary provider, falls back to ESPN Bet, then any available.
+
+const PREFERRED_PROVIDERS = ['draftkings', 'espnbet', 'fanduel', 'bovada'];
+
+export async function fetchSpreads(
+  teams: CfbTeam[],
+  year: number,
+  week: number,
+  seasonType = 'regular',
+): Promise<SpreadData> {
+  const result: SpreadData = {};
+  teams.forEach(t => { result[t.id] = null; });
+
+  try {
+    const res = await cfbdFetch('/lines', { year, week, seasonType });
+    if (!res.ok) return result;
+    const data = await res.json();
+    if (!Array.isArray(data)) return result;
+
+    // Build name→id map for matching
+    const nameToId = new Map(teams.map(t => [t.name.toLowerCase(), t.id]));
+    const idToTeam = new Map(teams.map(t => [t.id, t]));
+
+    for (const game of data) {
+      const homeTeam = (game.homeTeam ?? game.home_team ?? '').toLowerCase();
+      const awayTeam = (game.awayTeam ?? game.away_team ?? '').toLowerCase();
+      const homeId   = nameToId.get(homeTeam) ?? null;
+      const awayId   = nameToId.get(awayTeam) ?? null;
+
+      if (!homeId && !awayId) continue;
+
+      const lines: any[] = game.lines ?? [];
+      if (!lines.length) continue;
+
+      // Pick best available provider
+      let line: any = null;
+      for (const provider of PREFERRED_PROVIDERS) {
+        line = lines.find((l: any) =>
+          (l.provider ?? l.formattedSpread ?? '').toLowerCase().includes(provider)
+        );
+        if (line) break;
+      }
+      if (!line) line = lines[0]; // fallback to whatever is available
+      if (!line) continue;
+
+      // spread is from home team perspective: negative = home favored
+      const rawSpread = parseFloat(line.spread ?? line.homeSpread ?? line.formattedSpread ?? '0');
+      if (isNaN(rawSpread)) continue;
+
+      if (homeId && result[homeId] === null) result[homeId] = rawSpread;
+      if (awayId && result[awayId] === null) result[awayId] = -rawSpread; // flip for away
+    }
+  } catch (e) {
+    console.warn('[CFBD] fetchSpreads failed:', e);
+  }
+
+  return result;
 }
