@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Shield, TrendingUp, TrendingDown, Minus, Star, Calendar, List, X, MapPin, Tv, Clock } from 'lucide-react';
 import type { RosterEntry, CaptainPick, GameData, ScoringSettings, LeagueMember, WeeklyScore } from '../../types';
 import { calcWeeklyScore } from '../../services/scoring';
+import { Tooltip } from '../ui/Tooltip';
 
 interface Props {
   member: LeagueMember;
@@ -450,10 +451,10 @@ export function RosterView({
                       <tr key={entry.team_id} className="hover:bg-turf-800/20 transition-colors">
                         {/* Team name — sticky left, clickable */}
                         <td className="px-4 py-2.5 sticky left-0 bg-turf-900 z-10 border-r border-turf-800">
+                          <Tooltip content="Click to view full schedule" position="right" width="w-44">
                           <button
                             className="flex items-center gap-2 text-left w-full group"
                             onClick={() => setModalTeam(entry)}
-                            title="View full schedule"
                           >
                             <img
                               src={entry.team_logo}
@@ -465,6 +466,7 @@ export function RosterView({
                               {entry.team_name}
                             </span>
                           </button>
+                          </Tooltip>
                           <div className="text-turf-600 mt-0.5 pl-8">
                             {captainUses}/2 captain uses
                           </div>
@@ -501,13 +503,18 @@ export function RosterView({
                               {game ? (
                                 <div className="space-y-1 flex flex-col items-center">
                                   {/* Opponent logo */}
+                                  <Tooltip
+                                    content={`${isHome ? 'vs' : 'at'} ${game.opponent}${game.opponent_rank ? ` (#${game.opponent_rank})` : ''}`}
+                                    position="bottom"
+                                    width="w-40"
+                                  >
                                   <img
                                     src={oppLogo ?? teamLogoFallback(game.opponent)}
                                     alt={game.opponent}
                                     className="w-7 h-7 object-contain"
-                                    title={`${isHome ? 'vs' : 'at'} ${game.opponent}${game.opponent_rank ? ` (#${game.opponent_rank})` : ''}`}
                                     onError={e => { (e.target as HTMLImageElement).src = teamLogoFallback(game.opponent); }}
                                   />
+                                  </Tooltip>
 
                                   {/* Home/Away indicator + rank */}
                                   <span className="text-turf-600 text-xs leading-none">
