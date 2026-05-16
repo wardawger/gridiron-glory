@@ -407,8 +407,8 @@ export function RosterView({
   } | null>(null);
 
   const currentScore = useMemo(
-    () => calcWeeklyScore(member.user_id, currentWeek, roster, captainPicks, gameData, scoring),
-    [member.user_id, currentWeek, roster, captainPicks, gameData, scoring]
+    () => calcWeeklyScore(member.user_id, currentWeek, roster, captainPicks, gameData, scoring, spreadPicks),
+    [member.user_id, currentWeek, roster, captainPicks, gameData, scoring, spreadPicks]
   );
 
   const captainThisWeek = captainPicks.find(
