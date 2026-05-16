@@ -578,19 +578,18 @@ export function RosterView({
                     </button>
 
                     {game ? (
-                      <button
-                        className="mt-3 w-full text-left group/game"
-                        onClick={e => {
-                          e.stopPropagation();
-                          setGameScoreModal({
-                            game,
-                            teamName: entry.team_name,
-                            teamLogo: entry.team_logo,
-                            week: currentWeek,
-                            isCaptain,
-                          });
-                        }}
-                        title=""
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        className="mt-3 w-full text-left group/game cursor-pointer"
+                        onClick={() => setGameScoreModal({
+                          game,
+                          teamName: entry.team_name,
+                          teamLogo: entry.team_logo,
+                          week: currentWeek,
+                          isCaptain,
+                        })}
+                        onKeyDown={e => { if (e.key === 'Enter') setGameScoreModal({ game, teamName: entry.team_name, teamLogo: entry.team_logo, week: currentWeek, isCaptain }); }}
                       >
                         <div className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-turf-800/60 transition-colors">
                           <div className="flex items-center gap-2 min-w-0">
@@ -629,7 +628,7 @@ export function RosterView({
                             <span className="text-turf-700 group-hover/game:text-turf-500 transition-colors text-xs">↗</span>
                           </div>
                         </div>
-                      </button>
+                      </div>
                     ) : (
                       <p className="mt-2 text-xs text-turf-600">No game this week</p>
                     )}
