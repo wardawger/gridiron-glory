@@ -364,23 +364,21 @@ export function useLeague(user: User | null) {
     }, { onConflict: 'league_id,user_id,team_id,week' });
 
     if (err) return { error: err.message };
-    // Update local state immediately
-    const newPick: SpreadPick = {
-      id: `temp-${Date.now()}`,
-      league_id: league.id,
-      user_id: user.id,
-      team_id: teamId,
-      week,
-      locked_spread: lockedSpread,
-      picked_at: new Date().toISOString(),
-      result: null,
-      points: null,
-      commissioner_override: false,
-    };
-    setSpreadPicks(prev => {
-      const without = prev.filter(p => !(p.user_id === user.id && p.team_id === teamId && p.week === week));
-      return [...without, newPick];
-    });
+    // Fetch the real record from Supabase to get the actual ID
+    const { data: saved } = await supabase
+      .from('spread_picks')
+      .select('*')
+      .eq('league_id', league.id)
+      .eq('user_id', user.id)
+      .eq('team_id', teamId)
+      .eq('week', week)
+      .single();
+    if (saved) {
+      setSpreadPicks(prev => {
+        const without = prev.filter(p => !(p.user_id === user.id && p.team_id === teamId && p.week === week));
+        return [...without, saved as SpreadPick];
+      });
+    }
     return {};
   }, []);
 
