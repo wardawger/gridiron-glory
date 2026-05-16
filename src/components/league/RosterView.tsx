@@ -61,7 +61,7 @@ function formatSpread(spread: number | null | undefined): string {
 
 function spreadLabel(spread: number | null | undefined, teamName: string): string {
   if (spread == null) return 'No line';
-  if (spread === 0) return 'Pick 'em';
+  if (spread === 0) return "Pick 'em";
   return spread < 0
     ? `${teamName} favored by ${Math.abs(spread)}`
     : `${teamName} underdog by ${spread}`;
