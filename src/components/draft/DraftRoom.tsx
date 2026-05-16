@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { Search, Clock, CheckCircle2, Zap, ChevronDown, AlertCircle } from 'lucide-react';
 import type { League, LeagueMember, DraftPick, CfbTeam } from '../../types';
 import { getPickOwner, P4_CONFERENCES, DRAFT_CONF_MIN, DRAFT_CONF_MAX } from '../../services/scoring';
+import { Tooltip } from '../ui/Tooltip';
 
 // Re-export from types so DraftRoom can use them
 import { P4_CONFERENCES as P4_CONF_LIST } from '../../types';
@@ -63,11 +64,10 @@ export function DraftRoom({
     if (count >= DRAFT_CONF_MAX) {
       return `Max ${DRAFT_CONF_MAX} from ${team.conference}`;
     }
-    // Check if we MUST pick from this conference (not enough picks left to satisfy minimum)
     return null;
   };
 
-  // Warn if minimum won't be met — which P4 conferences still need picks
+  // Warn if minimum won't be met
   const confWarnings = useMemo(() => {
     if (!isMyTurn) return [];
     const warnings: string[] = [];
@@ -116,7 +116,6 @@ export function DraftRoom({
   const handlePick = async (team: CfbTeam) => {
     if (!isMyTurn || picking) return;
 
-    // Enforce max conference limit
     const block = getConfBlock(team);
     if (block) {
       setPickError(block);
@@ -124,7 +123,6 @@ export function DraftRoom({
       return;
     }
 
-    // Enforce minimum: if remaining picks = remaining minimums needed, must pick from deficient conf
     const mustPickConfs = (P4_CONF_LIST as readonly string[]).filter(conf => {
       const current = myConfCounts[conf] ?? 0;
       const needed = Math.max(0, DRAFT_CONF_MIN - current);
@@ -166,7 +164,6 @@ export function DraftRoom({
           </p>
         </div>
 
-        {/* Draft rules reminder */}
         <div className="card p-4 text-left text-sm space-y-2">
           <p className="font-medium text-turf-300">Draft Rules</p>
           <ul className="text-turf-400 space-y-1">
@@ -269,7 +266,7 @@ export function DraftRoom({
         </div>
       </div>
 
-      {/* Conference tracker — shown to current player */}
+      {/* Conference tracker */}
       {isMyTurn && (
         <div className="card p-3 grid grid-cols-4 gap-2">
           {(['SEC', 'Big Ten', 'Big 12', 'ACC'] as const).map(conf => {
@@ -277,17 +274,30 @@ export function DraftRoom({
             const atMax = count >= DRAFT_CONF_MAX;
             const atMin = count >= DRAFT_CONF_MIN;
             return (
-              <div key={conf} className={`text-center p-2 rounded-lg ${
-                atMax ? 'bg-red-900/30 border border-red-800/50' :
-                atMin ? 'bg-field-900/30 border border-field-800/50' :
-                'bg-turf-800'
-              }`}>
-                <p className="text-xs text-turf-400 truncate">{conf}</p>
-                <p className={`font-mono font-bold text-lg ${
-                  atMax ? 'text-red-400' : atMin ? 'text-field-400' : 'text-white'
-                }`}>{count}/{DRAFT_CONF_MAX}</p>
-                <p className="text-xs text-turf-500">min {DRAFT_CONF_MIN}</p>
-              </div>
+              <Tooltip
+                key={conf}
+                content={
+                  atMax
+                    ? `Maximum reached — you can't draft any more ${conf} teams.`
+                    : atMin
+                    ? `${conf} minimum met. You can draft up to ${DRAFT_CONF_MAX - count} more.`
+                    : `You need at least ${DRAFT_CONF_MIN - count} more from ${conf}.`
+                }
+                position="bottom"
+                width="w-52"
+              >
+                <div className={`text-center p-2 rounded-lg w-full cursor-default ${
+                  atMax ? 'bg-red-900/30 border border-red-800/50' :
+                  atMin ? 'bg-field-900/30 border border-field-800/50' :
+                  'bg-turf-800'
+                }`}>
+                  <p className="text-xs text-turf-400 truncate">{conf}</p>
+                  <p className={`font-mono font-bold text-lg ${
+                    atMax ? 'text-red-400' : atMin ? 'text-field-400' : 'text-white'
+                  }`}>{count}/{DRAFT_CONF_MAX}</p>
+                  <p className="text-xs text-turf-500">min {DRAFT_CONF_MIN}</p>
+                </div>
+              </Tooltip>
             );
           })}
         </div>
@@ -345,13 +355,13 @@ export function DraftRoom({
             {available.map(team => {
               const block = isMyTurn ? getConfBlock(team) : null;
               const isBlocked = !!block;
-              return (
+
+              const card = (
                 <button
                   key={team.id}
                   onClick={() => handlePick(team)}
                   disabled={!isMyTurn || picking || isBlocked}
-                  title={block ?? undefined}
-                  className={`card text-left p-3 flex items-center gap-3 transition-all group ${
+                  className={`card text-left p-3 flex items-center gap-3 transition-all group w-full ${
                     isBlocked
                       ? 'opacity-40 cursor-not-allowed border-red-900/30'
                       : isMyTurn && !picking
@@ -363,7 +373,7 @@ export function DraftRoom({
                     src={team.logo}
                     alt={team.name}
                     className="w-8 h-8 object-contain flex-shrink-0"
-                    onError={e => { (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(team.name)}&background=166534&color=fff`; }}
+                    onError={e => { (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(team.name)}&background=052e16&color=4ade80`; }}
                   />
                   <div className="flex-1 min-w-0">
                     <p className={`text-sm font-medium truncate transition-colors ${
@@ -383,6 +393,13 @@ export function DraftRoom({
                   )}
                 </button>
               );
+
+              // Wrap blocked teams in a styled tooltip
+              return isBlocked ? (
+                <Tooltip key={team.id} content={block} position="top" width="w-48">
+                  {card}
+                </Tooltip>
+              ) : card;
             })}
           </div>
         </div>
