@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Shield, UserPlus, Copy, Check, Trash2, Plus, Mail, Settings, Gift, RotateCcw, AlertTriangle } from 'lucide-react';
 import type {
-  League, LeagueMember, ManualBonus, DraftPick,
+  League, LeagueMember, ManualBonus, DraftPick, SpreadPick,
   BonusType, ScoringSettings,
 } from '../../types';
 import { BONUS_LABELS, BONUS_DEFAULT_POINTS } from '../../types';
@@ -11,6 +11,7 @@ interface Props {
   members: LeagueMember[];
   draftPicks: DraftPick[];
   manualBonuses: ManualBonus[];
+  spreadPicks: SpreadPick[];
   isCommissioner: boolean;
   onSendInvite: (email: string) => Promise<{ token?: string; error?: string }>;
   onUpdateWeek: (week: number) => void;
@@ -19,13 +20,16 @@ interface Props {
   onRemoveBonus: (id: string) => void;
   onRemoveFromRoster: (userId: string, teamId: string) => void;
   onResetDraft: () => Promise<{ error?: string }>;
+  onOverrideSpread: (pickId: string, result: 'covered' | 'missed', points: number) => Promise<{ error?: string }>;
+  onClearSpreadOverride: (pickId: string) => Promise<{ error?: string }>;
 }
 
 type Tab = 'members' | 'scoring' | 'bonuses';
 
 export function AdminPanel({
-  league, members, draftPicks, manualBonuses, isCommissioner,
+  league, members, draftPicks, manualBonuses, spreadPicks, isCommissioner,
   onSendInvite, onUpdateWeek, onUpdateScoring, onAddBonus, onRemoveBonus, onResetDraft,
+  onOverrideSpread, onClearSpreadOverride,
 }: Props) {
   const [tab, setTab]           = useState<Tab>('members');
   const [inviteEmail, setEmail] = useState('');
@@ -262,28 +266,139 @@ export function AdminPanel({
 
       {/* ── SCORING TAB ──────────────────────────────────── */}
       {tab === 'scoring' && (
-        <div className="card p-5 space-y-4">
-          <p className="text-sm text-turf-400">Adjust scoring settings for this league. Changes apply to all weeks.</p>
-          <div className="grid grid-cols-2 gap-4">
-            {(Object.entries(scoring) as [keyof ScoringSettings, number][]).map(([key, val]) => {
-              const labels: Record<keyof ScoringSettings, string> = {
-                win: 'Win', win_ranked: 'Beat Ranked', win_top15: 'Beat Top 15',
-                win_top5: 'Beat Top 5', loss: 'Loss', loss_g5: 'Loss to G5',
-              };
-              return (
-                <div key={key}>
-                  <label className="label">{labels[key]}</label>
-                  <input
-                    className="input font-mono"
-                    type="number"
-                    step="0.5"
-                    value={val}
-                    onChange={e => setScoring(prev => ({ ...prev, [key]: parseFloat(e.target.value) || 0 }))}
-                  />
-                </div>
-              );
-            })}
+        <div className="space-y-4">
+          {/* Base scoring */}
+          <div className="card p-5 space-y-4">
+            <h3 className="font-medium text-white text-sm">Base Scoring</h3>
+            <p className="text-xs text-turf-400">Adjust scoring settings for this league. Changes apply to all weeks.</p>
+            <div className="grid grid-cols-2 gap-4">
+              {(['win', 'win_ranked', 'win_top15', 'win_top5', 'loss', 'loss_g5'] as const).map(key => {
+                const labels: Record<string, string> = {
+                  win: 'Win', win_ranked: 'Beat Ranked', win_top15: 'Beat Top 15',
+                  win_top5: 'Beat Top 5', loss: 'Loss', loss_g5: 'Loss to G5',
+                };
+                return (
+                  <div key={key}>
+                    <label className="label">{labels[key]}</label>
+                    <input
+                      className="input font-mono"
+                      type="number"
+                      step="0.5"
+                      value={scoring[key] as number}
+                      onChange={e => setScoring(prev => ({ ...prev, [key]: parseFloat(e.target.value) || 0 }))}
+                    />
+                  </div>
+                );
+              })}
+            </div>
           </div>
+
+          {/* Spread betting settings */}
+          <div className="card p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-medium text-white text-sm">Spread Betting</h3>
+                <p className="text-xs text-turf-400 mt-0.5">Users pick which teams will cover or beat the spread each week</p>
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <span className="text-xs text-turf-400">{scoring.spread_enabled ? 'Enabled' : 'Disabled'}</span>
+                <button
+                  onClick={() => setScoring(prev => ({ ...prev, spread_enabled: !prev.spread_enabled }))}
+                  className={`relative w-10 h-5 rounded-full transition-colors ${scoring.spread_enabled ? 'bg-field-500' : 'bg-turf-700'}`}
+                >
+                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${scoring.spread_enabled ? 'left-5' : 'left-0.5'}`} />
+                </button>
+              </label>
+            </div>
+
+            {scoring.spread_enabled && (
+              <div className="space-y-4 pt-2 border-t border-turf-800">
+                {/* Points mode toggle */}
+                <div>
+                  <label className="label">Point Mode</label>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setScoring(prev => ({ ...prev, spread_is_multiplier: false }))}
+                      className={`flex-1 py-2 rounded-lg text-sm border transition-all ${!scoring.spread_is_multiplier ? 'bg-field-500 text-turf-950 border-field-500' : 'border-turf-700 text-turf-400 hover:text-white'}`}
+                    >
+                      Flat Points
+                    </button>
+                    <button
+                      onClick={() => setScoring(prev => ({ ...prev, spread_is_multiplier: true }))}
+                      className={`flex-1 py-2 rounded-lg text-sm border transition-all ${scoring.spread_is_multiplier ? 'bg-field-500 text-turf-950 border-field-500' : 'border-turf-700 text-turf-400 hover:text-white'}`}
+                    >
+                      Multiplier
+                    </button>
+                  </div>
+                  <p className="text-xs text-turf-500 mt-1">
+                    {scoring.spread_is_multiplier
+                      ? 'Multiplier: earn a multiple of the base game points for covering'
+                      : 'Flat: earn a set number of points for covering the spread'}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="label">
+                      {scoring.spread_is_multiplier ? 'Multiplier (×)' : 'Points for Covering'}
+                    </label>
+                    <input
+                      className="input font-mono"
+                      type="number"
+                      step={scoring.spread_is_multiplier ? '0.1' : '0.5'}
+                      min="0"
+                      value={scoring.spread_points}
+                      onChange={e => setScoring(prev => ({ ...prev, spread_points: parseFloat(e.target.value) || 0 }))}
+                    />
+                    <p className="text-xs text-turf-600 mt-0.5">
+                      Penalty for missing: {scoring.spread_is_multiplier ? `×${scoring.spread_points}` : `-${scoring.spread_points} pts`}
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="label">Max Picks / Week</label>
+                    <input
+                      className="input font-mono"
+                      type="number"
+                      min="1"
+                      max="10"
+                      value={scoring.spread_max_per_week}
+                      onChange={e => setScoring(prev => ({ ...prev, spread_max_per_week: parseInt(e.target.value) || 1 }))}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="label">Max Picks / Team / Season</label>
+                    <input
+                      className="input font-mono"
+                      type="number"
+                      min="1"
+                      max="20"
+                      value={scoring.spread_max_per_team}
+                      onChange={e => setScoring(prev => ({ ...prev, spread_max_per_team: parseInt(e.target.value) || 1 }))}
+                    />
+                  </div>
+
+                  <div className="flex flex-col justify-end">
+                    <label className="label">Captain Stacking</label>
+                    <label className="flex items-center gap-2 cursor-pointer mt-1">
+                      <button
+                        onClick={() => setScoring(prev => ({ ...prev, spread_allow_captain_stack: !prev.spread_allow_captain_stack }))}
+                        className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${scoring.spread_allow_captain_stack ? 'bg-field-500' : 'bg-turf-700'}`}
+                      >
+                        <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${scoring.spread_allow_captain_stack ? 'left-5' : 'left-0.5'}`} />
+                      </button>
+                      <span className="text-xs text-turf-400">
+                        {scoring.spread_allow_captain_stack ? 'Allowed' : 'Not allowed'}
+                      </span>
+                    </label>
+                    <p className="text-xs text-turf-600 mt-0.5">Pick spread on captain's team</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
           <button onClick={handleSaveScoring} className="btn-primary">
             Save Scoring Settings
           </button>
@@ -394,6 +509,74 @@ export function AdminPanel({
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {/* Spread pick overrides */}
+          {league.scoring.spread_enabled && spreadPicks.length > 0 && (
+            <div className="card overflow-hidden">
+              <div className="px-5 py-3 border-b border-turf-800">
+                <h3 className="font-medium text-white text-sm">Spread Pick Overrides</h3>
+                <p className="text-xs text-turf-400 mt-0.5">Manually set result for any spread pick if auto-scoring is incorrect</p>
+              </div>
+              <div className="divide-y divide-turf-800 max-h-96 overflow-y-auto">
+                {spreadPicks
+                  .sort((a, b) => b.week - a.week || a.user_id.localeCompare(b.user_id))
+                  .map(pick => {
+                    const mem = members.find(m => m.user_id === pick.user_id);
+                    const team = draftPicks.find(p => p.team_id === pick.team_id && p.user_id === pick.user_id);
+                    const spreadLabel = pick.locked_spread > 0
+                      ? `+${pick.locked_spread} (underdog)`
+                      : `${pick.locked_spread} (favored)`;
+                    return (
+                      <div key={pick.id} className="px-4 py-3 flex items-center gap-3 flex-wrap">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-white text-sm font-medium">{mem?.display_name}</span>
+                            <span className="text-turf-400 text-xs">·</span>
+                            <span className="text-turf-300 text-xs">{team?.team_name ?? pick.team_id}</span>
+                            <span className="text-turf-500 text-xs">Wk {pick.week}</span>
+                            <span className="font-mono text-xs text-turf-500">{spreadLabel}</span>
+                            {pick.commissioner_override && (
+                              <span className="badge-gold text-xs">Override</span>
+                            )}
+                          </div>
+                          <div className="text-xs text-turf-500 mt-0.5">
+                            {pick.result
+                              ? <span className={pick.result === 'covered' ? 'text-field-400' : 'text-red-400'}>
+                                  {pick.result === 'covered' ? '✓ Covered' : '✗ Missed'}
+                                  {pick.points !== null ? ` · ${pick.points > 0 ? '+' : ''}${pick.points} pts` : ''}
+                                </span>
+                              : <span className="text-turf-600">Pending</span>
+                            }
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <button
+                            onClick={() => onOverrideSpread(pick.id, 'covered', league.scoring.spread_points)}
+                            className="text-xs border border-field-700 text-field-400 hover:bg-field-900/30 rounded px-2 py-1 transition-colors"
+                          >
+                            ✓ Covered
+                          </button>
+                          <button
+                            onClick={() => onOverrideSpread(pick.id, 'missed', -league.scoring.spread_points)}
+                            className="text-xs border border-red-800 text-red-400 hover:bg-red-900/20 rounded px-2 py-1 transition-colors"
+                          >
+                            ✗ Missed
+                          </button>
+                          {pick.commissioner_override && (
+                            <button
+                              onClick={() => onClearSpreadOverride(pick.id)}
+                              className="text-xs text-turf-500 hover:text-turf-300 transition-colors"
+                            >
+                              Clear
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
             </div>
           )}
         </div>
