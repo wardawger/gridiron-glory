@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Award, TrendingUp, TrendingDown } from 'lucide-react';
 import type { League, LeagueMember, RosterEntry, TeamSeasonStats } from '../../types';
+import { normalizeScoring } from '../../types';
 import { calcStatRankingBonuses } from '../../services/scoring';
 import { buildStatBonusBoard } from '../../services/analytics';
 import { TeamLogo } from '../ui/TeamLogo';
@@ -14,12 +15,12 @@ interface Props {
 
 export function StatBonusPage({ league, members, rosters, seasonStats }: Props) {
   const confChampComplete = league.current_week >= 15;
-  const statBonusPoints = league.scoring.stat_bonus_points;
+  const scoring = useMemo(() => normalizeScoring(league.scoring), [league.scoring]);
 
   const board = useMemo(() => {
-    const byUser = calcStatRankingBonuses(rosters, seasonStats, !confChampComplete, statBonusPoints);
+    const byUser = calcStatRankingBonuses(rosters, seasonStats, !confChampComplete, scoring);
     return buildStatBonusBoard(byUser, rosters, members);
-  }, [rosters, seasonStats, confChampComplete, statBonusPoints, members]);
+  }, [rosters, seasonStats, confChampComplete, scoring, members]);
 
   const hasAnyData = board.some(b => b.top.length > 0 || b.bottom.length > 0);
 
@@ -35,7 +36,7 @@ export function StatBonusPage({ league, members, rosters, seasonStats }: Props) 
             <div>
               <h1 className="font-display text-2xl tracking-wide text-white">Statistical Bonuses</h1>
               <p className="text-turf-500 text-sm">
-                ±{statBonusPoints} pts for a Top 3 / Bottom 3 finish, among all drafted teams
+                Awarded to whoever owns the Top 3 / Bottom 3 team in each enabled category
               </p>
             </div>
           </div>
@@ -58,63 +59,71 @@ export function StatBonusPage({ league, members, rosters, seasonStats }: Props) 
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {board.map(category => (
-            <div key={category.stat} className="card p-4 space-y-3">
-              <h3 className="font-display text-lg tracking-wide text-white">{category.label}</h3>
+          {board.map(category => {
+            const topOn = scoring.stat_bonus_top3_enabled && scoring.stat_bonus_top3_categories[category.stat];
+            const botOn = scoring.stat_bonus_bottom3_enabled && scoring.stat_bonus_bottom3_categories[category.stat];
+            return (
+              <div key={category.stat} className="card p-4 space-y-3">
+                <h3 className="font-display text-lg tracking-wide text-white">{category.label}</h3>
 
-              <div>
-                <p className="text-xs text-field-500 uppercase tracking-wide font-medium mb-1.5 flex items-center gap-1">
-                  <TrendingUp className="w-3 h-3" /> Top 3
-                </p>
-                {category.top.length === 0 ? (
-                  <p className="text-xs text-turf-600 py-1">No data yet</p>
-                ) : (
-                  <div className="space-y-1">
-                    {category.top.map(e => (
-                      <div key={e.team_id} className="card-inner flex items-center gap-2.5 px-3 py-2">
-                        <span className="font-mono text-xs text-field-400 w-5 flex-shrink-0">#{e.rank}</span>
-                        <TeamLogo src={e.team_logo} alt={e.team_name} fallbackName={e.team_name} size={24} />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-medium text-white truncate">{e.team_name}</p>
-                          <p className="text-xs text-turf-500 truncate">{e.owner_name}</p>
+                <div>
+                  <p className="text-xs text-field-500 uppercase tracking-wide font-medium mb-1.5 flex items-center gap-1">
+                    <TrendingUp className="w-3 h-3" /> Top 3
+                  </p>
+                  {!topOn ? (
+                    <p className="text-xs text-turf-600 py-1">Not enabled</p>
+                  ) : category.top.length === 0 ? (
+                    <p className="text-xs text-turf-600 py-1">No data yet</p>
+                  ) : (
+                    <div className="space-y-1">
+                      {category.top.map(e => (
+                        <div key={e.team_id} className="card-inner flex items-center gap-2.5 px-3 py-2">
+                          <span className="font-mono text-xs text-field-400 w-5 flex-shrink-0">#{e.rank}</span>
+                          <TeamLogo src={e.team_logo} alt={e.team_name} fallbackName={e.team_name} size={24} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium text-white truncate">{e.team_name}</p>
+                            <p className="text-xs text-turf-500 truncate">{e.owner_name}</p>
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <p className="font-mono text-xs text-turf-300">{e.value.toFixed(1)}</p>
+                            <p className="font-mono text-xs text-field-400">+{e.points}</p>
+                          </div>
                         </div>
-                        <div className="text-right flex-shrink-0">
-                          <p className="font-mono text-xs text-turf-300">{e.value.toFixed(1)}</p>
-                          <p className="font-mono text-xs text-field-400">+{e.points}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
-              <div>
-                <p className="text-xs text-red-400 uppercase tracking-wide font-medium mb-1.5 flex items-center gap-1">
-                  <TrendingDown className="w-3 h-3" /> Bottom 3
-                </p>
-                {category.bottom.length === 0 ? (
-                  <p className="text-xs text-turf-600 py-1">No data yet</p>
-                ) : (
-                  <div className="space-y-1">
-                    {category.bottom.map(e => (
-                      <div key={e.team_id} className="card-inner flex items-center gap-2.5 px-3 py-2">
-                        <span className="font-mono text-xs text-red-400 w-5 flex-shrink-0">#{e.rank}</span>
-                        <TeamLogo src={e.team_logo} alt={e.team_name} fallbackName={e.team_name} size={24} />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-medium text-white truncate">{e.team_name}</p>
-                          <p className="text-xs text-turf-500 truncate">{e.owner_name}</p>
+                <div>
+                  <p className="text-xs text-red-400 uppercase tracking-wide font-medium mb-1.5 flex items-center gap-1">
+                    <TrendingDown className="w-3 h-3" /> Bottom 3
+                  </p>
+                  {!botOn ? (
+                    <p className="text-xs text-turf-600 py-1">Not enabled</p>
+                  ) : category.bottom.length === 0 ? (
+                    <p className="text-xs text-turf-600 py-1">No data yet</p>
+                  ) : (
+                    <div className="space-y-1">
+                      {category.bottom.map(e => (
+                        <div key={e.team_id} className="card-inner flex items-center gap-2.5 px-3 py-2">
+                          <span className="font-mono text-xs text-red-400 w-5 flex-shrink-0">#{e.rank}</span>
+                          <TeamLogo src={e.team_logo} alt={e.team_name} fallbackName={e.team_name} size={24} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium text-white truncate">{e.team_name}</p>
+                            <p className="text-xs text-turf-500 truncate">{e.owner_name}</p>
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <p className="font-mono text-xs text-turf-300">{e.value.toFixed(1)}</p>
+                            <p className="font-mono text-xs text-red-400">{e.points}</p>
+                          </div>
                         </div>
-                        <div className="text-right flex-shrink-0">
-                          <p className="font-mono text-xs text-turf-300">{e.value.toFixed(1)}</p>
-                          <p className="font-mono text-xs text-red-400">{e.points}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

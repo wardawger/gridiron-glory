@@ -5,7 +5,7 @@ import type {
   League, LeagueMember, DraftPick, CaptainPick,
   ManualBonus, SpreadPick, FreeAgencyMove, LeagueRole,
 } from '../types';
-import { P4_CONFERENCES, DRAFT_CONF_MAX } from '../types';
+import { P4_CONFERENCES, DRAFT_CONF_MAX, DEFAULT_SCORING } from '../types';
 import { rosterAtWeek, currentRosters } from '../services/roster';
 
 export function useLeague(user: User | null) {
@@ -182,14 +182,7 @@ export function useLeague(user: User | null) {
         draft_order: [user.id],
         draft_status: 'pending',
         draft_current_pick: 1,
-        scoring: {
-          win: 1, win_ranked: 1, win_top15: 2, win_top5: 3, loss: -1, loss_g5: -5,
-          spread_enabled: false, spread_points: 2, spread_is_multiplier: false,
-          spread_max_per_week: 2, spread_max_per_team: 3, spread_allow_captain_stack: false,
-          free_agency_enabled: false, fa_max_moves_per_season: 10, fa_max_moves_per_week: 2,
-          fa_penalty_enabled: false, fa_penalty_points: 3,
-          stat_bonus_points: 3,
-        },
+        scoring: DEFAULT_SCORING,
       })
       .select()
       .single();

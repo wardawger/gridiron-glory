@@ -4,6 +4,7 @@ import type {
   GameData, ManualBonus, TeamSeasonStats, StatRankingBonus,
   SpreadPick, DraftPick, FreeAgencyMove,
 } from '../types';
+import { STAT_BONUS_CATEGORIES, normalizeScoring } from '../types';
 import { rosterAtWeek, currentRosters } from './roster';
 
 export { P4_CONFERENCES, DRAFT_CONF_MIN, DRAFT_CONF_MAX } from '../types';
@@ -142,38 +143,43 @@ export function calcWeeklyScore(
 
 // ─── Stat ranking bonuses ─────────────────────────────────────────────────
 
-type StatKey = 'qbr' | 'rushing_tds' | 'receiving_tds' | 'def_ints' | 'sacks';
-
-const STAT_KEYS: StatKey[] = ['qbr', 'rushing_tds', 'receiving_tds', 'def_ints', 'sacks'];
-const TOP_N     = 3;
+const TOP_N = 3;
 
 export function calcStatRankingBonuses(
   rosters: Map<string, RosterEntry[]>,
   seasonStats: Map<string, TeamSeasonStats>,
   isPreview: boolean,
-  statBonusPoints = 3,
+  rawSettings: ScoringSettings,
 ): Map<string, StatRankingBonus[]> {
+  const settings = normalizeScoring(rawSettings);
   const allDraftedIds = new Set<string>();
   rosters.forEach(roster => roster.forEach(t => allDraftedIds.add(t.team_id)));
 
   const result = new Map<string, StatRankingBonus[]>();
   rosters.forEach((_, userId) => result.set(userId, []));
 
-  for (const stat of STAT_KEYS) {
+  for (const stat of STAT_BONUS_CATEGORIES) {
+    const topOn = settings.stat_bonus_top3_enabled && settings.stat_bonus_top3_categories[stat];
+    const botOn = settings.stat_bonus_bottom3_enabled && settings.stat_bonus_bottom3_categories[stat];
+    if (!topOn && !botOn) continue;
+
     const ranked = Array.from(allDraftedIds)
       .map(id => ({ id, val: seasonStats.get(id)?.[stat] ?? null }))
       .filter(x => x.val !== null)
       .sort((a, b) => (b.val as number) - (a.val as number));
 
     const total = ranked.length;
+    const statPoints = settings.stat_bonus_points[stat];
 
     ranked.forEach((entry, idx) => {
       const rank = idx + 1;
       const isTop = rank <= TOP_N;
-      const isBot = rank > total - TOP_N;
+      const isBot = !isTop && rank > total - TOP_N;
+      if (isTop && !topOn) return;
+      if (isBot && !botOn) return;
       if (!isTop && !isBot) return;
 
-      const pts = isTop ? statBonusPoints : -statBonusPoints;
+      const pts = isTop ? statPoints : -statPoints;
 
       rosters.forEach((roster, userId) => {
         const team = roster.find(t => t.team_id === entry.id);
@@ -210,7 +216,7 @@ export function buildLeaderboard(
   totalWeeks = 17,
 ): LeaderboardEntry[] {
   const rosters = currentRosters(members, draftPicks, freeAgencyMoves, currentWeek);
-  const statBonuses = calcStatRankingBonuses(rosters, seasonStats, !confChampComplete, settings.stat_bonus_points);
+  const statBonuses = calcStatRankingBonuses(rosters, seasonStats, !confChampComplete, settings);
 
   return members
     .map(member => {

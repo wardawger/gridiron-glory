@@ -35,6 +35,20 @@ export interface LeagueMember {
 
 // ─── Scoring ───────────────────────────────────────────────────────────────
 
+export type StatBonusCategory = 'qbr' | 'rushing_tds' | 'receiving_tds' | 'def_ints' | 'sacks';
+
+export const STAT_BONUS_CATEGORIES: StatBonusCategory[] = [
+  'qbr', 'rushing_tds', 'receiving_tds', 'def_ints', 'sacks',
+];
+
+export const STAT_BONUS_LABELS: Record<StatBonusCategory, string> = {
+  qbr:           'QBR (Passer Rating)',
+  rushing_tds:   'Rushing TDs',
+  receiving_tds: 'Receiving TDs',
+  def_ints:      'Defensive INTs',
+  sacks:         'Sacks',
+};
+
 export interface ScoringSettings {
   win: number;
   win_ranked: number;
@@ -56,7 +70,11 @@ export interface ScoringSettings {
   fa_penalty_enabled: boolean;
   fa_penalty_points: number;       // points subtracted the week a swap is made (entered as a positive number)
   // Statistical ranking bonus settings (Top 3 / Bottom 3 per category, among all drafted teams)
-  stat_bonus_points: number;       // points awarded/deducted for a Top 3 / Bottom 3 finish
+  stat_bonus_points: Record<StatBonusCategory, number>;        // points awarded/deducted per category, entered as a positive number
+  stat_bonus_top3_enabled: boolean;
+  stat_bonus_top3_categories: Record<StatBonusCategory, boolean>;
+  stat_bonus_bottom3_enabled: boolean;
+  stat_bonus_bottom3_categories: Record<StatBonusCategory, boolean>;
 }
 
 export const DEFAULT_SCORING: ScoringSettings = {
@@ -79,8 +97,37 @@ export const DEFAULT_SCORING: ScoringSettings = {
   fa_max_moves_per_week: 2,
   fa_penalty_enabled: false,
   fa_penalty_points: 3,
-  stat_bonus_points: 3,
+  stat_bonus_points: { qbr: 3, rushing_tds: 3, receiving_tds: 3, def_ints: 3, sacks: 3 },
+  stat_bonus_top3_enabled: true,
+  stat_bonus_top3_categories: { qbr: true, rushing_tds: true, receiving_tds: true, def_ints: true, sacks: true },
+  stat_bonus_bottom3_enabled: true,
+  stat_bonus_bottom3_categories: { qbr: true, rushing_tds: true, receiving_tds: true, def_ints: true, sacks: true },
 };
+
+// Fills in any missing/legacy-shaped scoring fields with defaults — handles
+// leagues saved before a settings field existed, or before it changed shape
+// (e.g. stat_bonus_points used to be a single number, not per-category).
+export function normalizeScoring(raw: Partial<ScoringSettings> | null | undefined): ScoringSettings {
+  const isPlainObject = (v: unknown): v is Record<string, unknown> =>
+    typeof v === 'object' && v !== null && !Array.isArray(v);
+
+  return {
+    ...DEFAULT_SCORING,
+    ...(raw ?? {}),
+    stat_bonus_points: {
+      ...DEFAULT_SCORING.stat_bonus_points,
+      ...(isPlainObject(raw?.stat_bonus_points) ? raw!.stat_bonus_points as any : {}),
+    },
+    stat_bonus_top3_categories: {
+      ...DEFAULT_SCORING.stat_bonus_top3_categories,
+      ...(isPlainObject(raw?.stat_bonus_top3_categories) ? raw!.stat_bonus_top3_categories as any : {}),
+    },
+    stat_bonus_bottom3_categories: {
+      ...DEFAULT_SCORING.stat_bonus_bottom3_categories,
+      ...(isPlainObject(raw?.stat_bonus_bottom3_categories) ? raw!.stat_bonus_bottom3_categories as any : {}),
+    },
+  };
+}
 
 // ─── Draft ─────────────────────────────────────────────────────────────────
 
@@ -355,7 +402,7 @@ export interface TeamSeasonStats {
 export interface StatRankingBonus {
   team_id:   string;
   team_name: string;
-  stat:      'qbr' | 'rushing_tds' | 'receiving_tds' | 'def_ints' | 'sacks';
+  stat:      StatBonusCategory;
   rank:      number;   // 1 = best
   points:    number;   // +3 or -3
   value:     number;   // actual stat value

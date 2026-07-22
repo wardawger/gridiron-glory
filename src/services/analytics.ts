@@ -1,4 +1,5 @@
-import type { LeaderboardEntry, DraftPick, LeagueMember, RosterEntry, StatRankingBonus } from '../types';
+import type { LeaderboardEntry, DraftPick, LeagueMember, RosterEntry, StatRankingBonus, StatBonusCategory } from '../types';
+import { STAT_BONUS_CATEGORIES, STAT_BONUS_LABELS } from '../types';
 
 export interface RosterAnalytics {
   user_id: string;
@@ -166,20 +167,11 @@ export interface StatBoardEntry {
 }
 
 export interface StatCategoryBoard {
-  stat: string;
+  stat: StatBonusCategory;
   label: string;
   top: StatBoardEntry[];
   bottom: StatBoardEntry[];
 }
-
-const STAT_CATEGORY_LABELS: Record<string, string> = {
-  qbr:            'QBR (Passer Rating)',
-  rushing_tds:    'Rushing TDs',
-  receiving_tds:  'Receiving TDs',
-  def_ints:       'Defensive INTs',
-  sacks:          'Sacks',
-};
-const STAT_CATEGORY_ORDER = ['qbr', 'rushing_tds', 'receiving_tds', 'def_ints', 'sacks'];
 
 // Reshapes calcStatRankingBonuses' per-user output into per-category
 // leaderboards, so the UI can show *why* a bonus was awarded, not just
@@ -192,7 +184,7 @@ export function buildStatBonusBoard(
   const memberName = (uid: string) => members.find(m => m.user_id === uid)?.display_name ?? 'Unknown';
 
   const boards = new Map<string, StatCategoryBoard>(
-    STAT_CATEGORY_ORDER.map(stat => [stat, { stat, label: STAT_CATEGORY_LABELS[stat], top: [], bottom: [] }])
+    STAT_BONUS_CATEGORIES.map(stat => [stat, { stat, label: STAT_BONUS_LABELS[stat], top: [], bottom: [] }])
   );
 
   statBonusesByUser.forEach((bonuses, userId) => {
@@ -219,7 +211,7 @@ export function buildStatBonusBoard(
     board.bottom.sort((a, b) => a.rank - b.rank);
   });
 
-  return STAT_CATEGORY_ORDER.map(stat => boards.get(stat)!);
+  return STAT_BONUS_CATEGORIES.map(stat => boards.get(stat)!);
 }
 
 // Color scale: green (good) → yellow → red (bad), normalized to array
