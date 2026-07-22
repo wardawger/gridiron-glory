@@ -55,6 +55,7 @@ export function AdminPanel({
   const [inviting, setInviting] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [resetError, setResetError] = useState('');
+  const [showResetModal, setShowResetModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
@@ -133,23 +134,16 @@ export function AdminPanel({
     setBonusNote('');
   };
 
-  const handleResetDraft = async () => {
-    const confirmed = window.confirm(
-      '⚠️ Reset the draft?\n\n' +
-      'This will permanently delete ALL draft picks and return the league to pre-draft status.\n\n' +
-      'This cannot be undone. Are you sure?'
-    );
-    if (!confirmed) return;
-
-    const doubleConfirmed = window.confirm(
-      'Last chance — are you absolutely sure you want to delete all draft picks?'
-    );
-    if (!doubleConfirmed) return;
-
+  const handleConfirmReset = async () => {
     setResetting(true);
     setResetError('');
     const result = await onResetDraft();
-    if (result?.error) setResetError(result.error);
+    if (result?.error) {
+      setResetError(result.error);
+      setResetting(false);
+      return;
+    }
+    setShowResetModal(false);
     setResetting(false);
   };
 
@@ -277,18 +271,13 @@ export function AdminPanel({
                     Captain picks and bonuses are not affected.
                     This cannot be undone.
                   </p>
-                  {resetError && (
-                    <p className="text-xs text-red-400 mt-2">{resetError}</p>
-                  )}
                 </div>
               </div>
               <button
-                onClick={handleResetDraft}
-                disabled={resetting}
+                onClick={() => { setResetError(''); setShowResetModal(true); }}
                 className="btn-danger flex-shrink-0"
               >
-                <RotateCcw className={`w-4 h-4 ${resetting ? 'animate-spin' : ''}`} />
-                {resetting ? 'Resetting…' : 'Reset Draft'}
+                <RotateCcw className="w-4 h-4" /> Reset Draft
               </button>
             </div>
           </div>
@@ -311,6 +300,52 @@ export function AdminPanel({
                 className="btn-danger flex-shrink-0"
               >
                 <Trash2 className="w-4 h-4" /> Delete League
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reset Draft confirmation modal */}
+      {showResetModal && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4"
+          style={{ backgroundColor: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)' }}
+          onClick={() => !resetting && setShowResetModal(false)}
+        >
+          <div
+            className="relative w-full max-w-sm rounded-2xl border border-red-900/50 bg-turf-950 shadow-2xl p-6 space-y-4"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-900/40 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="w-5 h-5 text-red-400" />
+              </div>
+              <h3 className="font-display text-xl text-white tracking-wide">Reset Draft?</h3>
+            </div>
+            <p className="text-sm text-turf-300">
+              This permanently deletes every draft pick in <span className="text-white font-medium">{league.name}</span> and
+              returns the league to pre-draft status. Captain picks and bonuses are not affected.{' '}
+              <span className="text-red-400 font-medium">There is no way to recover the picks.</span>
+            </p>
+            {resetError && (
+              <p className="text-xs text-red-400">{resetError}</p>
+            )}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowResetModal(false)}
+                disabled={resetting}
+                className="btn-secondary flex-1"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmReset}
+                disabled={resetting}
+                className="btn-danger flex-1"
+              >
+                {resetting && <Loader2 className="w-4 h-4 animate-spin" />}
+                {resetting ? 'Resetting…' : 'Yes, Reset Draft'}
               </button>
             </div>
           </div>
