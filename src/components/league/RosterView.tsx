@@ -604,23 +604,31 @@ export function RosterView({
                     )}
 
                     {isOwner && onSetCaptain && (
-                      <button
-                        onClick={() => onSetCaptain(currentWeek, entry.team_id)}
-                        disabled={!canBeCaptain && !isCaptain}
-                        className={`mt-3 w-full text-xs py-1.5 rounded-md transition-all border ${
-                          isCaptain
-                            ? 'bg-amber-900/40 border-amber-700 text-amber-300'
-                            : canBeCaptain
-                            ? 'border-turf-600 text-turf-400 hover:border-gold-500 hover:text-gold-400'
-                            : 'border-turf-800 text-turf-700 cursor-not-allowed'
-                        }`}
-                      >
-                        {isCaptain
-                          ? '★ Remove Captain'
-                          : canBeCaptain
-                          ? `Set Captain (${2 - captainUses} uses left)`
-                          : 'Captain limit reached'}
-                      </button>
+                      <div className="mt-3 pt-3 border-t border-turf-800/60 flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <span className={`text-xs font-medium ${isCaptain ? 'text-gold-400' : 'text-turf-300'}`}>
+                            {isCaptain ? 'Captain ×2' : 'Captain'}
+                          </span>
+                          <p className="text-xs text-turf-600">
+                            {isCaptain
+                              ? 'Doubles points this week'
+                              : canBeCaptain
+                              ? `${2 - captainUses} use${2 - captainUses === 1 ? '' : 's'} left`
+                              : 'Limit reached'}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => onSetCaptain(currentWeek, entry.team_id)}
+                          disabled={!canBeCaptain && !isCaptain}
+                          aria-label={isCaptain ? 'Remove captain' : 'Set captain'}
+                          className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${
+                            isCaptain ? 'bg-gold-500' : canBeCaptain ? 'bg-turf-700' : 'bg-turf-800 opacity-50 cursor-not-allowed'
+                          }`}
+                        >
+                          <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${isCaptain ? 'left-5' : 'left-0.5'}`} />
+                        </button>
+                      </div>
                     )}
 
                     {/* Spread pick — shown when feature is enabled and team has a game */}
@@ -635,85 +643,69 @@ export function RosterView({
                       const atTeamLimit = !existingPick && teamSeasonUses >= scoring.spread_max_per_team;
                       const kickedOff = isGameKickedOff((game as any)?.start_date);
                       const stackBlocked = !scoring.spread_allow_captain_stack && isCaptain && !existingPick;
-                      const canPick = isOwner && !!onSetSpread && !atWeekLimit && !atTeamLimit && !kickedOff && !stackBlocked;
+                      const canPick = isOwner && !!onSetSpread && !atWeekLimit && !atTeamLimit && !kickedOff && !stackBlocked && weekSpread !== null;
                       const spreadResult = existingPick?.result ?? null;
+                      const canRemove = !!existingPick && !spreadResult && !kickedOff && isOwner && !!onRemoveSpread;
+                      const isOn = !!existingPick;
+                      const toggleDisabled = isOn ? !canRemove : !canPick;
 
-                      // Spread line row — always visible when feature on + has game
+                      const handleToggle = async () => {
+                        if (toggleDisabled) return;
+                        if (isOn) {
+                          if (onRemoveSpread) await onRemoveSpread(currentWeek, entry.team_id);
+                        } else if (onSetSpread && weekSpread !== null) {
+                          const result = await onSetSpread(currentWeek, entry.team_id, weekSpread);
+                          if (result.error) setSpreadError(result.error);
+                        }
+                      };
+
+                      let subtext: string;
+                      if (existingPick) {
+                        if (spreadResult === 'covered')      subtext = `✓ Covered ${formatSpread(existingPick.locked_spread)}`;
+                        else if (spreadResult === 'missed')  subtext = `✗ Missed ${formatSpread(existingPick.locked_spread)}`;
+                        else subtext = `Locked ${formatSpread(existingPick.locked_spread)} · ${teamSeasonUses}/${scoring.spread_max_per_team} season`;
+                      } else if (spreadsLoading && !weekSpread) {
+                        subtext = 'Loading line…';
+                      } else if (weekSpread === null) {
+                        subtext = 'No line yet';
+                      } else if (kickedOff) {
+                        subtext = 'Game in progress';
+                      } else if (stackBlocked) {
+                        subtext = 'Captain stack disabled';
+                      } else if (atTeamLimit) {
+                        subtext = `Team limit (${scoring.spread_max_per_team}/season)`;
+                      } else if (atWeekLimit) {
+                        subtext = `Week limit (${scoring.spread_max_per_week}/week)`;
+                      } else {
+                        subtext = `${formatSpread(weekSpread)} (${weekSpread < 0 ? 'favored' : weekSpread > 0 ? 'underdog' : "pick 'em"}) · ${weekPicks.length}/${scoring.spread_max_per_week} this week`;
+                      }
+
+                      const trackColor = spreadResult === 'covered' ? 'bg-field-600'
+                        : spreadResult === 'missed' ? 'bg-red-600'
+                        : isOn ? 'bg-blue-600'
+                        : 'bg-turf-700';
+                      const labelColor = spreadResult === 'covered' ? 'text-field-400'
+                        : spreadResult === 'missed' ? 'text-red-400'
+                        : isOn ? 'text-blue-300'
+                        : 'text-turf-300';
+
                       return (
-                        <div className="mt-2 border-t border-turf-800/60 pt-2 space-y-1.5">
-                          {/* Line display */}
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="text-turf-500 flex items-center gap-1">
-                              <Coins className="w-3 h-3" /> <span>Spread</span>
+                        <div className="mt-2 pt-2 border-t border-turf-800/60 flex items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <span className={`text-xs font-medium flex items-center gap-1 ${labelColor}`}>
+                              <Coins className="w-3 h-3 flex-shrink-0" /> Spread
                             </span>
-                            {spreadsLoading && !weekSpread ? (
-                              <span className="text-turf-600 italic">Loading line…</span>
-                            ) : weekSpread !== null ? (
-                              <span className={`font-mono font-medium ${
-                                existingPick ? 'text-blue-300' : 'text-turf-200'
-                              }`}>
-                                {formatSpread(weekSpread)}
-                                <span className="text-turf-500 font-normal ml-1.5">
-                                  ({weekSpread < 0 ? 'favored' : weekSpread > 0 ? 'underdog' : "pick 'em"})
-                                </span>
-                              </span>
-                            ) : (
-                              <span className="text-turf-600">No line yet</span>
-                            )}
+                            <p className="text-xs text-turf-600 truncate">{subtext}</p>
                           </div>
-
-                          {/* Season usage */}
-                          <div className="flex items-center justify-between text-xs text-turf-600">
-                            <span>{teamSeasonUses}/{scoring.spread_max_per_team} season uses</span>
-                            <span>{weekPicks.length}/{scoring.spread_max_per_week} this week</span>
-                          </div>
-
-                          {/* Pick/status button — full-width, same style as captain button */}
-                          {existingPick ? (
-                            // Spread is locked — full button click removes it (if allowed)
-                            !spreadResult && !kickedOff && isOwner && onRemoveSpread ? (
-                              <button
-                                onClick={() => onRemoveSpread(currentWeek, entry.team_id)}
-                                className="mt-0.5 w-full text-xs py-1.5 rounded-md transition-all border bg-blue-900/20 border-blue-700 text-blue-300 hover:bg-red-900/20 hover:border-red-700 hover:text-red-300 flex items-center justify-center gap-1.5"
-                              >
-                                <Coins className="w-3 h-3" />
-                                Spread Locked {formatSpread(existingPick.locked_spread)} — Remove
-                              </button>
-                            ) : (
-                              // Game in progress or result known — non-clickable status
-                              <div className={`mt-0.5 w-full text-xs py-1.5 rounded-md border flex items-center justify-center gap-1.5 ${
-                                spreadResult === 'covered' ? 'bg-field-900/30 border-field-700 text-field-300' :
-                                spreadResult === 'missed'  ? 'bg-red-900/20 border-red-800 text-red-300' :
-                                'bg-blue-900/20 border-blue-700 text-blue-300'
-                              }`}>
-                                <Coins className="w-3 h-3" />
-                                {spreadResult === 'covered' ? `✓ Covered ${formatSpread(existingPick.locked_spread)}` :
-                                 spreadResult === 'missed'  ? `✗ Missed ${formatSpread(existingPick.locked_spread)}` :
-                                 `Spread Locked ${formatSpread(existingPick.locked_spread)}`}
-                              </div>
-                            )
-                          ) : weekSpread !== null && isOwner && onSetSpread ? (
-                            <button
-                              onClick={async () => {
-                                if (!canPick) return;
-                                const result = await onSetSpread(currentWeek, entry.team_id, weekSpread);
-                                if (result.error) setSpreadError(result.error);
-                              }}
-                              disabled={!canPick}
-                              className={`mt-0.5 w-full text-xs py-1.5 rounded-md transition-all border flex items-center justify-center gap-1.5 ${
-                                canPick
-                                  ? 'border-blue-600 text-blue-300 hover:bg-blue-900/30 hover:border-blue-500'
-                                  : 'border-turf-800 text-turf-700 cursor-not-allowed'
-                              }`}
-                            >
-                              <Coins className="w-3 h-3" />
-                              {kickedOff    ? 'Game in progress' :
-                               stackBlocked ? 'Captain stack disabled' :
-                               atTeamLimit  ? `Team limit (${scoring.spread_max_per_team}/season)` :
-                               atWeekLimit  ? `Week limit (${scoring.spread_max_per_week}/week)` :
-                               `Pick Spread (${formatSpread(weekSpread)})`}
-                            </button>
-                          ) : null}
+                          <button
+                            type="button"
+                            onClick={handleToggle}
+                            disabled={toggleDisabled}
+                            aria-label={isOn ? 'Remove spread pick' : 'Pick spread'}
+                            className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${trackColor} ${toggleDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          >
+                            <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${isOn ? 'left-5' : 'left-0.5'}`} />
+                          </button>
                         </div>
                       );
                     })()}
