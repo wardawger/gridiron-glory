@@ -290,10 +290,17 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                     {analytics.map((a, i) => (
                       <th
                         key={a.user_id}
-                        className="px-3 py-3 text-center text-xs uppercase tracking-wide font-display text-base select-none"
-                        style={{ color: PLAYER_COLORS[i] }}
+                        className="px-3 py-3 text-center select-none"
                       >
-                        {a.display_name.split(' ')[0]}
+                        <span className="inline-flex items-center gap-1.5 max-w-[9rem]">
+                          <span
+                            className="w-2 h-2 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: PLAYER_COLORS[i] }}
+                          />
+                          <span className="font-sans font-bold text-sm text-white truncate">
+                            {a.display_name.split(' ')[0]}
+                          </span>
+                        </span>
                       </th>
                     ))}
                   </tr>
