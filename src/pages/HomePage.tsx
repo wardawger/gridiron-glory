@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Coins } from 'lucide-react';
 import { Leaderboard } from '../components/league/Leaderboard';
 import type { League, LeagueMember, CaptainPick, GameData, ManualBonus, DraftPick, TeamSeasonStats, APRanking, SpreadPick, FreeAgencyMove } from '../types';
 import { buildLeaderboard } from '../services/scoring';
@@ -52,7 +52,7 @@ export function HomePage({
       )}
       {league.scoring.spread_enabled && (
         <div className="card p-4 flex items-center gap-3 text-sm border-blue-800/40 bg-blue-950/20">
-          <span className="text-blue-400">📊</span>
+          <Coins className="w-4 h-4 text-blue-400 flex-shrink-0" />
           <span className="text-blue-300">
             Spread betting is active this season. Visit My Roster to make your weekly spread picks.
           </span>
