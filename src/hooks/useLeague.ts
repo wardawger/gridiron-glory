@@ -171,6 +171,29 @@ export function useLeague(user: User | null) {
     return () => { supabase.removeChannel(channel); };
   }, [league?.id]);
 
+  // Fallback polling while a draft is active. Realtime should cover this,
+  // but a live draft is exactly where a silently-misconfigured realtime
+  // publication hurts most, so this keeps picks and turn order in sync
+  // within a few seconds even if the subscription above isn't delivering.
+  useEffect(() => {
+    if (!league || league.draft_status !== 'active') return;
+    const leagueId = league.id;
+
+    const poll = async () => {
+      const [picksRes, leagueRes] = await Promise.all([
+        supabase.from('draft_picks').select('*').eq('league_id', leagueId).order('pick_number'),
+        supabase.from('leagues').select('*').eq('id', leagueId).single(),
+      ]);
+      if (picksRes.data) setDraftPicks(picksRes.data);
+      if (leagueRes.data) {
+        setAllLeagues(prev => prev.map(l => l.id === leagueId ? leagueRes.data as League : l));
+      }
+    };
+
+    const interval = setInterval(poll, 4000);
+    return () => clearInterval(interval);
+  }, [league?.id, league?.draft_status]);
+
   // ─── Actions ──────────────────────────────────────────────────────────────
 
   const createLeague = async (name: string, maxTeams: number, playerCount: number) => {
