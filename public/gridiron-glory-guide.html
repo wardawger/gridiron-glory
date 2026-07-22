@@ -586,9 +586,108 @@
     .heatmap-row { grid-template-columns: 120px repeat(4, 1fr); }
     .draft-grid { grid-template-columns: repeat(2, 1fr); }
   }
+
+  /* ── Icons ── */
+  .icon {
+    width: 1em; height: 1em;
+    display: inline-block;
+    vertical-align: -0.15em;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    flex-shrink: 0;
+  }
+  .dot-live {
+    display: inline-block;
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    background: #ef4444;
+    box-shadow: 0 0 0 3px rgba(239,68,68,0.25);
+    animation: dot-pulse 1.8s ease-in-out infinite;
+  }
+  @keyframes dot-pulse {
+    0%, 100% { box-shadow: 0 0 0 3px rgba(239,68,68,0.25); }
+    50% { box-shadow: 0 0 0 6px rgba(239,68,68,0.08); }
+  }
+
+  /* ── Scroll reveal ── */
+  .reveal {
+    opacity: 0;
+    transform: translateY(22px);
+    transition: opacity 0.6s ease, transform 0.6s ease;
+  }
+  .reveal.in-view { opacity: 1; transform: translateY(0); }
+  .feature-card:nth-child(1) { transition-delay: 0s; }
+  .feature-card:nth-child(2) { transition-delay: 0.06s; }
+  .feature-card:nth-child(3) { transition-delay: 0.12s; }
+  .feature-card:nth-child(4) { transition-delay: 0.18s; }
+  .feature-card:nth-child(5) { transition-delay: 0.24s; }
+  .feature-card:nth-child(6) { transition-delay: 0.3s; }
+  .feature-card:nth-child(7) { transition-delay: 0.36s; }
+  .feature-card:nth-child(8) { transition-delay: 0.42s; }
+
+  /* ── Timeline scroll animation ── */
+  .timeline::before {
+    transform: scaleY(var(--timeline-progress, 0));
+    transform-origin: top;
+    transition: transform 0.1s linear;
+  }
+  .tl-item {
+    opacity: 0;
+    transform: translateY(18px);
+    transition: opacity 0.5s ease, transform 0.5s ease;
+  }
+  .tl-item.in-view { opacity: 1; transform: translateY(0); }
+  .tl-dot {
+    transform: scale(0);
+    transition: transform 0.45s cubic-bezier(.34,1.56,.64,1) 0.15s;
+  }
+  .tl-item.in-view .tl-dot { transform: scale(1); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .reveal, .tl-item, .tl-dot { transition: none !important; opacity: 1 !important; transform: none !important; }
+    .timeline::before { transition: none !important; transform: scaleY(1) !important; }
+    .dot-live { animation: none !important; }
+  }
 </style>
 </head>
 <body>
+<svg style="display:none" aria-hidden="true">
+<defs>
+<symbol id="i-football" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="9" ry="5" transform="rotate(-40 12 12)"/><line x1="7.8" y1="15.5" x2="16.2" y2="8.5"/><line x1="9.3" y1="13.2" x2="10.7" y2="11.8"/><line x1="11.1" y1="11.4" x2="12.5" y2="10"/><line x1="12.9" y1="9.6" x2="14.3" y2="8.2"/></symbol>
+<symbol id="i-star" viewBox="0 0 24 24"><path d="M12 2.5l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5-5.8-3-5.8 3 1.1-6.5-4.7-4.6 6.5-.9z"/></symbol>
+<symbol id="i-bar-chart" viewBox="0 0 24 24"><line x1="5" y1="21" x2="5" y2="12"/><line x1="12" y1="21" x2="12" y2="7"/><line x1="19" y1="21" x2="19" y2="15"/><line x1="3" y1="21" x2="21" y2="21"/></symbol>
+<symbol id="i-trophy" viewBox="0 0 24 24"><path d="M8 4h8v6a4 4 0 0 1-8 0V4z"/><path d="M8 5H5a3 3 0 0 0 3 5"/><path d="M16 5h3a3 3 0 0 1-3 5"/><line x1="12" y1="14" x2="12" y2="18"/><path d="M9 21h6"/><line x1="12" y1="18" x2="12" y2="21"/></symbol>
+<symbol id="i-zap" viewBox="0 0 24 24"><polygon points="13 2 4 14 11 14 10 22 20 10 13 10 13 2"/></symbol>
+<symbol id="i-radio" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2"/><path d="M8.5 8.5a5 5 0 0 0 0 7"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M5.5 5.5a9 9 0 0 0 0 13"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+<symbol id="i-swap" viewBox="0 0 24 24"><polyline points="17 2 21 6 17 10"/><line x1="3" y1="6" x2="21" y2="6"/><polyline points="7 22 3 18 7 14"/><line x1="21" y1="18" x2="3" y2="18"/></symbol>
+<symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="M21 16l-5.5-5.5L4 21"/></symbol>
+<symbol id="i-bulb" viewBox="0 0 24 24"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a6 6 0 0 0-4 10.5c.7.6 1 1.4 1 2.5h6c0-1.1.3-1.9 1-2.5A6 6 0 0 0 12 2z"/></symbol>
+<symbol id="i-clipboard" viewBox="0 0 24 24"><rect x="6" y="4" width="12" height="17" rx="2"/><rect x="9" y="2" width="6" height="4" rx="1"/><line x1="9" y1="11" x2="15" y2="11"/><line x1="9" y1="15" x2="15" y2="15"/></symbol>
+<symbol id="i-coins" viewBox="0 0 24 24"><circle cx="8" cy="8" r="6"/><circle cx="15" cy="15" r="6"/></symbol>
+<symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s-7-6.5-7-11a7 7 0 0 1 14 0c0 4.5-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></symbol>
+<symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="16" y1="3" x2="16" y2="7"/></symbol>
+<symbol id="i-scale" viewBox="0 0 24 24"><line x1="12" y1="3" x2="12" y2="21"/><line x1="5" y1="7" x2="19" y2="7"/><path d="M5 7l-3 6a3 3 0 0 0 6 0z"/><path d="M19 7l-3 6a3 3 0 0 0 6 0z"/><line x1="8" y1="21" x2="16" y2="21"/></symbol>
+<symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 13a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V19a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H4a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H10a1.7 1.7 0 0 0 1-1.5V4a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V10a1.7 1.7 0 0 0 1.5 1H20a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
+<symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 21V4"/><path d="M5 4h14l-3 4 3 4H5"/></symbol>
+<symbol id="i-award" viewBox="0 0 24 24"><circle cx="12" cy="8" r="6"/><path d="M9 13.5L7 22l5-3 5 3-2-8.5"/></symbol>
+<symbol id="i-alert-triangle" viewBox="0 0 24 24"><path d="M12 3l10 18H2z"/><line x1="12" y1="9" x2="12" y2="14"/><circle cx="12" cy="17.4" r="0.9" fill="currentColor" stroke="none"/></symbol>
+<symbol id="i-trending-up" viewBox="0 0 24 24"><polyline points="3 17 9 11 13 15 21 6"/><polyline points="15 6 21 6 21 12"/></symbol>
+<symbol id="i-crown" viewBox="0 0 24 24"><path d="M3 17l1.5-8L9 13l3-7 3 7 4.5-4L21 17z"/><line x1="3" y1="20" x2="21" y2="20"/></symbol>
+<symbol id="i-pencil" viewBox="0 0 24 24"><path d="M17 3a2.8 2.8 0 0 1 4 4L7 21l-5 1 1-5z"/><line x1="15" y1="5" x2="19" y2="9"/></symbol>
+<symbol id="i-smile" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/><path d="M8.5 14a4 4 0 0 0 7 0"/></symbol>
+<symbol id="i-camera" viewBox="0 0 24 24"><path d="M5 7h3l2-2h4l2 2h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 16 14"/></symbol>
+<symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.5 3-6 6.5-6s6.5 2.5 6.5 6"/><circle cx="17" cy="8.5" r="2.8"/><path d="M15.5 14c2.5.3 4.5 2.5 4.5 6"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.3" y2="16.3"/></symbol>
+<symbol id="i-gift" viewBox="0 0 24 24"><rect x="3" y="9" width="18" height="4"/><rect x="5" y="13" width="14" height="8"/><line x1="12" y1="9" x2="12" y2="21"/><path d="M12 9C10 6 6 6 6 4a2 2 0 0 1 4 0c0 2 2 5 2 5z"/><path d="M12 9c2-3 6-3 6-5a2 2 0 0 0-4 0c0 2-2 5-2 5z"/></symbol>
+<symbol id="i-refresh" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><polyline points="21 3 21 8 16 8"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><polyline points="3 21 3 16 8 16"/></symbol>
+<symbol id="i-trash" viewBox="0 0 24 24"><line x1="4" y1="7" x2="20" y2="7"/><path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"/><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></symbol>
+</defs>
+</svg>
 <div class="page">
 
   <!-- ══ HERO ══ -->
@@ -598,11 +697,11 @@
     <h1>GRIDIRON GLORY</h1>
     <p class="hero-sub">College Football Fantasy League — User Guide & Setup Manual</p>
     <div class="hero-tags">
-      <span class="tag tag-green">🏈 Snake Draft</span>
-      <span class="tag tag-gold">⭐ Captain Picks</span>
-      <span class="tag tag-blue">📊 Live Scoring</span>
-      <span class="tag tag-green">🔴 Real-Time Draft</span>
-      <span class="tag tag-gold">🏆 Postseason Bonuses</span>
+      <span class="tag tag-green"><svg class="icon"><use href="#i-football"></use></svg> Snake Draft</span>
+      <span class="tag tag-gold"><svg class="icon"><use href="#i-star"></use></svg> Captain Picks</span>
+      <span class="tag tag-blue"><svg class="icon"><use href="#i-bar-chart"></use></svg> Live Scoring</span>
+      <span class="tag tag-green"><span class="dot-live" style="margin-right:2px;"></span> Real-Time Draft</span>
+      <span class="tag tag-gold"><svg class="icon"><use href="#i-trophy"></use></svg> Postseason Bonuses</span>
     </div>
   </div>
 
@@ -637,43 +736,43 @@
     </div>
 
     <div class="feature-grid">
-      <div class="feature-card">
-        <div class="feature-icon" style="background:rgba(34,197,94,0.1)">🐍</div>
+      <div class="feature-card reveal">
+        <div class="feature-icon" style="background:rgba(34,197,94,0.1);color:var(--green-400)"><svg class="icon"><use href="#i-zap"></use></svg></div>
         <div class="feature-title">Live Snake Draft</div>
         <div class="feature-body">Everyone joins the draft room at the same time. Picks happen in real-time — when it's your turn, the room lights up and you pick from the available teams.</div>
       </div>
-      <div class="feature-card">
-        <div class="feature-icon" style="background:rgba(245,158,11,0.1)">⭐</div>
+      <div class="feature-card reveal">
+        <div class="feature-icon" style="background:rgba(245,158,11,0.1);color:var(--gold-light)"><svg class="icon"><use href="#i-star"></use></svg></div>
         <div class="feature-title">Weekly Captain Picks</div>
         <div class="feature-body">Each week you designate one captain from your roster. Their points are doubled. Each team can only be captain twice per season — choose wisely.</div>
       </div>
-      <div class="feature-card">
-        <div class="feature-icon" style="background:rgba(96,165,250,0.1)">📡</div>
+      <div class="feature-card reveal">
+        <div class="feature-icon" style="background:rgba(96,165,250,0.1);color:var(--blue-400)"><svg class="icon"><use href="#i-radio"></use></svg></div>
         <div class="feature-title">Live Game Data</div>
         <div class="feature-body">Scores, rankings, and stats pull automatically from the College Football Data API every 30 minutes during the season. No manual entry needed for weekly results.</div>
       </div>
-      <div class="feature-card">
-        <div class="feature-icon" style="background:rgba(167,139,250,0.1)">🏆</div>
+      <div class="feature-card reveal">
+        <div class="feature-icon" style="background:rgba(167,139,250,0.1);color:var(--purple-400)"><svg class="icon"><use href="#i-trophy"></use></svg></div>
         <div class="feature-title">Full Postseason</div>
         <div class="feature-body">Scoring runs through the National Championship. Bowl games, CFP rounds, conference championships, Heisman Trophy — every milestone counts.</div>
       </div>
-      <div class="feature-card">
-        <div class="feature-icon" style="background:rgba(248,113,113,0.1)">📊</div>
+      <div class="feature-card reveal">
+        <div class="feature-icon" style="background:rgba(248,113,113,0.1);color:var(--red-400)"><svg class="icon"><use href="#i-bar-chart"></use></svg></div>
         <div class="feature-title">Roster Analytics</div>
         <div class="feature-body">A built-in analytics dashboard shows roster quality, best/worst picks, over/under draft value, and weekly scoring trends with heat-map comparisons.</div>
       </div>
-      <div class="feature-card">
-        <div class="feature-icon" style="background:rgba(34,197,94,0.1)">🔒</div>
+      <div class="feature-card reveal">
+        <div class="feature-icon" style="background:rgba(34,197,94,0.1);color:var(--green-400)"><svg class="icon"><use href="#i-lock"></use></svg></div>
         <div class="feature-title">Private Leagues</div>
         <div class="feature-body">Leagues are invite-only. The commissioner generates a personal link for each player — nobody can join without an invitation.</div>
       </div>
-      <div class="feature-card">
-        <div class="feature-icon" style="background:rgba(96,165,250,0.1)">🔁</div>
+      <div class="feature-card reveal">
+        <div class="feature-icon" style="background:rgba(96,165,250,0.1);color:var(--blue-400)"><svg class="icon"><use href="#i-swap"></use></svg></div>
         <div class="feature-title">Free Agency</div>
         <div class="feature-body">If the commissioner turns it on, drop an underperforming team and pick up an available one — within weekly and season limits the commissioner sets.</div>
       </div>
-      <div class="feature-card">
-        <div class="feature-icon" style="background:rgba(245,158,11,0.1)">🖼️</div>
+      <div class="feature-card reveal">
+        <div class="feature-icon" style="background:rgba(245,158,11,0.1);color:var(--gold-light)"><svg class="icon"><use href="#i-image"></use></svg></div>
         <div class="feature-title">Custom Avatars</div>
         <div class="feature-body">Represent yourself with a team logo, a sports emoji, or your own uploaded photo — set independently for each league you're in.</div>
       </div>
@@ -691,22 +790,22 @@
     </div>
 
     <div class="flow">
-      <div class="flow-step">
+      <div class="flow-step reveal">
         <div class="step-num">1</div>
         <div class="step-title">Sign Up</div>
         <div class="step-body">Visit the app URL, click Sign Up, enter your name and email. Verify your email — takes 30 seconds.</div>
       </div>
-      <div class="flow-step">
+      <div class="flow-step reveal">
         <div class="step-num">2</div>
         <div class="step-title">Create League</div>
         <div class="step-body">Name your league, choose number of players and teams per player. You become commissioner automatically.</div>
       </div>
-      <div class="flow-step">
+      <div class="flow-step reveal">
         <div class="step-num">3</div>
         <div class="step-title">Invite Players</div>
         <div class="step-body">Generate invite links in the Admin panel. Send each link to a player — they sign up and join automatically.</div>
       </div>
-      <div class="flow-step">
+      <div class="flow-step reveal">
         <div class="step-num">4</div>
         <div class="step-title">Draft Day</div>
         <div class="step-body">When everyone's ready, set the draft order and click Start Draft. All players pick in real time.</div>
@@ -714,7 +813,7 @@
     </div>
 
     <!-- Create League Screen Mockup -->
-    <div class="mockup-wrap" style="margin-top:32px;">
+    <div class="mockup-wrap reveal" style="margin-top:32px;">
       <div class="mockup-bar">
         <div class="mockup-dot" style="background:#ff5f57"></div>
         <div class="mockup-dot" style="background:#febc2e"></div>
@@ -761,22 +860,22 @@
     </div>
 
     <div class="invite-flow">
-      <div class="invite-step">
+      <div class="invite-step reveal">
         <div class="invite-step-num">1</div>
         <div class="invite-step-title">Commissioner generates link</div>
         <div class="invite-step-body">Admin → Members & Invites → enter email → click Invite. A unique link appears instantly.</div>
       </div>
-      <div class="invite-step">
+      <div class="invite-step reveal">
         <div class="invite-step-num">2</div>
         <div class="invite-step-title">Copy & share the link</div>
         <div class="invite-step-body">Click Copy and send it via text, email, or group chat. No email server needed.</div>
       </div>
-      <div class="invite-step">
+      <div class="invite-step reveal">
         <div class="invite-step-num">3</div>
         <div class="invite-step-title">Player signs up</div>
         <div class="invite-step-body">They click the link, create an account, verify email, and land directly in the league.</div>
       </div>
-      <div class="invite-step">
+      <div class="invite-step reveal">
         <div class="invite-step-num">4</div>
         <div class="invite-step-title">Ready to draft!</div>
         <div class="invite-step-body">Once all players have joined, commissioner sets draft order and starts the draft.</div>
@@ -784,7 +883,7 @@
     </div>
 
     <div class="callout callout-green" style="margin-top:20px;">
-      <div class="callout-icon">💡</div>
+      <div class="callout-icon"><svg class="icon" style="color:var(--green-400)"><use href="#i-bulb"></use></svg></div>
       <div class="callout-text"><strong>Multi-league support:</strong> Players can belong to multiple leagues. A league switcher in the header lets anyone toggle between leagues they've joined. You can run separate leagues for different friend groups with the same account.</div>
     </div>
   </div>
@@ -800,14 +899,14 @@
     </div>
 
     <div class="callout callout-gold">
-      <div class="callout-icon">📋</div>
+      <div class="callout-icon"><svg class="icon" style="color:var(--gold-light)"><use href="#i-clipboard"></use></svg></div>
       <div class="callout-text">
         <strong>Conference Draft Rules:</strong> Each player must draft at least <strong>2 teams</strong> from each P4 conference (SEC, Big Ten, Big 12, ACC) and no more than <strong>3 teams</strong> from any single P4 conference. There are no limits on G5, Independents, or Pac-12 teams. The app enforces these rules automatically during the draft.
       </div>
     </div>
 
     <!-- Draft Board Mockup -->
-    <div class="mockup-wrap" style="margin-top:28px;">
+    <div class="mockup-wrap reveal" style="margin-top:28px;">
       <div class="mockup-bar">
         <div class="mockup-dot" style="background:#ff5f57"></div>
         <div class="mockup-dot" style="background:#febc2e"></div>
@@ -870,24 +969,24 @@
             <!-- Team list -->
             <div>
               <div style="display:flex;gap:8px;margin-bottom:12px;">
-                <div style="flex:1;background:var(--turf-800);border:1px solid var(--turf-700);border-radius:8px;padding:8px 12px;color:var(--turf-500);font-size:12px;">🔍  Search teams…</div>
+                <div style="flex:1;background:var(--turf-800);border:1px solid var(--turf-700);border-radius:8px;padding:8px 12px;color:var(--turf-500);font-size:12px;"><svg class="icon"><use href="#i-search"></use></svg>  Search teams…</div>
                 <div style="background:var(--turf-800);border:1px solid var(--turf-700);border-radius:8px;padding:8px 12px;color:var(--turf-400);font-size:12px;">ALL ▾</div>
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
                 <div style="background:var(--turf-900);border:1px solid var(--green-700);border-radius:8px;padding:10px;display:flex;align-items:center;gap:8px;">
-                  <div style="width:28px;height:28px;background:rgba(34,197,94,0.1);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;">🏈</div>
+                  <div style="width:28px;height:28px;background:rgba(34,197,94,0.1);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;letter-spacing:0.5px;">AL</div>
                   <div><div style="font-size:12px;font-weight:600;color:var(--white);">Alabama</div><div style="font-size:10px;color:var(--turf-500);">SEC</div></div>
                 </div>
                 <div style="background:var(--turf-900);border:1px solid var(--turf-700);border-radius:8px;padding:10px;display:flex;align-items:center;gap:8px;">
-                  <div style="width:28px;height:28px;background:rgba(96,165,250,0.1);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;">🏈</div>
+                  <div style="width:28px;height:28px;background:rgba(96,165,250,0.1);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;letter-spacing:0.5px;">OSU</div>
                   <div><div style="font-size:12px;font-weight:600;color:var(--white);">Ohio State</div><div style="font-size:10px;color:var(--turf-500);">Big Ten</div></div>
                 </div>
                 <div style="background:var(--turf-900);border:1px solid var(--turf-700);border-radius:8px;padding:10px;display:flex;align-items:center;gap:8px;">
-                  <div style="width:28px;height:28px;background:rgba(167,139,250,0.1);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;">🏈</div>
+                  <div style="width:28px;height:28px;background:rgba(167,139,250,0.1);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;letter-spacing:0.5px;">GA</div>
                   <div><div style="font-size:12px;font-weight:600;color:var(--white);">Georgia</div><div style="font-size:10px;color:var(--turf-500);">SEC</div></div>
                 </div>
                 <div style="background:var(--turf-900);border:1px solid var(--turf-700);border-radius:8px;padding:10px;display:flex;align-items:center;gap:8px;">
-                  <div style="width:28px;height:28px;background:rgba(248,113,113,0.1);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;">🏈</div>
+                  <div style="width:28px;height:28px;background:rgba(248,113,113,0.1);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;letter-spacing:0.5px;">PSU</div>
                   <div><div style="font-size:12px;font-weight:600;color:var(--white);">Penn State</div><div style="font-size:10px;color:var(--turf-500);">Big Ten</div></div>
                 </div>
               </div>
@@ -940,14 +1039,14 @@
     </div>
 
     <div class="callout callout-green">
-      <div class="callout-icon">📌</div>
+      <div class="callout-icon"><svg class="icon" style="color:var(--green-400)"><use href="#i-pin"></use></svg></div>
       <div class="callout-text"><strong>Points stack on ranked wins.</strong> Example: Louisville beats #2 Ohio State → +1 (Win) +1 (Beat Ranked) +2 (Top 15) +3 (Top 5) = <strong>+7 points</strong>, or +14 with Captain.</div>
     </div>
 
     <div class="score-grid">
       <div>
-        <div class="score-section">
-          <div class="score-section-head" style="color:var(--green-400);">🏈 Weekly Game Results</div>
+        <div class="score-section reveal">
+          <div class="score-section-head" style="color:var(--green-400);"><svg class="icon"><use href="#i-football"></use></svg> Weekly Game Results</div>
           <div class="score-row"><span class="score-label">Win</span><span class="score-val pos">+1</span></div>
           <div class="score-row"><span class="score-label">Win vs Ranked opponent</span><span class="score-val pos">+1</span></div>
           <div class="score-row"><span class="score-label">Win vs Top 15</span><span class="score-val pos">+2</span></div>
@@ -955,8 +1054,8 @@
           <div class="score-row"><span class="score-label">Loss</span><span class="score-val neg">−1</span></div>
           <div class="score-row"><span class="score-label">Loss to G5 team</span><span class="score-val neg">−5</span></div>
         </div>
-        <div class="score-section" style="margin-top:12px;">
-          <div class="score-section-head" style="color:var(--blue-400);">📈 Statistical Bonuses (defaults)</div>
+        <div class="score-section reveal" style="margin-top:12px;">
+          <div class="score-section-head" style="color:var(--blue-400);"><svg class="icon"><use href="#i-trending-up"></use></svg> Statistical Bonuses (defaults)</div>
           <div class="score-row"><span class="score-label">Top 3 in QBR</span><span class="score-val pos">+3</span></div>
           <div class="score-row"><span class="score-label">Top 3 in Rushing TDs</span><span class="score-val pos">+3</span></div>
           <div class="score-row"><span class="score-label">Top 3 in Receiving TDs</span><span class="score-val pos">+3</span></div>
@@ -969,8 +1068,8 @@
         </div>
       </div>
       <div>
-        <div class="score-section">
-          <div class="score-section-head" style="color:var(--gold-light);">🏆 Postseason Milestones</div>
+        <div class="score-section reveal">
+          <div class="score-section-head" style="color:var(--gold-light);"><svg class="icon"><use href="#i-trophy"></use></svg> Postseason Milestones</div>
           <div class="score-row"><span class="score-label">Bowl Eligible (6 wins)</span><span class="score-val pos">+5</span></div>
           <div class="score-row"><span class="score-label">Not Bowl Eligible</span><span class="score-val neg">−5</span></div>
           <div class="score-row"><span class="score-label">Won Bowl Game (non-CFP)</span><span class="score-val pos">+5</span></div>
@@ -984,8 +1083,8 @@
           <div class="score-row"><span class="score-label">Heisman Invitee</span><span class="score-val pos">+10</span></div>
           <div class="score-row"><span class="score-label">Heisman Winner</span><span class="score-val pos">+15</span></div>
         </div>
-        <div class="score-section" style="margin-top:12px;">
-          <div class="score-section-head" style="color:var(--red-400);">⚠️ Penalties</div>
+        <div class="score-section reveal" style="margin-top:12px;">
+          <div class="score-section-head" style="color:var(--red-400);"><svg class="icon"><use href="#i-alert-triangle"></use></svg> Penalties</div>
           <div class="score-row"><span class="score-label">Coach Fired (before NC)</span><span class="score-val neg">−10</span></div>
           <div class="score-row"><span class="score-label">Fulmer Cup Suspension</span><span class="score-val neg">−2 / −6 max</span></div>
         </div>
@@ -1008,9 +1107,9 @@
     </div>
 
     <div class="captain-demo">
-      <div class="team-card">
+      <div class="team-card reveal">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-          <div class="team-logo-placeholder" style="background:rgba(96,165,250,0.1);">🏈</div>
+          <div class="team-logo-placeholder" style="background:rgba(96,165,250,0.1);"><span style="font-size:11px;font-weight:700;letter-spacing:0.5px;">OSU</span></div>
           <div>
             <div class="team-name">Ohio State</div>
             <div class="team-conf">Big Ten · 1/2 captain uses</div>
@@ -1027,10 +1126,10 @@
           <div class="toggle-sw" style="background:var(--turf-700);"><i style="left:2px;"></i></div>
         </div>
       </div>
-      <div class="team-card captain">
+      <div class="team-card captain reveal">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
           <div style="display:flex;align-items:center;gap:10px;">
-            <div class="team-logo-placeholder" style="background:rgba(245,158,11,0.1);">🏈</div>
+            <div class="team-logo-placeholder" style="background:rgba(245,158,11,0.1);"><span style="font-size:11px;font-weight:700;letter-spacing:0.5px;">GA</span></div>
             <div>
               <div class="team-name">Georgia</div>
               <div class="team-conf">SEC · 0/2 captain uses</div>
@@ -1057,7 +1156,7 @@
     </div>
 
     <div class="callout callout-gold" style="margin-top:20px;">
-      <div class="callout-icon">📅</div>
+      <div class="callout-icon"><svg class="icon" style="color:var(--gold-light)"><use href="#i-calendar"></use></svg></div>
       <div class="callout-text"><strong>Browse any week, not just the current one.</strong> My Roster's week dropdown lets you jump to any week of the season — past or future — to review results or set captains ahead of time. Once a game kicks off, that team's Captain toggle locks so you can't retroactively change it. Switch to the Full Schedule tab for a season-long grid view of every team's opponents.</div>
     </div>
   </div>
@@ -1073,9 +1172,9 @@
     </div>
 
     <div class="captain-demo">
-      <div class="team-card">
+      <div class="team-card reveal">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-          <div class="team-logo-placeholder" style="background:rgba(96,165,250,0.1);">🏈</div>
+          <div class="team-logo-placeholder" style="background:rgba(96,165,250,0.1);"><span style="font-size:11px;font-weight:700;letter-spacing:0.5px;">IA</span></div>
           <div>
             <div class="team-name">Iowa State</div>
             <div class="team-conf">Big 12</div>
@@ -1083,15 +1182,15 @@
         </div>
         <div class="toggle-row" style="border-top:none;padding-top:0;margin-top:0;">
           <div>
-            <div class="toggle-label" style="color:var(--turf-300);">🪙 Spread</div>
+            <div class="toggle-label" style="color:var(--turf-300);"><svg class="icon"><use href="#i-coins"></use></svg> Spread</div>
             <div class="toggle-sub">-3.5 favored · 1/3 season · 0/2 week</div>
           </div>
           <div class="toggle-sw" style="background:var(--turf-700);"><i style="left:2px;"></i></div>
         </div>
       </div>
-      <div class="team-card" style="border-color:rgba(96,165,250,0.4);">
+      <div class="team-card reveal" style="border-color:rgba(96,165,250,0.4);">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-          <div class="team-logo-placeholder" style="background:rgba(34,197,94,0.1);">🏈</div>
+          <div class="team-logo-placeholder" style="background:rgba(34,197,94,0.1);"><span style="font-size:11px;font-weight:700;letter-spacing:0.5px;">MIZ</span></div>
           <div>
             <div class="team-name">Missouri</div>
             <div class="team-conf">SEC</div>
@@ -1099,7 +1198,7 @@
         </div>
         <div class="toggle-row" style="border-top:none;padding-top:0;margin-top:0;">
           <div>
-            <div class="toggle-label" style="color:var(--green-400);">🪙 Spread</div>
+            <div class="toggle-label" style="color:var(--green-400);"><svg class="icon"><use href="#i-coins"></use></svg> Spread</div>
             <div class="toggle-sub">✓ Covered +6.5</div>
           </div>
           <div class="toggle-sw" style="background:var(--green-600);"><i style="left:20px;"></i></div>
@@ -1108,7 +1207,7 @@
     </div>
 
     <div class="callout callout-green" style="margin-top:20px;">
-      <div class="callout-icon">🪙</div>
+      <div class="callout-icon"><svg class="icon" style="color:var(--green-400)"><use href="#i-coins"></use></svg></div>
       <div class="callout-text"><strong>How it's scored:</strong> The commissioner sets a flat point value or a multiplier on your team's base game score, plus limits on how many picks you can make per week and how many times you can pick the same team per season. Picks lock once the game kicks off and settle automatically as Covered or Missed.</div>
     </div>
   </div>
@@ -1124,17 +1223,17 @@
     </div>
 
     <div class="flow">
-      <div class="flow-step">
+      <div class="flow-step reveal">
         <div class="step-num">1</div>
         <div class="step-title">Drop a team</div>
         <div class="step-body">Choose one team currently on your roster to release back into the pool.</div>
       </div>
-      <div class="flow-step">
+      <div class="flow-step reveal">
         <div class="step-num">2</div>
         <div class="step-title">Add a team</div>
         <div class="step-body">Search and filter every team nobody else owns, and pick the one you want instead.</div>
       </div>
-      <div class="flow-step">
+      <div class="flow-step reveal">
         <div class="step-num">3</div>
         <div class="step-title">Confirm the swap</div>
         <div class="step-body">Conference min/max draft rules still apply. Points you already earned stay locked in — only future weeks change.</div>
@@ -1142,12 +1241,12 @@
     </div>
 
     <div class="callout callout-green" style="margin-top:24px;">
-      <div class="callout-icon">⚖️</div>
+      <div class="callout-icon"><svg class="icon" style="color:var(--green-400)"><use href="#i-scale"></use></svg></div>
       <div class="callout-text"><strong>Limits are commissioner-controlled.</strong> Admin settings cap how many swaps you can make per week and for the whole season, and can optionally subtract a fixed number of points from your score the week you make a swap — a real trade-off for chasing a hot team late in the year.</div>
     </div>
 
     <div class="callout callout-gold" style="margin-top:12px;">
-      <div class="callout-icon">📋</div>
+      <div class="callout-icon"><svg class="icon" style="color:var(--gold-light)"><use href="#i-clipboard"></use></svg></div>
       <div class="callout-text"><strong>Every swap is logged.</strong> The Free Agency page shows a running history of every add/drop made league-wide — who, what, and when — visible to all members, not just the commissioner.</div>
     </div>
   </div>
@@ -1163,34 +1262,34 @@
     </div>
   
     <div class="callout callout-gold" style="margin-top:20px;">
-      <div class="callout-icon">⚙️</div>
+      <div class="callout-icon"><svg class="icon" style="color:var(--gold-light)"><use href="#i-gear"></use></svg></div>
       <div class="callout-text"><strong>How to award a bonus:</strong> Admin → Postseason Bonuses tab → select the player, bonus type, and team → click Award Bonus. The default point value pre-fills automatically but can be adjusted. Add an optional note (e.g. "SEC Championship win") for reference.</div>
     </div>
   
     <div class="score-grid" style="margin-top:20px;">
-      <div class="score-section">
-        <div class="score-section-head" style="color:var(--gold-light);">🏟️ Bowl & Conference</div>
+      <div class="score-section reveal">
+        <div class="score-section-head" style="color:var(--gold-light);"><svg class="icon"><use href="#i-flag"></use></svg> Bowl & Conference</div>
         <div class="score-row"><span class="score-label">Bowl Eligible</span><span class="score-val pos">+5</span></div>
         <div class="score-row"><span class="score-label">Not Bowl Eligible</span><span class="score-val neg">−5</span></div>
         <div class="score-row"><span class="score-label">Won Bowl Game (non-CFP)</span><span class="score-val pos">+5</span></div>
         <div class="score-row"><span class="score-label">Made Conf. Championship</span><span class="score-val pos">+10</span></div>
         <div class="score-row"><span class="score-label">Won Conference</span><span class="score-val pos">+10</span></div>
       </div>
-      <div class="score-section">
-        <div class="score-section-head" style="color:var(--gold-light);">🏆 CFP Ladder</div>
+      <div class="score-section reveal">
+        <div class="score-section-head" style="color:var(--gold-light);"><svg class="icon"><use href="#i-trophy"></use></svg> CFP Ladder</div>
         <div class="score-row"><span class="score-label">Made CFP</span><span class="score-val pos">+5</span></div>
         <div class="score-row"><span class="score-label">Made CFP Quarterfinal</span><span class="score-val pos">+10</span></div>
         <div class="score-row"><span class="score-label">Made CFP Semifinal</span><span class="score-val pos">+15</span></div>
         <div class="score-row"><span class="score-label">Made CFP Final</span><span class="score-val pos">+20</span></div>
         <div class="score-row"><span class="score-label">Won CFP Championship</span><span class="score-val pos">+25</span></div>
       </div>
-      <div class="score-section">
-        <div class="score-section-head" style="color:var(--gold-light);">🎖️ Awards</div>
+      <div class="score-section reveal">
+        <div class="score-section-head" style="color:var(--gold-light);"><svg class="icon"><use href="#i-award"></use></svg> Awards</div>
         <div class="score-row"><span class="score-label">Heisman Invitee</span><span class="score-val pos">+10</span></div>
         <div class="score-row"><span class="score-label">Heisman Winner</span><span class="score-val pos">+15</span></div>
       </div>
-      <div class="score-section">
-        <div class="score-section-head" style="color:var(--red-400);">⚠️ Penalties</div>
+      <div class="score-section reveal">
+        <div class="score-section-head" style="color:var(--red-400);"><svg class="icon"><use href="#i-alert-triangle"></use></svg> Penalties</div>
         <div class="score-row"><span class="score-label">Coach Fired (before NC)</span><span class="score-val neg">−10</span></div>
         <div class="score-row"><span class="score-label">Fulmer Cup Suspension</span><span class="score-val neg">−2 / −6 max</span></div>
       </div>
@@ -1208,31 +1307,31 @@
     </div>
 
     <div class="feature-grid">
-      <div class="feature-card">
-        <div class="feature-icon" style="background:rgba(96,165,250,0.1)">📈</div>
+      <div class="feature-card reveal">
+        <div class="feature-icon" style="background:rgba(96,165,250,0.1);color:var(--blue-400)"><svg class="icon"><use href="#i-trending-up"></use></svg></div>
         <div class="feature-title">Five Categories</div>
         <div class="feature-body">QBR (passer rating), Rushing TDs, Receiving TDs, Defensive INTs, and Sacks — ranked among every drafted team in the league.</div>
       </div>
-      <div class="feature-card">
-        <div class="feature-icon" style="background:rgba(34,197,94,0.1)">⚙️</div>
+      <div class="feature-card reveal">
+        <div class="feature-icon" style="background:rgba(34,197,94,0.1);color:var(--green-400)"><svg class="icon"><use href="#i-gear"></use></svg></div>
         <div class="feature-title">Fully Configurable</div>
         <div class="feature-body">The commissioner sets, per category, whether Top and Bottom bonuses are on, how many teams count, and how many points each is worth.</div>
       </div>
-      <div class="feature-card">
+      <div class="feature-card reveal">
         <div class="feature-icon" style="background:rgba(245,158,11,0.1)">◎</div>
         <div class="feature-title">Preview → Locked</div>
         <div class="feature-body">Bonuses show as a live preview (◎) that can still move until conference championship week, then lock in permanently.</div>
       </div>
     </div>
 
-    <div style="background:var(--turf-900);border:1px solid var(--turf-700);border-radius:14px;overflow:hidden;margin-top:24px;">
+    <div class="reveal" style="background:var(--turf-900);border:1px solid var(--turf-700);border-radius:14px;overflow:hidden;margin-top:24px;">
       <div style="padding:14px 18px;border-bottom:1px solid var(--turf-800);font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px;color:var(--white);">QBR (Passer Rating)</div>
       <div style="padding:14px 18px;display:grid;grid-template-columns:1fr 1fr;gap:16px;">
         <div>
           <div style="font-size:11px;color:var(--green-400);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Top 3</div>
           <div style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:12px;">
             <span class="mono" style="color:var(--green-400);width:20px;">#1</span>
-            <div class="team-logo-placeholder" style="width:24px;height:24px;font-size:12px;background:rgba(34,197,94,0.1);margin:0;">🏈</div>
+            <div class="team-logo-placeholder" style="width:24px;height:24px;font-size:12px;background:rgba(34,197,94,0.1);margin:0;"><span style="font-size:11px;font-weight:700;letter-spacing:0.5px;">AL</span></div>
             <div style="flex:1;"><div style="color:var(--white);">Vanderbilt</div><div style="color:var(--turf-500);font-size:10px;">Warren</div></div>
             <span class="mono" style="color:var(--green-400);">+3</span>
           </div>
@@ -1241,7 +1340,7 @@
           <div style="font-size:11px;color:var(--red-400);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Bottom 3</div>
           <div style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:12px;">
             <span class="mono" style="color:var(--red-400);width:20px;">#48</span>
-            <div class="team-logo-placeholder" style="width:24px;height:24px;font-size:12px;background:rgba(248,113,113,0.1);margin:0;">🏈</div>
+            <div class="team-logo-placeholder" style="width:24px;height:24px;font-size:12px;background:rgba(248,113,113,0.1);margin:0;"><span style="font-size:11px;font-weight:700;letter-spacing:0.5px;">OSU</span></div>
             <div style="flex:1;"><div style="color:var(--white);">Rice</div><div style="color:var(--turf-500);font-size:10px;">Jordan</div></div>
             <span class="mono" style="color:var(--red-400);">−3</span>
           </div>
@@ -1259,7 +1358,7 @@
       The Standings page shows real-time point totals for every player, updated every 30 minutes during the season. Click any player's row to view their full roster and weekly breakdown.
     </div>
 
-    <div class="mockup-wrap" style="margin-top:28px;">
+    <div class="mockup-wrap reveal" style="margin-top:28px;">
       <div class="mockup-bar">
         <div class="mockup-dot" style="background:#ff5f57"></div>
         <div class="mockup-dot" style="background:#febc2e"></div>
@@ -1309,7 +1408,7 @@
           <!-- Player list -->
           <div style="background:var(--turf-900);border:1px solid var(--turf-700);border-radius:12px;overflow:hidden;">
             <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--turf-800);background:rgba(245,158,11,0.04);">
-              <span style="font-size:18px;">👑</span>
+              <span style="color:var(--gold-light);"><svg class="icon"><use href="#i-crown"></use></svg></span>
               <div style="width:32px;height:32px;background:var(--green-500);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--turf-950);font-size:13px;">W</div>
               <div style="flex:1;">
                 <div style="display:flex;align-items:center;gap:8px;"><span style="font-weight:600;color:var(--green-300);">Warren</span><span class="badge badge-green">You</span><span style="font-size:12px;color:var(--gold-light);">★</span></div>
@@ -1351,7 +1450,7 @@
       Below the leaderboard, the Roster Analytics section gives a deeper view of how each roster compares. Switch between Table, Weekly, and Graphs views. Hover any metric label for an explanation.
     </div>
 
-    <div style="background:var(--turf-900);border:1px solid var(--turf-700);border-radius:14px;overflow:hidden;margin-top:24px;">
+    <div class="reveal" style="background:var(--turf-900);border:1px solid var(--turf-700);border-radius:14px;overflow:hidden;margin-top:24px;">
       <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--turf-800);">
         <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;color:var(--white);">Roster Analytics</div>
         <div style="display:flex;gap:4px;background:var(--turf-800);padding:4px;border-radius:8px;">
@@ -1430,7 +1529,7 @@
     </div>
 
     <div class="callout callout-green" style="margin-top:20px;">
-      <div class="callout-icon">📊</div>
+      <div class="callout-icon"><svg class="icon" style="color:var(--green-400)"><use href="#i-bar-chart"></use></svg></div>
       <div class="callout-text"><strong>The Graphs tab</strong> layers on three visuals: a radar chart comparing roster quality across five dimensions, a season trend line showing cumulative points week by week, and a draft value scatter plot — every drafted team's pick number vs. its AP rank, so you can see at a glance who found value late and who reached early.</div>
     </div>
   </div>
@@ -1446,23 +1545,23 @@
     </div>
 
     <div class="feature-grid">
-      <div class="feature-card">
-        <div class="feature-icon" style="background:rgba(34,197,94,0.1)">✏️</div>
+      <div class="feature-card reveal">
+        <div class="feature-icon" style="background:rgba(34,197,94,0.1);color:var(--green-400)"><svg class="icon"><use href="#i-pencil"></use></svg></div>
         <div class="feature-title">Display Name Per League</div>
         <div class="feature-body">Your name is set independently for each league you're in — go by something different with your work league than your college friends.</div>
       </div>
-      <div class="feature-card">
-        <div class="feature-icon" style="background:rgba(245,158,11,0.1)">🏈</div>
+      <div class="feature-card reveal">
+        <div class="feature-icon" style="background:rgba(245,158,11,0.1);color:var(--gold-light)"><svg class="icon"><use href="#i-football"></use></svg></div>
         <div class="feature-title">Team Logo Avatar</div>
         <div class="feature-body">Pick any FBS team's logo as your avatar — shown on a white backdrop so it stays visible against the dark theme.</div>
       </div>
-      <div class="feature-card">
-        <div class="feature-icon" style="background:rgba(96,165,250,0.1)">😈</div>
+      <div class="feature-card reveal">
+        <div class="feature-icon" style="background:rgba(96,165,250,0.1);color:var(--blue-400)"><svg class="icon"><use href="#i-smile"></use></svg></div>
         <div class="feature-title">Emoji Avatar</div>
         <div class="feature-body">Or pick from a curated set of sports-flavored emoji — quick, no upload required.</div>
       </div>
-      <div class="feature-card">
-        <div class="feature-icon" style="background:rgba(167,139,250,0.1)">📷</div>
+      <div class="feature-card reveal">
+        <div class="feature-icon" style="background:rgba(167,139,250,0.1);color:var(--purple-400)"><svg class="icon"><use href="#i-camera"></use></svg></div>
         <div class="feature-title">Upload a Photo</div>
         <div class="feature-body">PNG, JPG, WEBP, or GIF — up to 2MB, between 100×100 and 2048×2048 pixels. Square images look best.</div>
       </div>
@@ -1480,18 +1579,18 @@
     </div>
 
     <div class="feature-grid">
-      <div class="feature-card">
-        <div class="feature-icon" style="background:rgba(34,197,94,0.1)">⏱️</div>
+      <div class="feature-card reveal">
+        <div class="feature-icon" style="background:rgba(34,197,94,0.1);color:var(--green-400)"><svg class="icon"><use href="#i-clock"></use></svg></div>
         <div class="feature-title">Timeline View</div>
         <div class="feature-body">Every pick in the order it happened, with round, pick number, and the exact timestamp it was made.</div>
       </div>
-      <div class="feature-card">
-        <div class="feature-icon" style="background:rgba(96,165,250,0.1)">👥</div>
+      <div class="feature-card reveal">
+        <div class="feature-icon" style="background:rgba(96,165,250,0.1);color:var(--blue-400)"><svg class="icon"><use href="#i-users"></use></svg></div>
         <div class="feature-title">By Manager View</div>
         <div class="feature-body">The same picks grouped by manager instead, so you can see how each roster came together pick by pick.</div>
       </div>
-      <div class="feature-card">
-        <div class="feature-icon" style="background:rgba(245,158,11,0.1)">🔍</div>
+      <div class="feature-card reveal">
+        <div class="feature-icon" style="background:rgba(245,158,11,0.1);color:var(--gold-light)"><svg class="icon"><use href="#i-search"></use></svg></div>
         <div class="feature-title">Searchable</div>
         <div class="feature-body">Filter by team name, conference, or manager to find a specific pick fast.</div>
       </div>
@@ -1559,35 +1658,35 @@
     </div>
 
     <div class="feature-grid">
-      <div class="feature-card">
-        <div class="feature-icon" style="background:rgba(34,197,94,0.1)">👥</div>
+      <div class="feature-card reveal">
+        <div class="feature-icon" style="background:rgba(34,197,94,0.1);color:var(--green-400)"><svg class="icon"><use href="#i-users"></use></svg></div>
         <div class="feature-title">Members & Invites</div>
         <div class="feature-body">Generate invite links for new players, view who's in the league, and advance the current week counter. Each invite is unique and single-use.</div>
       </div>
-      <div class="feature-card">
-        <div class="feature-icon" style="background:rgba(245,158,11,0.1)">🎁</div>
+      <div class="feature-card reveal">
+        <div class="feature-icon" style="background:rgba(245,158,11,0.1);color:var(--gold-light)"><svg class="icon"><use href="#i-gift"></use></svg></div>
         <div class="feature-title">Postseason Bonuses</div>
         <div class="feature-body">Award all postseason bonuses manually — bowl results, CFP rounds, Heisman, conference championships, coach firings, Fulmer Cup suspensions. Points apply instantly to the leaderboard.</div>
       </div>
-      <div class="feature-card">
-        <div class="feature-icon" style="background:rgba(96,165,250,0.1)">⚙️</div>
+      <div class="feature-card reveal">
+        <div class="feature-icon" style="background:rgba(96,165,250,0.1);color:var(--blue-400)"><svg class="icon"><use href="#i-gear"></use></svg></div>
         <div class="feature-title">Scoring Settings</div>
         <div class="feature-body">Adjust point values for wins, ranked wins, G5 losses, spread betting, free agency penalties, and statistical bonus thresholds — all fully configurable, all in one tab.</div>
       </div>
-      <div class="feature-card">
-        <div class="feature-icon" style="background:rgba(248,113,113,0.1)">🔄</div>
+      <div class="feature-card reveal">
+        <div class="feature-icon" style="background:rgba(248,113,113,0.1);color:var(--red-400)"><svg class="icon"><use href="#i-refresh"></use></svg></div>
         <div class="feature-title">Reset Draft</div>
         <div class="feature-body">If the draft needs to be redone, wipe all picks (and any free agency swaps) and return to pre-draft status. A confirmation modal spells out exactly what's lost before you commit. Captain picks and bonuses are not affected.</div>
       </div>
-      <div class="feature-card">
-        <div class="feature-icon" style="background:rgba(239,68,68,0.12)">🗑️</div>
+      <div class="feature-card reveal">
+        <div class="feature-icon" style="background:rgba(239,68,68,0.12);color:var(--red-400)"><svg class="icon"><use href="#i-trash"></use></svg></div>
         <div class="feature-title">Delete League</div>
         <div class="feature-body">Permanently removes the league and everything in it — members, picks, scores, settings. A confirmation modal names the league and requires an explicit click. This cannot be undone.</div>
       </div>
     </div>
 
     <div class="callout callout-green" style="margin-top:20px;">
-      <div class="callout-icon">📋</div>
+      <div class="callout-icon"><svg class="icon" style="color:var(--green-400)"><use href="#i-clipboard"></use></svg></div>
       <div class="callout-text">
         <strong>Commissioner weekly checklist:</strong> Every Monday — (1) advance current week in Admin, (2) check for any G5 upsets to verify scoring, (3) during postseason, award any bowl results or CFP advancement bonuses from the weekend.
       </div>
@@ -1602,7 +1701,7 @@
     <div class="section-title">Rules at a Glance</div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:24px;">
-      <div class="score-section">
+      <div class="score-section reveal">
         <div class="score-section-head" style="color:var(--turf-300);">Draft Rules</div>
         <div class="score-row"><span class="score-label">Teams per player</span><span class="score-val neu">10</span></div>
         <div class="score-row"><span class="score-label">Min per P4 conference</span><span class="score-val neu">2</span></div>
@@ -1610,7 +1709,7 @@
         <div class="score-row"><span class="score-label">G5 / Independent limit</span><span class="score-val neu">None</span></div>
         <div class="score-row"><span class="score-label">Draft format</span><span class="score-val neu">Snake</span></div>
       </div>
-      <div class="score-section">
+      <div class="score-section reveal">
         <div class="score-section-head" style="color:var(--turf-300);">Captain Rules</div>
         <div class="score-row"><span class="score-label">Captains per week</span><span class="score-val neu">1</span></div>
         <div class="score-row"><span class="score-label">Max uses per team</span><span class="score-val neu">2×</span></div>
@@ -1618,14 +1717,14 @@
         <div class="score-row"><span class="score-label">Can captain any week?</span><span class="score-val neu">Yes, future too</span></div>
         <div class="score-row"><span class="score-label">Can change captain?</span><span class="score-val neu">Yes, until game</span></div>
       </div>
-      <div class="score-section">
+      <div class="score-section reveal">
         <div class="score-section-head" style="color:var(--turf-300);">Free Agency Defaults</div>
         <div class="score-row"><span class="score-label">Enabled by default?</span><span class="score-val neu">No — commissioner opt-in</span></div>
         <div class="score-row"><span class="score-label">Moves per season</span><span class="score-val neu">10</span></div>
         <div class="score-row"><span class="score-label">Moves per week</span><span class="score-val neu">2</span></div>
         <div class="score-row"><span class="score-label">Swap penalty</span><span class="score-val neu">Off by default</span></div>
       </div>
-      <div class="score-section">
+      <div class="score-section reveal">
         <div class="score-section-head" style="color:var(--turf-300);">Spread Betting Defaults</div>
         <div class="score-row"><span class="score-label">Enabled by default?</span><span class="score-val neu">No — commissioner opt-in</span></div>
         <div class="score-row"><span class="score-label">Picks per week</span><span class="score-val neu">2</span></div>
@@ -1643,5 +1742,46 @@
   </div>
 
 </div>
+<script>
+(function () {
+  var revealEls = document.querySelectorAll('.reveal, .tl-item');
+
+  if ('IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('in-view');
+          io.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
+    revealEls.forEach(function (el) { io.observe(el); });
+  } else {
+    revealEls.forEach(function (el) { el.classList.add('in-view'); });
+  }
+
+  // Timeline line grows in step with how far the section has scrolled by
+  var timelineEl = document.querySelector('.timeline');
+  function updateTimelineProgress() {
+    if (!timelineEl) return;
+    var rect = timelineEl.getBoundingClientRect();
+    var vh = window.innerHeight;
+    var start = vh * 0.85;
+    var end = vh * 0.3;
+    var progress = (start - rect.top) / (rect.height + start - end);
+    progress = Math.max(0, Math.min(1, progress));
+    timelineEl.style.setProperty('--timeline-progress', progress);
+  }
+  var ticking = false;
+  window.addEventListener('scroll', function () {
+    if (!ticking) {
+      requestAnimationFrame(function () { updateTimelineProgress(); ticking = false; });
+      ticking = true;
+    }
+  }, { passive: true });
+  window.addEventListener('resize', updateTimelineProgress);
+  updateTimelineProgress();
+})();
+</script>
 </body>
 </html>
