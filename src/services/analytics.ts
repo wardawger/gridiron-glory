@@ -78,6 +78,7 @@ export function computeAnalytics(
     const mid50Ranks  = teamRanks.slice(top25n, top25n + mid50n).map(t => t.rank);
     const bot25Ranks  = teamRanks.slice(top25n + mid50n).map(t => t.rank);
     const allRanks    = teamRanks.map(t => t.rank).filter(r => r < 999);
+    const rankedTeams = teamRanks.filter(t => t.rank < 999);
 
     // Best/worst picks by total season points
     const teamPtsArr = roster.map(t => ({
@@ -106,8 +107,8 @@ export function computeAnalytics(
       bot25_avg:    avg(bot25Ranks),
       best_pick:    teamPtsArr[0] ?? null,
       worst_pick:   teamPtsArr[teamPtsArr.length - 1] ?? null,
-      best_team:    teamRanks[0]?.rank < 999 ? teamRanks[0] : null,
-      worst_team:   teamRanks[teamRanks.length - 1]?.rank < 999 ? teamRanks[teamRanks.length - 1] : null,
+      best_team:    rankedTeams[0] ?? null,
+      worst_team:   rankedTeams[rankedTeams.length - 1] ?? null,
       over_under_pts: overUnderTotal,
       over_under_avg: rankedCount > 0 ? +(overUnderTotal / rankedCount).toFixed(1) : 0,
       draft_pick_numbers: roster.map(t => pickMap.get(t.team_id) ?? 0).filter(Boolean).sort((a, b) => a - b),
