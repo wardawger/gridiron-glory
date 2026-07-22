@@ -262,6 +262,14 @@ export function useLeague(user: User | null) {
 
     if (deleteErr) return { error: deleteErr.message };
 
+    // Free agency swaps are layered on top of draft picks when computing a
+    // roster, so they must also be cleared or a team acquired via free
+    // agency would survive the reset and keep showing on the roster.
+    const { error: faDeleteErr } = await supabase
+      .from('free_agency_moves').delete().eq('league_id', league.id);
+
+    if (faDeleteErr) return { error: faDeleteErr.message };
+
     const { error: updateErr } = await supabase
       .from('leagues').update({
         draft_status: 'pending',
@@ -272,6 +280,7 @@ export function useLeague(user: User | null) {
     if (updateErr) return { error: updateErr.message };
 
     setDraftPicks([]);
+    setFreeAgencyMoves([]);
     return {};
   };
 

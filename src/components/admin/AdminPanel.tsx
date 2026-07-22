@@ -267,8 +267,8 @@ export function AdminPanel({
                 <div>
                   <p className="font-medium text-white">Reset Draft</p>
                   <p className="text-xs text-turf-500 mt-0.5">
-                    Deletes all draft picks and returns the league to pre-draft status.
-                    Captain picks and bonuses are not affected.
+                    Deletes all draft picks and free agency swaps, and returns the league to
+                    pre-draft status. Captain picks and bonuses are not affected.
                     This cannot be undone.
                   </p>
                 </div>
@@ -324,9 +324,9 @@ export function AdminPanel({
               <h3 className="font-display text-xl text-white tracking-wide">Reset Draft?</h3>
             </div>
             <p className="text-sm text-turf-300">
-              This permanently deletes every draft pick in <span className="text-white font-medium">{league.name}</span> and
+              This permanently deletes every draft pick and free agency swap in <span className="text-white font-medium">{league.name}</span> and
               returns the league to pre-draft status. Captain picks and bonuses are not affected.{' '}
-              <span className="text-red-400 font-medium">There is no way to recover the picks.</span>
+              <span className="text-red-400 font-medium">There is no way to recover them.</span>
             </p>
             {resetError && (
               <p className="text-xs text-red-400">{resetError}</p>
