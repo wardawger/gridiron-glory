@@ -606,8 +606,8 @@ export function RosterView({
                     {isOwner && onSetCaptain && (
                       <div className="mt-3 pt-3 border-t border-turf-800/60 flex items-center justify-between gap-2">
                         <div className="min-w-0">
-                          <span className={`text-xs font-medium ${isCaptain ? 'text-gold-400' : 'text-turf-300'}`}>
-                            {isCaptain ? 'Captain ×2' : 'Captain'}
+                          <span className={`text-xs font-medium flex items-center gap-1 ${isCaptain ? 'text-gold-400' : 'text-turf-300'}`}>
+                            <Star className="w-3 h-3 flex-shrink-0" /> {isCaptain ? 'Captain ×2' : 'Captain'}
                           </span>
                           <p className="text-xs text-turf-600">
                             {isCaptain
