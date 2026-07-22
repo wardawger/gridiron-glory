@@ -71,6 +71,7 @@ export function RosterPage({
     <RosterView
       member={member}
       roster={roster}
+      draftPicks={draftPicks}
       captainPicks={captainPicks}
       gameData={gameData}
       scoring={league.scoring}

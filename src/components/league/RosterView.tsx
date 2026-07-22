@@ -1,7 +1,8 @@
 import { useMemo, useState, useEffect } from 'react';
 import { Shield, TrendingUp, TrendingDown, Minus, Star, Calendar, List, X, MapPin, Tv, Clock, Zap, Coins } from 'lucide-react';
-import type { RosterEntry, CaptainPick, GameData, ScoringSettings, LeagueMember, WeeklyScore, GameResult, SpreadPick, SpreadData, FreeAgencyMove } from '../../types';
+import type { RosterEntry, CaptainPick, GameData, ScoringSettings, LeagueMember, WeeklyScore, GameResult, SpreadPick, SpreadData, FreeAgencyMove, DraftPick } from '../../types';
 import { calcWeeklyScore, scoreGame, didCoverSpread } from '../../services/scoring';
+import { rosterAtWeek } from '../../services/roster';
 import { Tooltip } from '../ui/Tooltip';
 import { TeamLogo } from '../ui/TeamLogo';
 import { Avatar } from '../ui/Avatar';
@@ -9,6 +10,7 @@ import { Avatar } from '../ui/Avatar';
 interface Props {
   member: LeagueMember;
   roster: RosterEntry[];
+  draftPicks: DraftPick[];
   captainPicks: CaptainPick[];
   gameData: GameData;
   scoring: ScoringSettings;
@@ -364,12 +366,17 @@ function ScheduleModal({ team, gameData, captainPicks, userId, currentWeek, onCl
 // ── Main RosterView ───────────────────────────────────────────────────────────
 
 export function RosterView({
-  member, roster, captainPicks, gameData, scoring,
+  member, roster, draftPicks, captainPicks, gameData, scoring,
   currentWeek, weeklyScores, isOwner, onSetCaptain, captainUsage,
   spreadData, spreadPicks, spreadUsage, onSetSpread, onRemoveSpread, onRefreshSpreads,
   freeAgencyMoves, viewUserId,
 }: Props) {
   const [view, setView] = useState<'week' | 'schedule'>('week');
+  // Which week the roster page is browsing — defaults to the league's actual
+  // current week each time this page is opened, but can be changed freely
+  // without affecting league.current_week (used elsewhere for free agency,
+  // standings, and stat bonus lock-in).
+  const [selectedWeek, setSelectedWeek] = useState(currentWeek);
   const [modalTeam, setModalTeam] = useState<RosterEntry | null>(null);
   const [spreadError, setSpreadError] = useState<string | null>(null);
   const [spreadsLoading, setSpreadsLoading] = useState(false);
@@ -378,21 +385,29 @@ export function RosterView({
     week: number; isCaptain: boolean;
   } | null>(null);
 
-  // Auto-fetch spreads when feature is on and we don't have data for this week
+  // Roster as it stood during the selected week — accounts for free agency
+  // swaps, so browsing to a past week shows the teams actually held that
+  // week rather than today's roster.
+  const weekRoster = useMemo(
+    () => rosterAtWeek(viewUserId, selectedWeek, draftPicks, freeAgencyMoves),
+    [viewUserId, selectedWeek, draftPicks, freeAgencyMoves]
+  );
+
+  // Auto-fetch spreads when feature is on and we don't have data for the selected week
   useEffect(() => {
     if (!scoring.spread_enabled) return;
-    if (spreadData[currentWeek] !== undefined) return;
+    if (spreadData[selectedWeek] !== undefined) return;
     setSpreadsLoading(true);
-    onRefreshSpreads(currentWeek).finally(() => setSpreadsLoading(false));
-  }, [scoring.spread_enabled, currentWeek]);
+    onRefreshSpreads(selectedWeek).finally(() => setSpreadsLoading(false));
+  }, [scoring.spread_enabled, selectedWeek]);
 
   const currentScore = useMemo(
-    () => calcWeeklyScore(member.user_id, currentWeek, roster, captainPicks, gameData, scoring, spreadPicks, freeAgencyMoves),
-    [member.user_id, currentWeek, roster, captainPicks, gameData, scoring, spreadPicks, freeAgencyMoves]
+    () => calcWeeklyScore(member.user_id, selectedWeek, weekRoster, captainPicks, gameData, scoring, spreadPicks, freeAgencyMoves),
+    [member.user_id, selectedWeek, weekRoster, captainPicks, gameData, scoring, spreadPicks, freeAgencyMoves]
   );
 
   const captainThisWeek = captainPicks.find(
-    p => p.user_id === member.user_id && p.week === currentWeek
+    p => p.user_id === member.user_id && p.week === selectedWeek
   )?.team_id ?? null;
 
   const getCaptainForWeek = (week: number) =>
@@ -448,7 +463,7 @@ export function RosterView({
           </div>
           <div className="text-right">
             <div className="font-mono text-3xl font-bold text-white">{currentScore.points}</div>
-            <div className="text-xs text-turf-500">Week {currentWeek} pts</div>
+            <div className="text-xs text-turf-500">Week {selectedWeek} pts</div>
           </div>
         </div>
 
@@ -463,7 +478,7 @@ export function RosterView({
                   <div
                     key={ws.week}
                     className={`flex flex-col items-center justify-center w-10 h-10 rounded-lg text-xs font-mono ${
-                      ws.week === currentWeek
+                      ws.week === selectedWeek
                         ? 'bg-field-500/20 border border-field-600 text-field-300'
                         : ws.points > 0
                         ? 'bg-turf-800 text-turf-300'
@@ -488,14 +503,26 @@ export function RosterView({
 
         {/* View toggle */}
         <div className="flex gap-1 bg-turf-900 p-1 rounded-xl border border-turf-800">
-          <button
-            onClick={() => setView('week')}
-            className={`flex items-center gap-1.5 flex-1 justify-center py-2 rounded-lg text-sm font-medium transition-all ${
+          <div
+            className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg transition-all ${
               view === 'week' ? 'bg-field-500 text-turf-950' : 'text-turf-400 hover:text-white'
             }`}
           >
-            <List className="w-3.5 h-3.5" /> This Week
-          </button>
+            <List className="w-3.5 h-3.5 flex-shrink-0" />
+            <select
+              value={selectedWeek}
+              onChange={e => { setSelectedWeek(Number(e.target.value)); setView('week'); }}
+              className={`bg-transparent border-0 outline-none py-2 text-sm font-medium cursor-pointer text-center ${
+                view === 'week' ? 'text-turf-950' : 'text-turf-400'
+              }`}
+            >
+              {WEEKS.map(w => (
+                <option key={w} value={w} className="bg-turf-800 text-white">
+                  {w === 0 ? 'Week 0' : `Week ${w}`}
+                </option>
+              ))}
+            </select>
+          </div>
           <button
             onClick={() => setView('schedule')}
             className={`flex items-center gap-1.5 flex-1 justify-center py-2 rounded-lg text-sm font-medium transition-all ${
@@ -508,18 +535,19 @@ export function RosterView({
 
         {/* ── THIS WEEK VIEW ── */}
         {view === 'week' && (
-          roster.length === 0 ? (
+          weekRoster.length === 0 ? (
             <div className="card p-12 text-center text-turf-500">
-              <p>No teams drafted yet</p>
+              <p>{roster.length === 0 ? 'No teams drafted yet' : 'No teams rostered that week'}</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {roster.map(entry => {
-                const game = gameData[entry.team_id]?.[currentWeek];
+              {weekRoster.map(entry => {
+                const game = gameData[entry.team_id]?.[selectedWeek];
                 const isCaptain = entry.team_id === captainThisWeek;
                 const weekBreak = currentScore.breakdown.find(b => b.team_id === entry.team_id);
                 const captainUses = captainUsage.get(entry.team_id) ?? 0;
-                const canBeCaptain = captainUses < 2 || isCaptain;
+                const captainKickedOff = isGameKickedOff((game as any)?.start_date);
+                const canBeCaptain = (captainUses < 2 || isCaptain) && !captainKickedOff;
                 const oppLogo = (game as any)?.opponent_logo ?? null;
                 const isHome  = (game as any)?.is_home  ?? true;
 
@@ -561,10 +589,10 @@ export function RosterView({
                           game,
                           teamName: entry.team_name,
                           teamLogo: entry.team_logo,
-                          week: currentWeek,
+                          week: selectedWeek,
                           isCaptain,
                         })}
-                        onKeyDown={e => { if (e.key === 'Enter') setGameScoreModal({ game, teamName: entry.team_name, teamLogo: entry.team_logo, week: currentWeek, isCaptain }); }}
+                        onKeyDown={e => { if (e.key === 'Enter') setGameScoreModal({ game, teamName: entry.team_name, teamLogo: entry.team_logo, week: selectedWeek, isCaptain }); }}
                       >
                         <div className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-turf-800/60 transition-colors">
                           <div className="flex items-center gap-2 min-w-0">
@@ -610,7 +638,9 @@ export function RosterView({
                             <Star className="w-3 h-3 flex-shrink-0" /> {isCaptain ? 'Captain ×2' : 'Captain'}
                           </span>
                           <p className="text-xs text-turf-600">
-                            {isCaptain
+                            {captainKickedOff
+                              ? (isCaptain ? 'Game started — locked' : 'Game started')
+                              : isCaptain
                               ? 'Doubles points this week'
                               : canBeCaptain
                               ? `${2 - captainUses} use${2 - captainUses === 1 ? '' : 's'} left`
@@ -619,8 +649,8 @@ export function RosterView({
                         </div>
                         <button
                           type="button"
-                          onClick={() => onSetCaptain(currentWeek, entry.team_id)}
-                          disabled={!canBeCaptain && !isCaptain}
+                          onClick={() => onSetCaptain(selectedWeek, entry.team_id)}
+                          disabled={captainKickedOff || (!canBeCaptain && !isCaptain)}
                           aria-label={isCaptain ? 'Remove captain' : 'Set captain'}
                           className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${
                             isCaptain ? 'bg-gold-500' : canBeCaptain ? 'bg-turf-700' : 'bg-turf-800 opacity-50 cursor-not-allowed'
@@ -633,12 +663,12 @@ export function RosterView({
 
                     {/* Spread pick — shown when feature is enabled and team has a game */}
                     {scoring.spread_enabled && game && (() => {
-                      const weekSpread = spreadData[currentWeek]?.[entry.team_id] ?? null;
+                      const weekSpread = spreadData[selectedWeek]?.[entry.team_id] ?? null;
                       const existingPick = spreadPicks.find(
-                        p => p.team_id === entry.team_id && p.week === currentWeek
+                        p => p.team_id === entry.team_id && p.week === selectedWeek
                       );
                       const teamSeasonUses = spreadUsage.get(entry.team_id) ?? 0;
-                      const weekPicks = spreadPicks.filter(p => p.week === currentWeek);
+                      const weekPicks = spreadPicks.filter(p => p.week === selectedWeek);
                       const atWeekLimit = !existingPick && weekPicks.length >= scoring.spread_max_per_week;
                       const atTeamLimit = !existingPick && teamSeasonUses >= scoring.spread_max_per_team;
                       const kickedOff = isGameKickedOff((game as any)?.start_date);
@@ -652,9 +682,9 @@ export function RosterView({
                       const handleToggle = async () => {
                         if (toggleDisabled) return;
                         if (isOn) {
-                          if (onRemoveSpread) await onRemoveSpread(currentWeek, entry.team_id);
+                          if (onRemoveSpread) await onRemoveSpread(selectedWeek, entry.team_id);
                         } else if (onSetSpread && weekSpread !== null) {
-                          const result = await onSetSpread(currentWeek, entry.team_id, weekSpread);
+                          const result = await onSetSpread(selectedWeek, entry.team_id, weekSpread);
                           if (result.error) setSpreadError(result.error);
                         }
                       };
