@@ -603,7 +603,7 @@ export function RosterView({
                       <p className="mt-2 text-xs text-turf-600">No game this week</p>
                     )}
 
-                    {isOwner && onSetCaptain && (
+                    {isOwner && onSetCaptain && game && (
                       <div className="mt-3 pt-3 border-t border-turf-800/60 flex items-center justify-between gap-2">
                         <div className="min-w-0">
                           <span className={`text-xs font-medium flex items-center gap-1 ${isCaptain ? 'text-gold-400' : 'text-turf-300'}`}>
