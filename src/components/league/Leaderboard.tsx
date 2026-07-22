@@ -537,10 +537,11 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
 
           {/* ── GRAPHS VIEW ── */}
           {analyticsTab === 'graphs' && (
-            <div className="p-5 space-y-8">
+            <div className="p-5 space-y-4">
               {/* Radar */}
-              <div>
-                <p className="text-xs text-turf-500 mb-4">Normalized roster quality across 5 dimensions (higher = better)</p>
+              <div className="card-inner p-4">
+                <h3 className="font-display text-lg tracking-wide text-white">Roster profile</h3>
+                <p className="text-xs text-turf-500 mt-0.5 mb-4">Normalized roster quality across 5 dimensions (higher = better)</p>
                 {radarData.length === 0 ? (
                   <p className="text-turf-600 text-sm text-center py-8">No ranking data yet</p>
                 ) : (
@@ -582,8 +583,9 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
               </div>
 
               {/* Season trend */}
-              <div>
-                <p className="text-xs text-turf-500 mb-4">Cumulative points across the season</p>
+              <div className="card-inner p-4">
+                <h3 className="font-display text-lg tracking-wide text-white">Season trend</h3>
+                <p className="text-xs text-turf-500 mt-0.5 mb-4">Cumulative points across the season</p>
                 {trendData.length === 0 ? (
                   <p className="text-turf-600 text-sm text-center py-8">No weekly data yet — check back once games are played</p>
                 ) : (
@@ -625,8 +627,9 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
               </div>
 
               {/* Draft value scatter */}
-              <div>
-                <p className="text-xs text-turf-500 mb-4">Draft pick number vs. AP rank — points below the diagonal were drafted later than their rank suggests</p>
+              <div className="card-inner p-4">
+                <h3 className="font-display text-lg tracking-wide text-white">Draft value</h3>
+                <p className="text-xs text-turf-500 mt-0.5 mb-4">Draft pick number vs. AP rank — points below the diagonal were drafted later than their rank suggests</p>
                 {scatterByManager.length === 0 ? (
                   <p className="text-turf-600 text-sm text-center py-8">No ranking data yet</p>
                 ) : (
