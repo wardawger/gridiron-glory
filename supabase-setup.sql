@@ -68,6 +68,11 @@ create policy "Users can join leagues (insert own row)"
   on league_members for insert
   with check (user_id = auth.uid());
 
+create policy "Users can update their own membership"
+  on league_members for update
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
 create policy "Commissioner can manage members"
   on league_members for all
   using (league_id in (

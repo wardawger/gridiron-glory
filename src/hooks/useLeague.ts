@@ -3,13 +3,14 @@ import type { User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import type {
   League, LeagueMember, DraftPick, CaptainPick,
-  ManualBonus, SpreadPick, FreeAgencyMove,
+  ManualBonus, SpreadPick, FreeAgencyMove, LeagueRole,
 } from '../types';
 import { P4_CONFERENCES, DRAFT_CONF_MAX } from '../types';
 import { rosterAtWeek, currentRosters } from '../services/roster';
 
 export function useLeague(user: User | null) {
   const [allLeagues, setAllLeagues]     = useState<League[]>([]);
+  const [allMemberships, setAllMemberships] = useState<Record<string, LeagueRole>>({});
   const [selectedLeagueId, setSelectedLeagueId] = useState<string | null>(null);
   const [members, setMembers]           = useState<LeagueMember[]>([]);
   const [draftPicks, setDraftPicks]     = useState<DraftPick[]>([]);
@@ -51,12 +52,13 @@ export function useLeague(user: User | null) {
     try {
       const { data: memberships, error: memErr } = await supabase
         .from('league_members')
-        .select('league_id, leagues(*)')
+        .select('league_id, role, leagues(*)')
         .eq('user_id', user.id);
 
       if (memErr) throw memErr;
       if (!memberships || memberships.length === 0) {
         setAllLeagues([]);
+        setAllMemberships({});
         setSelectedLeagueId(null);
         setLoading(false);
         return;
@@ -64,6 +66,7 @@ export function useLeague(user: User | null) {
 
       const leagues = memberships.map((m: any) => m.leagues as League);
       setAllLeagues(leagues);
+      setAllMemberships(Object.fromEntries(memberships.map((m: any) => [m.league_id, m.role as LeagueRole])));
 
       const stored = localStorage.getItem(`gridiron_league_${user.id}`);
       const toSelect = stored && leagues.find(l => l.id === stored)
@@ -548,13 +551,33 @@ export function useLeague(user: User | null) {
     setDraftPicks(prev => prev.filter(p => !(p.user_id === userId && p.team_id === teamId)));
   };
 
+  // Update the display name for the current league membership only
+  const updateDisplayName = async (name: string): Promise<{ error?: string }> => {
+    if (!league || !user) return { error: 'Not ready' };
+    const trimmed = name.trim();
+    if (!trimmed) return { error: 'Display name cannot be empty' };
+
+    const { error: err } = await supabase
+      .from('league_members')
+      .update({ display_name: trimmed })
+      .eq('league_id', league.id)
+      .eq('user_id', user.id);
+
+    if (err) return { error: err.message };
+    setMembers(prev => prev.map(m =>
+      m.user_id === user.id ? { ...m, display_name: trimmed } : m
+    ));
+    return {};
+  };
+
   return {
-    league, allLeagues, selectedLeagueId,
+    league, allLeagues, allMemberships, selectedLeagueId,
     members, draftPicks, captainPicks, manualBonuses, spreadPicks, freeAgencyMoves,
     rosters, myMembership, isCommissioner, loading, error,
     switchLeague, createLeague, sendInvite, startDraft, makeDraftPick, resetDraft,
     setCaptain, addManualBonus, removeManualBonus,
     setSpreadPick, removeSpreadPick, overrideSpreadResult, clearSpreadOverride,
-    updateWeek, updateScoring, removeFromRoster, makeFreeAgencyMove, reload: loadAllLeagues,
+    updateWeek, updateScoring, removeFromRoster, makeFreeAgencyMove, updateDisplayName,
+    reload: loadAllLeagues,
   };
 }

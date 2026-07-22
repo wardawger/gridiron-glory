@@ -143,7 +143,16 @@ export function Header({
               <span className="hidden sm:inline">Refresh</span>
             </button>
             <div className="h-5 w-px bg-turf-700" />
-            <span className="text-sm text-turf-400 hidden sm:inline">{displayName}</span>
+            <Link
+              to="/account"
+              className="flex items-center gap-2 px-1.5 py-1 rounded-lg hover:bg-turf-800 transition-colors group"
+              title="My Account"
+            >
+              <div className="w-6 h-6 rounded-full bg-field-900 flex items-center justify-center text-field-400 font-bold text-xs flex-shrink-0">
+                {displayName?.[0]?.toUpperCase() ?? '?'}
+              </div>
+              <span className="text-sm text-turf-400 group-hover:text-white transition-colors hidden sm:inline">{displayName}</span>
+            </Link>
             <button onClick={onSignOut} className="btn-ghost btn-sm">
               <LogOut className="w-4 h-4" />
             </button>

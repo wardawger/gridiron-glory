@@ -8,6 +8,7 @@ import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { CreateLeaguePage } from './pages/CreateLeaguePage';
 import { HomePage }         from './pages/HomePage';
 import { RosterPage }       from './pages/RosterPage';
+import { AccountPage }      from './pages/AccountPage';
 import { JoinPage }         from './pages/JoinPage';
 import { DraftRoom }        from './components/draft/DraftRoom';
 import { AdminPanel }       from './components/admin/AdminPanel';
@@ -122,6 +123,16 @@ export default function App() {
             <Route path="/roster"         element={<RosterPage league={lg} members={league.members} draftPicks={league.draftPicks} captainPicks={league.captainPicks} gameData={cfb.gameData} spreadData={cfb.spreadData} spreadPicks={league.spreadPicks} freeAgencyMoves={league.freeAgencyMoves} userId={auth.user.id} onSetCaptain={league.setCaptain} onSetSpread={league.setSpreadPick} onRemoveSpread={league.removeSpreadPick} onRefreshSpreads={cfb.refreshSpreads} />} />
             <Route path="/roster/:userId" element={<RosterPage league={lg} members={league.members} draftPicks={league.draftPicks} captainPicks={league.captainPicks} gameData={cfb.gameData} spreadData={cfb.spreadData} spreadPicks={league.spreadPicks} freeAgencyMoves={league.freeAgencyMoves} userId={auth.user.id} onSetCaptain={league.setCaptain} onSetSpread={league.setSpreadPick} onRemoveSpread={league.removeSpreadPick} onRefreshSpreads={cfb.refreshSpreads} />} />
             <Route path="/rankings" element={<RankingsPage rankings={cfb.rankings} teams={cfb.teams} records={cfb.records} />} />
+            <Route path="/account" element={
+              <AccountPage
+                auth={auth}
+                league={lg}
+                myMembership={league.myMembership}
+                allLeagues={league.allLeagues}
+                allMemberships={league.allMemberships}
+                onUpdateDisplayName={league.updateDisplayName}
+              />
+            } />
             <Route path="/draft-recap" element={<DraftRecapPage league={lg} members={league.members} draftPicks={league.draftPicks} />} />
             <Route path="/free-agency" element={
               <FreeAgencyPage
