@@ -275,6 +275,36 @@ export function useLeague(user: User | null) {
     return {};
   };
 
+  const deleteLeague = async (): Promise<{ error?: string }> => {
+    if (!league || !user || !isCommissioner) return { error: 'Not authorized' };
+
+    // Explicit safety net for tables that may not cascade from leagues(id) —
+    // harmless no-op for any that already do.
+    await supabase.from('spread_picks').delete().eq('league_id', league.id);
+    await supabase.from('free_agency_moves').delete().eq('league_id', league.id);
+
+    const { error: err } = await supabase.from('leagues').delete().eq('id', league.id);
+    if (err) return { error: err.message };
+
+    const remaining = allLeagues.filter(l => l.id !== league.id);
+    setAllLeagues(remaining);
+    setAllMemberships(prev => {
+      const next = { ...prev };
+      delete next[league.id];
+      return next;
+    });
+
+    const nextId = remaining[0]?.id ?? null;
+    setSelectedLeagueId(nextId);
+    if (nextId) {
+      localStorage.setItem(`gridiron_league_${user.id}`, nextId);
+    } else {
+      localStorage.removeItem(`gridiron_league_${user.id}`);
+    }
+
+    return {};
+  };
+
   const setCaptain = useCallback(async (week: number, teamId: string) => {
     const league = leagueRef.current;
     const user   = userRef.current;
@@ -585,7 +615,7 @@ export function useLeague(user: User | null) {
     league, allLeagues, allMemberships, selectedLeagueId,
     members, draftPicks, captainPicks, manualBonuses, spreadPicks, freeAgencyMoves,
     rosters, myMembership, isCommissioner, loading, error,
-    switchLeague, createLeague, sendInvite, startDraft, makeDraftPick, resetDraft,
+    switchLeague, createLeague, sendInvite, startDraft, makeDraftPick, resetDraft, deleteLeague,
     setCaptain, addManualBonus, removeManualBonus,
     setSpreadPick, removeSpreadPick, overrideSpreadResult, clearSpreadOverride,
     updateWeek, updateScoring, removeFromRoster, makeFreeAgencyMove, updateDisplayName, updateAvatar,

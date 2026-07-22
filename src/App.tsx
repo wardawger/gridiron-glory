@@ -184,6 +184,7 @@ export default function App() {
                 onRemoveBonus={league.removeManualBonus}
                 onRemoveFromRoster={league.removeFromRoster}
                 onResetDraft={league.resetDraft}
+                onDeleteLeague={league.deleteLeague}
                 onOverrideSpread={league.overrideSpreadResult}
                 onClearSpreadOverride={league.clearSpreadOverride}
               />

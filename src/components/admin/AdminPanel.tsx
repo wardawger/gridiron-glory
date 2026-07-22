@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Shield, UserPlus, Copy, Check, Trash2, Plus, Mail, Settings, Gift, RotateCcw, AlertTriangle, TrendingUp, TrendingDown } from 'lucide-react';
+import { Shield, UserPlus, Copy, Check, Trash2, Plus, Mail, Settings, Gift, RotateCcw, AlertTriangle, TrendingUp, TrendingDown, Loader2 } from 'lucide-react';
 import type {
   League, LeagueMember, ManualBonus, DraftPick, SpreadPick, FreeAgencyMove,
   BonusType, ScoringSettings, StatBonusCategorySettings,
@@ -23,6 +23,7 @@ interface Props {
   onRemoveBonus: (id: string) => void;
   onRemoveFromRoster: (userId: string, teamId: string) => void;
   onResetDraft: () => Promise<{ error?: string }>;
+  onDeleteLeague: () => Promise<{ error?: string }>;
   onOverrideSpread: (pickId: string, result: 'covered' | 'missed', points: number) => Promise<{ error?: string }>;
   onClearSpreadOverride: (pickId: string) => Promise<{ error?: string }>;
 }
@@ -44,7 +45,7 @@ type Tab = 'members' | 'scoring' | 'bonuses';
 
 export function AdminPanel({
   league, members, draftPicks, manualBonuses, spreadPicks, freeAgencyMoves, isCommissioner,
-  onSendInvite, onUpdateWeek, onUpdateScoring, onAddBonus, onRemoveBonus, onResetDraft,
+  onSendInvite, onUpdateWeek, onUpdateScoring, onAddBonus, onRemoveBonus, onResetDraft, onDeleteLeague,
   onOverrideSpread, onClearSpreadOverride,
 }: Props) {
   const [tab, setTab]           = useState<Tab>('members');
@@ -54,6 +55,9 @@ export function AdminPanel({
   const [inviting, setInviting] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [resetError, setResetError] = useState('');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
   const [scoring, setScoring]   = useState<ScoringSettings>(normalizeScoring(league.scoring));
   const [bonusUserId, setBonusUser]       = useState('');
   const [bonusType, setBonusType]         = useState<BonusType>('win_bowl');
@@ -147,6 +151,19 @@ export function AdminPanel({
     const result = await onResetDraft();
     if (result?.error) setResetError(result.error);
     setResetting(false);
+  };
+
+  const handleConfirmDelete = async () => {
+    setDeleting(true);
+    setDeleteError('');
+    const result = await onDeleteLeague();
+    if (result?.error) {
+      setDeleteError(result.error);
+      setDeleting(false);
+      return;
+    }
+    setShowDeleteModal(false);
+    setDeleting(false);
   };
 
   const tabs: { id: Tab; label: string; icon: any }[] = [
@@ -272,6 +289,74 @@ export function AdminPanel({
               >
                 <RotateCcw className={`w-4 h-4 ${resetting ? 'animate-spin' : ''}`} />
                 {resetting ? 'Resetting…' : 'Reset Draft'}
+              </button>
+            </div>
+          </div>
+
+          {/* Delete League */}
+          <div className="card p-5 border-red-900/40">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-medium text-white">Delete League</p>
+                  <p className="text-xs text-turf-500 mt-0.5">
+                    Permanently deletes this league and everything in it — members, draft picks,
+                    scores, and settings. This cannot be undone.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => { setDeleteError(''); setShowDeleteModal(true); }}
+                className="btn-danger flex-shrink-0"
+              >
+                <Trash2 className="w-4 h-4" /> Delete League
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete League confirmation modal */}
+      {showDeleteModal && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4"
+          style={{ backgroundColor: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)' }}
+          onClick={() => !deleting && setShowDeleteModal(false)}
+        >
+          <div
+            className="relative w-full max-w-sm rounded-2xl border border-red-900/50 bg-turf-950 shadow-2xl p-6 space-y-4"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-900/40 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="w-5 h-5 text-red-400" />
+              </div>
+              <h3 className="font-display text-xl text-white tracking-wide">Delete League?</h3>
+            </div>
+            <p className="text-sm text-turf-300">
+              This permanently deletes <span className="text-white font-medium">{league.name}</span> —
+              every member, draft pick, score, and setting.{' '}
+              <span className="text-red-400 font-medium">There is no way to recover it.</span>
+            </p>
+            {deleteError && (
+              <p className="text-xs text-red-400">{deleteError}</p>
+            )}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                disabled={deleting}
+                className="btn-secondary flex-1"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                disabled={deleting}
+                className="btn-danger flex-1"
+              >
+                {deleting && <Loader2 className="w-4 h-4 animate-spin" />}
+                {deleting ? 'Deleting…' : 'Yes, Delete League'}
               </button>
             </div>
           </div>
