@@ -65,6 +65,15 @@ export const STAT_BONUS_LABELS: Record<StatBonusCategory, string> = {
   sacks:         'Sacks',
 };
 
+export interface StatBonusCategorySettings {
+  top_enabled: boolean;
+  top_count: number;
+  top_points: number;
+  bottom_enabled: boolean;
+  bottom_count: number;
+  bottom_points: number; // may be negative
+}
+
 export interface ScoringSettings {
   win: number;
   win_ranked: number;
@@ -85,12 +94,9 @@ export interface ScoringSettings {
   fa_max_moves_per_week: number;   // max adds/drops per user per week
   fa_penalty_enabled: boolean;
   fa_penalty_points: number;       // points subtracted the week a swap is made (entered as a positive number)
-  // Statistical ranking bonus settings (Top 3 / Bottom 3 per category, among all drafted teams)
-  stat_bonus_points: Record<StatBonusCategory, number>;        // points awarded/deducted per category, entered as a positive number
-  stat_bonus_top3_enabled: boolean;
-  stat_bonus_top3_categories: Record<StatBonusCategory, boolean>;
-  stat_bonus_bottom3_enabled: boolean;
-  stat_bonus_bottom3_categories: Record<StatBonusCategory, boolean>;
+  // Statistical ranking bonus settings (top-N / bottom-N per category, among all drafted teams)
+  stat_bonus_enabled: boolean; // master toggle for the whole feature
+  stat_bonus_categories: Record<StatBonusCategory, StatBonusCategorySettings>;
 }
 
 export const DEFAULT_SCORING: ScoringSettings = {
@@ -113,35 +119,37 @@ export const DEFAULT_SCORING: ScoringSettings = {
   fa_max_moves_per_week: 2,
   fa_penalty_enabled: false,
   fa_penalty_points: 3,
-  stat_bonus_points: { qbr: 3, rushing_tds: 3, receiving_tds: 3, def_ints: 3, sacks: 3 },
-  stat_bonus_top3_enabled: true,
-  stat_bonus_top3_categories: { qbr: true, rushing_tds: true, receiving_tds: true, def_ints: true, sacks: true },
-  stat_bonus_bottom3_enabled: true,
-  stat_bonus_bottom3_categories: { qbr: true, rushing_tds: true, receiving_tds: true, def_ints: true, sacks: true },
+  stat_bonus_enabled: true,
+  stat_bonus_categories: {
+    qbr:           { top_enabled: true, top_count: 3, top_points: 3, bottom_enabled: true, bottom_count: 3, bottom_points: -3 },
+    rushing_tds:   { top_enabled: true, top_count: 3, top_points: 3, bottom_enabled: true, bottom_count: 3, bottom_points: -3 },
+    receiving_tds: { top_enabled: true, top_count: 3, top_points: 3, bottom_enabled: true, bottom_count: 3, bottom_points: -3 },
+    def_ints:      { top_enabled: true, top_count: 3, top_points: 3, bottom_enabled: true, bottom_count: 3, bottom_points: -3 },
+    sacks:         { top_enabled: true, top_count: 3, top_points: 3, bottom_enabled: true, bottom_count: 3, bottom_points: -3 },
+  },
 };
 
 // Fills in any missing/legacy-shaped scoring fields with defaults — handles
 // leagues saved before a settings field existed, or before it changed shape
-// (e.g. stat_bonus_points used to be a single number, not per-category).
+// (e.g. stat bonuses used to be a single global Top 3/Bottom 3, not
+// per-category configurable counts and points).
 export function normalizeScoring(raw: Partial<ScoringSettings> | null | undefined): ScoringSettings {
   const isPlainObject = (v: unknown): v is Record<string, unknown> =>
     typeof v === 'object' && v !== null && !Array.isArray(v);
 
+  const rawCategories = isPlainObject((raw as any)?.stat_bonus_categories)
+    ? (raw as any).stat_bonus_categories as Record<string, unknown>
+    : {};
+  const categories = {} as Record<StatBonusCategory, StatBonusCategorySettings>;
+  STAT_BONUS_CATEGORIES.forEach(cat => {
+    const rawCat = isPlainObject(rawCategories[cat]) ? rawCategories[cat] as Partial<StatBonusCategorySettings> : {};
+    categories[cat] = { ...DEFAULT_SCORING.stat_bonus_categories[cat], ...rawCat };
+  });
+
   return {
     ...DEFAULT_SCORING,
     ...(raw ?? {}),
-    stat_bonus_points: {
-      ...DEFAULT_SCORING.stat_bonus_points,
-      ...(isPlainObject(raw?.stat_bonus_points) ? raw!.stat_bonus_points as any : {}),
-    },
-    stat_bonus_top3_categories: {
-      ...DEFAULT_SCORING.stat_bonus_top3_categories,
-      ...(isPlainObject(raw?.stat_bonus_top3_categories) ? raw!.stat_bonus_top3_categories as any : {}),
-    },
-    stat_bonus_bottom3_categories: {
-      ...DEFAULT_SCORING.stat_bonus_bottom3_categories,
-      ...(isPlainObject(raw?.stat_bonus_bottom3_categories) ? raw!.stat_bonus_bottom3_categories as any : {}),
-    },
+    stat_bonus_categories: categories,
   };
 }
 

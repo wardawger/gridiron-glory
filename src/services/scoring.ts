@@ -143,8 +143,6 @@ export function calcWeeklyScore(
 
 // ─── Stat ranking bonuses ─────────────────────────────────────────────────
 
-const TOP_N = 3;
-
 export function calcStatRankingBonuses(
   rosters: Map<string, RosterEntry[]>,
   seasonStats: Map<string, TeamSeasonStats>,
@@ -152,16 +150,17 @@ export function calcStatRankingBonuses(
   rawSettings: ScoringSettings,
 ): Map<string, StatRankingBonus[]> {
   const settings = normalizeScoring(rawSettings);
-  const allDraftedIds = new Set<string>();
-  rosters.forEach(roster => roster.forEach(t => allDraftedIds.add(t.team_id)));
-
   const result = new Map<string, StatRankingBonus[]>();
   rosters.forEach((_, userId) => result.set(userId, []));
 
+  if (!settings.stat_bonus_enabled) return result;
+
+  const allDraftedIds = new Set<string>();
+  rosters.forEach(roster => roster.forEach(t => allDraftedIds.add(t.team_id)));
+
   for (const stat of STAT_BONUS_CATEGORIES) {
-    const topOn = settings.stat_bonus_top3_enabled && settings.stat_bonus_top3_categories[stat];
-    const botOn = settings.stat_bonus_bottom3_enabled && settings.stat_bonus_bottom3_categories[stat];
-    if (!topOn && !botOn) continue;
+    const cat = settings.stat_bonus_categories[stat];
+    if (!cat.top_enabled && !cat.bottom_enabled) continue;
 
     const ranked = Array.from(allDraftedIds)
       .map(id => ({ id, val: seasonStats.get(id)?.[stat] ?? null }))
@@ -169,17 +168,14 @@ export function calcStatRankingBonuses(
       .sort((a, b) => (b.val as number) - (a.val as number));
 
     const total = ranked.length;
-    const statPoints = settings.stat_bonus_points[stat];
 
     ranked.forEach((entry, idx) => {
       const rank = idx + 1;
-      const isTop = rank <= TOP_N;
-      const isBot = !isTop && rank > total - TOP_N;
-      if (isTop && !topOn) return;
-      if (isBot && !botOn) return;
+      const isTop = cat.top_enabled && rank <= cat.top_count;
+      const isBot = !isTop && cat.bottom_enabled && rank > total - cat.bottom_count;
       if (!isTop && !isBot) return;
 
-      const pts = isTop ? statPoints : -statPoints;
+      const pts = isTop ? cat.top_points : cat.bottom_points;
 
       rosters.forEach((roster, userId) => {
         const team = roster.find(t => t.team_id === entry.id);

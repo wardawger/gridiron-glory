@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react';
-import { Shield, UserPlus, Copy, Check, Trash2, Plus, Mail, Settings, Gift, RotateCcw, AlertTriangle } from 'lucide-react';
+import { Shield, UserPlus, Copy, Check, Trash2, Plus, Mail, Settings, Gift, RotateCcw, AlertTriangle, TrendingUp, TrendingDown } from 'lucide-react';
 import type {
   League, LeagueMember, ManualBonus, DraftPick, SpreadPick, FreeAgencyMove,
-  BonusType, ScoringSettings,
+  BonusType, ScoringSettings, StatBonusCategorySettings,
 } from '../../types';
 import { BONUS_LABELS, BONUS_DEFAULT_POINTS, normalizeScoring, STAT_BONUS_CATEGORIES, STAT_BONUS_LABELS } from '../../types';
 import { rosterAtWeek } from '../../services/roster';
@@ -25,6 +25,19 @@ interface Props {
   onResetDraft: () => Promise<{ error?: string }>;
   onOverrideSpread: (pickId: string, result: 'covered' | 'missed', points: number) => Promise<{ error?: string }>;
   onClearSpreadOverride: (pickId: string) => Promise<{ error?: string }>;
+}
+
+function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: () => void; disabled?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onChange}
+      disabled={disabled}
+      className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${checked ? 'bg-field-500' : 'bg-turf-700'} ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
+    >
+      <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${checked ? 'left-5' : 'left-0.5'}`} />
+    </button>
+  );
 }
 
 type Tab = 'members' | 'scoring' | 'bonuses';
@@ -296,92 +309,112 @@ export function AdminPanel({
 
           {/* Statistical ranking bonus settings */}
           <div className="card p-5 space-y-4">
-            <div>
-              <h3 className="font-medium text-white text-sm">Statistical Ranking Bonuses</h3>
-              <p className="text-xs text-turf-400 mt-0.5">
-                Automatically awarded to whoever owns the Top 3 / Bottom 3 team in each enabled category
-                (among all drafted teams). Shown as a live preview until conference championship week,
-                then locks in.
-              </p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-medium text-white text-sm">Statistical Ranking Bonuses</h3>
+                <p className="text-xs text-turf-400 mt-0.5">
+                  Award points to whoever owns a top- or bottom-ranked team in each category
+                  (among all drafted teams). Shown as a live preview until conference championship
+                  week, then locks in.
+                </p>
+              </div>
+              <Toggle
+                checked={scoring.stat_bonus_enabled}
+                onChange={() => setScoring(prev => ({ ...prev, stat_bonus_enabled: !prev.stat_bonus_enabled }))}
+              />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="card-inner flex items-center justify-between px-3 py-2">
-                <span className="text-sm text-white">Top 3 Bonuses</span>
-                <button
-                  onClick={() => setScoring(prev => ({ ...prev, stat_bonus_top3_enabled: !prev.stat_bonus_top3_enabled }))}
-                  className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${scoring.stat_bonus_top3_enabled ? 'bg-field-500' : 'bg-turf-700'}`}
-                >
-                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${scoring.stat_bonus_top3_enabled ? 'left-5' : 'left-0.5'}`} />
-                </button>
-              </div>
-              <div className="card-inner flex items-center justify-between px-3 py-2">
-                <span className="text-sm text-white">Bottom 3 Bonuses</span>
-                <button
-                  onClick={() => setScoring(prev => ({ ...prev, stat_bonus_bottom3_enabled: !prev.stat_bonus_bottom3_enabled }))}
-                  className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${scoring.stat_bonus_bottom3_enabled ? 'bg-field-500' : 'bg-turf-700'}`}
-                >
-                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${scoring.stat_bonus_bottom3_enabled ? 'left-5' : 'left-0.5'}`} />
-                </button>
-              </div>
-            </div>
+            {scoring.stat_bonus_enabled && (
+              <div className="space-y-3 pt-2 border-t border-turf-800">
+                {STAT_BONUS_CATEGORIES.map(cat => {
+                  const c = scoring.stat_bonus_categories[cat];
+                  const updateCat = (patch: Partial<StatBonusCategorySettings>) =>
+                    setScoring(prev => ({
+                      ...prev,
+                      stat_bonus_categories: {
+                        ...prev.stat_bonus_categories,
+                        [cat]: { ...prev.stat_bonus_categories[cat], ...patch },
+                      },
+                    }));
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-xs text-turf-500 uppercase tracking-wide">
-                    <th className="text-left py-2 font-medium">Category</th>
-                    <th className="text-center py-2 font-medium w-24">Points</th>
-                    <th className="text-center py-2 font-medium w-16">Top 3</th>
-                    <th className="text-center py-2 font-medium w-16">Bottom 3</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-turf-800">
-                  {STAT_BONUS_CATEGORIES.map(cat => (
-                    <tr key={cat}>
-                      <td className="py-2 text-turf-300">{STAT_BONUS_LABELS[cat]}</td>
-                      <td className="py-2">
-                        <input
-                          className="input font-mono w-20 mx-auto text-center"
-                          type="number"
-                          min="0"
-                          step="0.5"
-                          value={scoring.stat_bonus_points[cat]}
-                          onChange={e => setScoring(prev => ({
-                            ...prev,
-                            stat_bonus_points: { ...prev.stat_bonus_points, [cat]: parseFloat(e.target.value) || 0 },
-                          }))}
-                        />
-                      </td>
-                      <td className="py-2 text-center">
-                        <input
-                          type="checkbox"
-                          className={`w-4 h-4 rounded accent-field-500 ${scoring.stat_bonus_top3_enabled ? 'cursor-pointer' : 'opacity-30 cursor-not-allowed'}`}
-                          checked={scoring.stat_bonus_top3_categories[cat]}
-                          disabled={!scoring.stat_bonus_top3_enabled}
-                          onChange={e => setScoring(prev => ({
-                            ...prev,
-                            stat_bonus_top3_categories: { ...prev.stat_bonus_top3_categories, [cat]: e.target.checked },
-                          }))}
-                        />
-                      </td>
-                      <td className="py-2 text-center">
-                        <input
-                          type="checkbox"
-                          className={`w-4 h-4 rounded accent-field-500 ${scoring.stat_bonus_bottom3_enabled ? 'cursor-pointer' : 'opacity-30 cursor-not-allowed'}`}
-                          checked={scoring.stat_bonus_bottom3_categories[cat]}
-                          disabled={!scoring.stat_bonus_bottom3_enabled}
-                          onChange={e => setScoring(prev => ({
-                            ...prev,
-                            stat_bonus_bottom3_categories: { ...prev.stat_bonus_bottom3_categories, [cat]: e.target.checked },
-                          }))}
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  return (
+                    <div key={cat} className="card-inner p-3 space-y-3">
+                      <p className="text-sm font-medium text-white">{STAT_BONUS_LABELS[cat]}</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {/* Top */}
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-turf-400 flex items-center gap-1">
+                              <TrendingUp className="w-3 h-3 text-field-400" /> Top Bonus
+                            </span>
+                            <Toggle checked={c.top_enabled} onChange={() => updateCat({ top_enabled: !c.top_enabled })} />
+                          </div>
+                          {c.top_enabled && (
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <label className="text-[10px] text-turf-500 uppercase tracking-wide block mb-1"># of Teams</label>
+                                <input
+                                  className="input font-mono text-center"
+                                  type="number"
+                                  min="1"
+                                  value={c.top_count}
+                                  onChange={e => updateCat({ top_count: parseInt(e.target.value) || 1 })}
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[10px] text-turf-500 uppercase tracking-wide block mb-1">Points Each</label>
+                                <input
+                                  className="input font-mono text-center"
+                                  type="number"
+                                  step="0.5"
+                                  value={c.top_points}
+                                  onChange={e => updateCat({ top_points: parseFloat(e.target.value) || 0 })}
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Bottom */}
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-turf-400 flex items-center gap-1">
+                              <TrendingDown className="w-3 h-3 text-red-400" /> Bottom Bonus
+                            </span>
+                            <Toggle checked={c.bottom_enabled} onChange={() => updateCat({ bottom_enabled: !c.bottom_enabled })} />
+                          </div>
+                          {c.bottom_enabled && (
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <label className="text-[10px] text-turf-500 uppercase tracking-wide block mb-1"># of Teams</label>
+                                <input
+                                  className="input font-mono text-center"
+                                  type="number"
+                                  min="1"
+                                  value={c.bottom_count}
+                                  onChange={e => updateCat({ bottom_count: parseInt(e.target.value) || 1 })}
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[10px] text-turf-500 uppercase tracking-wide block mb-1">Points Each</label>
+                                <input
+                                  className="input font-mono text-center"
+                                  type="number"
+                                  step="0.5"
+                                  value={c.bottom_points}
+                                  onChange={e => updateCat({ bottom_points: parseFloat(e.target.value) || 0 })}
+                                />
+                                <p className="text-[10px] text-turf-600 mt-0.5">Negative values subtract points</p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Spread betting settings */}

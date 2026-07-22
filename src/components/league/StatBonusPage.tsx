@@ -36,7 +36,7 @@ export function StatBonusPage({ league, members, rosters, seasonStats }: Props) 
             <div>
               <h1 className="font-display text-2xl tracking-wide text-white">Statistical Bonuses</h1>
               <p className="text-turf-500 text-sm">
-                Awarded to whoever owns the Top 3 / Bottom 3 team in each enabled category
+                Awarded to whoever owns a top- or bottom-ranked team in each enabled category
               </p>
             </div>
           </div>
@@ -60,15 +60,16 @@ export function StatBonusPage({ league, members, rosters, seasonStats }: Props) 
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {board.map(category => {
-            const topOn = scoring.stat_bonus_top3_enabled && scoring.stat_bonus_top3_categories[category.stat];
-            const botOn = scoring.stat_bonus_bottom3_enabled && scoring.stat_bonus_bottom3_categories[category.stat];
+            const catSettings = scoring.stat_bonus_categories[category.stat];
+            const topOn = scoring.stat_bonus_enabled && catSettings.top_enabled;
+            const botOn = scoring.stat_bonus_enabled && catSettings.bottom_enabled;
             return (
               <div key={category.stat} className="card p-4 space-y-3">
                 <h3 className="font-display text-lg tracking-wide text-white">{category.label}</h3>
 
                 <div>
                   <p className="text-xs text-field-500 uppercase tracking-wide font-medium mb-1.5 flex items-center gap-1">
-                    <TrendingUp className="w-3 h-3" /> Top 3
+                    <TrendingUp className="w-3 h-3" /> Top{topOn ? ` ${catSettings.top_count}` : ''}
                   </p>
                   {!topOn ? (
                     <p className="text-xs text-turf-600 py-1">Not enabled</p>
@@ -96,7 +97,7 @@ export function StatBonusPage({ league, members, rosters, seasonStats }: Props) 
 
                 <div>
                   <p className="text-xs text-red-400 uppercase tracking-wide font-medium mb-1.5 flex items-center gap-1">
-                    <TrendingDown className="w-3 h-3" /> Bottom 3
+                    <TrendingDown className="w-3 h-3" /> Bottom{botOn ? ` ${catSettings.bottom_count}` : ''}
                   </p>
                   {!botOn ? (
                     <p className="text-xs text-turf-600 py-1">Not enabled</p>
