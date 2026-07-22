@@ -450,6 +450,13 @@
     font-size: 12px;
   }
 
+  /* ── Toggle row (Captain / Spread picks) ── */
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--turf-800); }
+  .toggle-label { font-size: 12px; font-weight: 500; display: flex; align-items: center; gap: 5px; }
+  .toggle-sub { font-size: 11px; color: var(--turf-500); margin-top: 1px; }
+  .toggle-sw { position: relative; width: 38px; height: 20px; border-radius: 999px; flex-shrink: 0; }
+  .toggle-sw i { position: absolute; top: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; }
+
   /* ── Analytics preview ── */
   .heatmap-row {
     display: grid;
@@ -609,8 +616,13 @@
       <li><a href="#draft">The Snake Draft</a></li>
       <li><a href="#scoring">How Scoring Works</a></li>
       <li><a href="#captains">Captain Picks</a></li>
+      <li><a href="#spread">Spread Betting</a></li>
+      <li><a href="#free-agency">Free Agency</a></li>
       <li><a href="#postseason">Postseason Bonuses</a></li>
+      <li><a href="#stat-bonuses">Statistical Bonuses</a></li>
       <li><a href="#analytics">Roster Analytics</a></li>
+      <li><a href="#avatars">Your Profile &amp; Avatar</a></li>
+      <li><a href="#draft-recap">Draft Recap</a></li>
       <li><a href="#year">Season Timeline</a></li>
       <li><a href="#commissioner">Commissioner Tools</a></li>
     </ul>
@@ -654,6 +666,16 @@
         <div class="feature-icon" style="background:rgba(34,197,94,0.1)">🔒</div>
         <div class="feature-title">Private Leagues</div>
         <div class="feature-body">Leagues are invite-only. The commissioner generates a personal link for each player — nobody can join without an invitation.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:rgba(96,165,250,0.1)">🔁</div>
+        <div class="feature-title">Free Agency</div>
+        <div class="feature-body">If the commissioner turns it on, drop an underperforming team and pick up an available one — within weekly and season limits the commissioner sets.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:rgba(245,158,11,0.1)">🖼️</div>
+        <div class="feature-title">Custom Avatars</div>
+        <div class="feature-body">Represent yourself with a team logo, a sports emoji, or your own uploaded photo — set independently for each league you're in.</div>
       </div>
     </div>
   </div>
@@ -934,13 +956,16 @@
           <div class="score-row"><span class="score-label">Loss to G5 team</span><span class="score-val neg">−5</span></div>
         </div>
         <div class="score-section" style="margin-top:12px;">
-          <div class="score-section-head" style="color:var(--blue-400);">📈 Stats (post Conf. Championship)</div>
+          <div class="score-section-head" style="color:var(--blue-400);">📈 Statistical Bonuses (defaults)</div>
           <div class="score-row"><span class="score-label">Top 3 in QBR</span><span class="score-val pos">+3</span></div>
           <div class="score-row"><span class="score-label">Top 3 in Rushing TDs</span><span class="score-val pos">+3</span></div>
           <div class="score-row"><span class="score-label">Top 3 in Receiving TDs</span><span class="score-val pos">+3</span></div>
           <div class="score-row"><span class="score-label">Top 3 in INTs (defense)</span><span class="score-val pos">+3</span></div>
           <div class="score-row"><span class="score-label">Top 3 in Sacks</span><span class="score-val pos">+3</span></div>
           <div class="score-row"><span class="score-label">Bottom 3 in any category</span><span class="score-val neg">−3</span></div>
+        </div>
+        <div style="margin-top:8px;padding:10px 12px;background:var(--turf-900);border:1px solid var(--turf-700);border-radius:8px;font-size:11px;color:var(--turf-500);">
+          Every number here — how many teams count as "top" or "bottom," and how many points each is worth — is configurable per category. See <a href="#stat-bonuses" style="color:var(--green-400);">Statistical Bonuses</a>.
         </div>
       </div>
       <div>
@@ -994,8 +1019,12 @@
         <div style="background:var(--turf-800);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--turf-400);margin-bottom:10px;">
           vs #8 Penn State · TBD
         </div>
-        <div style="border:1px solid var(--turf-600);border-radius:6px;padding:8px;text-align:center;font-size:12px;color:var(--turf-400);">
-          Set Captain (1 use left)
+        <div class="toggle-row">
+          <div>
+            <div class="toggle-label" style="color:var(--turf-300);">★ Captain</div>
+            <div class="toggle-sub">1 use left</div>
+          </div>
+          <div class="toggle-sw" style="background:var(--turf-700);"><i style="left:2px;"></i></div>
         </div>
       </div>
       <div class="team-card captain">
@@ -1017,15 +1046,109 @@
           <span style="color:var(--turf-500);">Base: <span class="mono" style="color:var(--green-400);">+3 pts</span></span>
           <span style="color:var(--gold-light);font-weight:600;">Captain: <span class="mono">+6 pts ×2</span></span>
         </div>
-        <div style="background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.3);border-radius:6px;padding:8px;text-align:center;font-size:12px;color:var(--gold-light);margin-top:10px;font-weight:600;">
-          ★ Remove Captain
+        <div class="toggle-row">
+          <div>
+            <div class="toggle-label" style="color:var(--gold-light);">★ Captain ×2</div>
+            <div class="toggle-sub">Doubles points this week</div>
+          </div>
+          <div class="toggle-sw" style="background:var(--gold);"><i style="left:20px;"></i></div>
         </div>
       </div>
     </div>
 
     <div class="callout callout-gold" style="margin-top:20px;">
       <div class="callout-icon">📅</div>
-      <div class="callout-text"><strong>Plan ahead with the Full Schedule view.</strong> In My Roster, switch to the Full Schedule tab to see every team's upcoming opponents across all 16 weeks. You can set captain picks for future weeks directly from this grid — perfect for locking in captains before big rivalry games.</div>
+      <div class="callout-text"><strong>Browse any week, not just the current one.</strong> My Roster's week dropdown lets you jump to any week of the season — past or future — to review results or set captains ahead of time. Once a game kicks off, that team's Captain toggle locks so you can't retroactively change it. Switch to the Full Schedule tab for a season-long grid view of every team's opponents.</div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ══ SPREAD BETTING ══ -->
+  <div class="section" id="spread">
+    <div class="section-label">Optional Feature</div>
+    <div class="section-title">Spread Betting</div>
+    <div class="section-body">
+      If your commissioner turns it on in Admin settings, each week you can also pick which of your rostered teams will cover the point spread — a second toggle on every team card, right below Captain.
+    </div>
+
+    <div class="captain-demo">
+      <div class="team-card">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+          <div class="team-logo-placeholder" style="background:rgba(96,165,250,0.1);">🏈</div>
+          <div>
+            <div class="team-name">Iowa State</div>
+            <div class="team-conf">Big 12</div>
+          </div>
+        </div>
+        <div class="toggle-row" style="border-top:none;padding-top:0;margin-top:0;">
+          <div>
+            <div class="toggle-label" style="color:var(--turf-300);">🪙 Spread</div>
+            <div class="toggle-sub">-3.5 favored · 1/3 season · 0/2 week</div>
+          </div>
+          <div class="toggle-sw" style="background:var(--turf-700);"><i style="left:2px;"></i></div>
+        </div>
+      </div>
+      <div class="team-card" style="border-color:rgba(96,165,250,0.4);">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+          <div class="team-logo-placeholder" style="background:rgba(34,197,94,0.1);">🏈</div>
+          <div>
+            <div class="team-name">Missouri</div>
+            <div class="team-conf">SEC</div>
+          </div>
+        </div>
+        <div class="toggle-row" style="border-top:none;padding-top:0;margin-top:0;">
+          <div>
+            <div class="toggle-label" style="color:var(--green-400);">🪙 Spread</div>
+            <div class="toggle-sub">✓ Covered +6.5</div>
+          </div>
+          <div class="toggle-sw" style="background:var(--green-600);"><i style="left:20px;"></i></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout callout-green" style="margin-top:20px;">
+      <div class="callout-icon">🪙</div>
+      <div class="callout-text"><strong>How it's scored:</strong> The commissioner sets a flat point value or a multiplier on your team's base game score, plus limits on how many picks you can make per week and how many times you can pick the same team per season. Picks lock once the game kicks off and settle automatically as Covered or Missed.</div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ══ FREE AGENCY ══ -->
+  <div class="section" id="free-agency">
+    <div class="section-label">Optional Feature</div>
+    <div class="section-title">Free Agency</div>
+    <div class="section-body">
+      If your commissioner enables it, a Free Agency page appears in the nav where you can drop an underperforming team and pick up any team nobody else currently owns — the draft isn't the only way onto a roster.
+    </div>
+
+    <div class="flow">
+      <div class="flow-step">
+        <div class="step-num">1</div>
+        <div class="step-title">Drop a team</div>
+        <div class="step-body">Choose one team currently on your roster to release back into the pool.</div>
+      </div>
+      <div class="flow-step">
+        <div class="step-num">2</div>
+        <div class="step-title">Add a team</div>
+        <div class="step-body">Search and filter every team nobody else owns, and pick the one you want instead.</div>
+      </div>
+      <div class="flow-step">
+        <div class="step-num">3</div>
+        <div class="step-title">Confirm the swap</div>
+        <div class="step-body">Conference min/max draft rules still apply. Points you already earned stay locked in — only future weeks change.</div>
+      </div>
+    </div>
+
+    <div class="callout callout-green" style="margin-top:24px;">
+      <div class="callout-icon">⚖️</div>
+      <div class="callout-text"><strong>Limits are commissioner-controlled.</strong> Admin settings cap how many swaps you can make per week and for the whole season, and can optionally subtract a fixed number of points from your score the week you make a swap — a real trade-off for chasing a hot team late in the year.</div>
+    </div>
+
+    <div class="callout callout-gold" style="margin-top:12px;">
+      <div class="callout-icon">📋</div>
+      <div class="callout-text"><strong>Every swap is logged.</strong> The Free Agency page shows a running history of every add/drop made league-wide — who, what, and when — visible to all members, not just the commissioner.</div>
     </div>
   </div>
 
@@ -1073,7 +1196,60 @@
       </div>
     </div>
   </div>
-  
+
+  <div class="divider"></div>
+
+  <!-- ══ STAT BONUSES ══ -->
+  <div class="section" id="stat-bonuses">
+    <div class="section-label">Fully Automatic</div>
+    <div class="section-title">Statistical Bonuses</div>
+    <div class="section-body">
+      Every 30 minutes, the app ranks all drafted teams across five statistical categories and awards bonus points automatically — no admin clicks required. A dedicated Stat Bonuses page, visible to everyone, shows exactly which team, stat, and rank earned each point.
+    </div>
+
+    <div class="feature-grid">
+      <div class="feature-card">
+        <div class="feature-icon" style="background:rgba(96,165,250,0.1)">📈</div>
+        <div class="feature-title">Five Categories</div>
+        <div class="feature-body">QBR (passer rating), Rushing TDs, Receiving TDs, Defensive INTs, and Sacks — ranked among every drafted team in the league.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:rgba(34,197,94,0.1)">⚙️</div>
+        <div class="feature-title">Fully Configurable</div>
+        <div class="feature-body">The commissioner sets, per category, whether Top and Bottom bonuses are on, how many teams count, and how many points each is worth.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:rgba(245,158,11,0.1)">◎</div>
+        <div class="feature-title">Preview → Locked</div>
+        <div class="feature-body">Bonuses show as a live preview (◎) that can still move until conference championship week, then lock in permanently.</div>
+      </div>
+    </div>
+
+    <div style="background:var(--turf-900);border:1px solid var(--turf-700);border-radius:14px;overflow:hidden;margin-top:24px;">
+      <div style="padding:14px 18px;border-bottom:1px solid var(--turf-800);font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px;color:var(--white);">QBR (Passer Rating)</div>
+      <div style="padding:14px 18px;display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div>
+          <div style="font-size:11px;color:var(--green-400);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Top 3</div>
+          <div style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:12px;">
+            <span class="mono" style="color:var(--green-400);width:20px;">#1</span>
+            <div class="team-logo-placeholder" style="width:24px;height:24px;font-size:12px;background:rgba(34,197,94,0.1);margin:0;">🏈</div>
+            <div style="flex:1;"><div style="color:var(--white);">Vanderbilt</div><div style="color:var(--turf-500);font-size:10px;">Warren</div></div>
+            <span class="mono" style="color:var(--green-400);">+3</span>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--red-400);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Bottom 3</div>
+          <div style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:12px;">
+            <span class="mono" style="color:var(--red-400);width:20px;">#48</span>
+            <div class="team-logo-placeholder" style="width:24px;height:24px;font-size:12px;background:rgba(248,113,113,0.1);margin:0;">🏈</div>
+            <div style="flex:1;"><div style="color:var(--white);">Rice</div><div style="color:var(--turf-500);font-size:10px;">Jordan</div></div>
+            <span class="mono" style="color:var(--red-400);">−3</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="divider"></div>
   <!-- ══ STANDINGS MOCKUP ══ -->
   <div class="section" id="standings-mock">
@@ -1172,7 +1348,7 @@
     <div class="section-label">Roster Analytics</div>
     <div class="section-title">Dig Into the Numbers</div>
     <div class="section-body">
-      Below the leaderboard, the Roster Analytics section gives a deeper view of how each roster compares. Switch between Table, Weekly, and Radar views. Hover any metric label for an explanation.
+      Below the leaderboard, the Roster Analytics section gives a deeper view of how each roster compares. Switch between Table, Weekly, and Graphs views. Hover any metric label for an explanation.
     </div>
 
     <div style="background:var(--turf-900);border:1px solid var(--turf-700);border-radius:14px;overflow:hidden;margin-top:24px;">
@@ -1181,7 +1357,7 @@
         <div style="display:flex;gap:4px;background:var(--turf-800);padding:4px;border-radius:8px;">
           <div style="padding:4px 12px;background:var(--green-500);border-radius:6px;font-size:11px;font-weight:600;color:var(--turf-950);">Table</div>
           <div style="padding:4px 12px;font-size:11px;font-weight:500;color:var(--turf-400);">Weekly</div>
-          <div style="padding:4px 12px;font-size:11px;font-weight:500;color:var(--turf-400);">Radar</div>
+          <div style="padding:4px 12px;font-size:11px;font-weight:500;color:var(--turf-400);">Graphs</div>
         </div>
       </div>
       <div style="padding:16px 20px;overflow-x:auto;">
@@ -1227,6 +1403,20 @@
           <div class="hm-cell hm-red">−2.7</div>
           <div class="hm-cell hm-red">−6.6</div>
         </div>
+        <div class="heatmap-row">
+          <div class="hm-label">Win/Loss Record ⓘ</div>
+          <div class="hm-cell hm-green">62-38</div>
+          <div class="hm-cell hm-green">58-41</div>
+          <div class="hm-cell hm-yellow">50-49</div>
+          <div class="hm-cell hm-red">44-55</div>
+        </div>
+        <div class="heatmap-row">
+          <div class="hm-label">Captain Efficiency ⓘ</div>
+          <div class="hm-cell hm-green">81%</div>
+          <div class="hm-cell hm-yellow">64%</div>
+          <div class="hm-cell hm-yellow">59%</div>
+          <div class="hm-cell hm-red">37%</div>
+        </div>
         <div style="border-top:1px solid var(--turf-800);margin-top:12px;padding-top:12px;">
           <div style="font-size:11px;color:var(--turf-500);margin-bottom:8px;font-weight:600;text-transform:uppercase;letter-spacing:1px;">Best Available — Not Drafted</div>
           <div style="display:flex;flex-wrap:wrap;gap:6px;">
@@ -1236,6 +1426,74 @@
             <span class="badge badge-gray">Minnesota <span style="color:var(--turf-600);">(#40)</span></span>
           </div>
         </div>
+      </div>
+    </div>
+
+    <div class="callout callout-green" style="margin-top:20px;">
+      <div class="callout-icon">📊</div>
+      <div class="callout-text"><strong>The Graphs tab</strong> layers on three visuals: a radar chart comparing roster quality across five dimensions, a season trend line showing cumulative points week by week, and a draft value scatter plot — every drafted team's pick number vs. its AP rank, so you can see at a glance who found value late and who reached early.</div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ══ AVATARS ══ -->
+  <div class="section" id="avatars">
+    <div class="section-label">Your Identity</div>
+    <div class="section-title">Your Profile &amp; Avatar</div>
+    <div class="section-body">
+      Click your name in the top-right corner to open My Account. From there you can change your password, see every league you belong to (with an Admin badge wherever you're commissioner), and customize how you appear.
+    </div>
+
+    <div class="feature-grid">
+      <div class="feature-card">
+        <div class="feature-icon" style="background:rgba(34,197,94,0.1)">✏️</div>
+        <div class="feature-title">Display Name Per League</div>
+        <div class="feature-body">Your name is set independently for each league you're in — go by something different with your work league than your college friends.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:rgba(245,158,11,0.1)">🏈</div>
+        <div class="feature-title">Team Logo Avatar</div>
+        <div class="feature-body">Pick any FBS team's logo as your avatar — shown on a white backdrop so it stays visible against the dark theme.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:rgba(96,165,250,0.1)">😈</div>
+        <div class="feature-title">Emoji Avatar</div>
+        <div class="feature-body">Or pick from a curated set of sports-flavored emoji — quick, no upload required.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:rgba(167,139,250,0.1)">📷</div>
+        <div class="feature-title">Upload a Photo</div>
+        <div class="feature-body">PNG, JPG, WEBP, or GIF — up to 2MB, between 100×100 and 2048×2048 pixels. Square images look best.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ══ DRAFT RECAP ══ -->
+  <div class="section" id="draft-recap">
+    <div class="section-label">Draft History</div>
+    <div class="section-title">Draft Recap</div>
+    <div class="section-body">
+      Once the draft is underway (or finished), every member can visit Draft Recap for a full history of picks — no need to be the commissioner, and no need to remember who took what.
+    </div>
+
+    <div class="feature-grid">
+      <div class="feature-card">
+        <div class="feature-icon" style="background:rgba(34,197,94,0.1)">⏱️</div>
+        <div class="feature-title">Timeline View</div>
+        <div class="feature-body">Every pick in the order it happened, with round, pick number, and the exact timestamp it was made.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:rgba(96,165,250,0.1)">👥</div>
+        <div class="feature-title">By Manager View</div>
+        <div class="feature-body">The same picks grouped by manager instead, so you can see how each roster came together pick by pick.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:rgba(245,158,11,0.1)">🔍</div>
+        <div class="feature-title">Searchable</div>
+        <div class="feature-body">Filter by team name, conference, or manager to find a specific pick fast.</div>
       </div>
     </div>
   </div>
@@ -1261,7 +1519,7 @@
         <div class="tl-dot green"></div>
         <div class="tl-month">Late August – November</div>
         <div class="tl-title">Regular Season</div>
-        <div class="tl-body">Scores update automatically every 30 minutes on game days. Each week players set their Captain before games kick off. The leaderboard updates live throughout Saturday. Commissioner advances the week counter in the Admin panel each Monday.</div>
+        <div class="tl-body">Scores update automatically every 30 minutes on game days. Each week players set their Captain and Spread picks before games kick off — My Roster's week dropdown lets you plan ahead or review any past week. If enabled, Free Agency swaps are also open during this window. The leaderboard updates live throughout Saturday. Commissioner advances the week counter in the Admin panel each Monday.</div>
       </div>
       <div class="tl-item">
         <div class="tl-dot gold"></div>
@@ -1314,12 +1572,17 @@
       <div class="feature-card">
         <div class="feature-icon" style="background:rgba(96,165,250,0.1)">⚙️</div>
         <div class="feature-title">Scoring Settings</div>
-        <div class="feature-body">Adjust the point values for any scoring category — wins, ranked wins, G5 losses, and more. Changes apply to all weeks retroactively.</div>
+        <div class="feature-body">Adjust point values for wins, ranked wins, G5 losses, spread betting, free agency penalties, and statistical bonus thresholds — all fully configurable, all in one tab.</div>
       </div>
       <div class="feature-card">
         <div class="feature-icon" style="background:rgba(248,113,113,0.1)">🔄</div>
         <div class="feature-title">Reset Draft</div>
-        <div class="feature-body">If the draft needs to be redone, the commissioner can wipe all picks and reset to pre-draft status. Requires double confirmation. Captain picks and bonuses are not affected.</div>
+        <div class="feature-body">If the draft needs to be redone, wipe all picks (and any free agency swaps) and return to pre-draft status. A confirmation modal spells out exactly what's lost before you commit. Captain picks and bonuses are not affected.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:rgba(239,68,68,0.12)">🗑️</div>
+        <div class="feature-title">Delete League</div>
+        <div class="feature-body">Permanently removes the league and everything in it — members, picks, scores, settings. A confirmation modal names the league and requires an explicit click. This cannot be undone.</div>
       </div>
     </div>
 
@@ -1354,6 +1617,20 @@
         <div class="score-row"><span class="score-label">Captain multiplier</span><span class="score-val neu">×2</span></div>
         <div class="score-row"><span class="score-label">Can captain any week?</span><span class="score-val neu">Yes, future too</span></div>
         <div class="score-row"><span class="score-label">Can change captain?</span><span class="score-val neu">Yes, until game</span></div>
+      </div>
+      <div class="score-section">
+        <div class="score-section-head" style="color:var(--turf-300);">Free Agency Defaults</div>
+        <div class="score-row"><span class="score-label">Enabled by default?</span><span class="score-val neu">No — commissioner opt-in</span></div>
+        <div class="score-row"><span class="score-label">Moves per season</span><span class="score-val neu">10</span></div>
+        <div class="score-row"><span class="score-label">Moves per week</span><span class="score-val neu">2</span></div>
+        <div class="score-row"><span class="score-label">Swap penalty</span><span class="score-val neu">Off by default</span></div>
+      </div>
+      <div class="score-section">
+        <div class="score-section-head" style="color:var(--turf-300);">Spread Betting Defaults</div>
+        <div class="score-row"><span class="score-label">Enabled by default?</span><span class="score-val neu">No — commissioner opt-in</span></div>
+        <div class="score-row"><span class="score-label">Picks per week</span><span class="score-val neu">2</span></div>
+        <div class="score-row"><span class="score-label">Same team per season</span><span class="score-val neu">3</span></div>
+        <div class="score-row"><span class="score-label">Captain stacking</span><span class="score-val neu">Off by default</span></div>
       </div>
     </div>
   </div>
