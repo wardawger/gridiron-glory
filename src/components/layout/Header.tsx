@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Trophy, Users, Shield, BarChart3, LogOut, RefreshCw, Zap, ChevronDown, Plus } from 'lucide-react';
+import { Trophy, Users, Shield, BarChart3, LogOut, RefreshCw, Zap, ChevronDown, Plus, History } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import type { League, LeagueMember } from '../../types';
 
@@ -37,6 +37,7 @@ export function Header({
     { to: '/',          label: 'Standings',  icon: Trophy },
     { to: '/roster',    label: 'My Roster',  icon: Users },
     { to: '/rankings',  label: 'AP Top 25',  icon: BarChart3 },
+    { to: '/draft-recap', label: 'Draft Recap', icon: History },
     ...(myMembership?.role === 'commissioner'
       ? [{ to: '/admin', label: 'Admin', icon: Shield }]
       : []),

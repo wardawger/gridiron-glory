@@ -12,6 +12,7 @@ import { JoinPage }         from './pages/JoinPage';
 import { DraftRoom }        from './components/draft/DraftRoom';
 import { AdminPanel }       from './components/admin/AdminPanel';
 import { RankingsPage }     from './components/league/RankingsPage';
+import { DraftRecapPage }   from './components/league/DraftRecapPage';
 import { Loader2 }          from 'lucide-react';
 
 export default function App() {
@@ -119,6 +120,7 @@ export default function App() {
             <Route path="/roster"         element={<RosterPage league={lg} members={league.members} draftPicks={league.draftPicks} captainPicks={league.captainPicks} gameData={cfb.gameData} spreadData={cfb.spreadData} spreadPicks={league.spreadPicks} userId={auth.user.id} onSetCaptain={league.setCaptain} onSetSpread={league.setSpreadPick} onRemoveSpread={league.removeSpreadPick} onRefreshSpreads={cfb.refreshSpreads} />} />
             <Route path="/roster/:userId" element={<RosterPage league={lg} members={league.members} draftPicks={league.draftPicks} captainPicks={league.captainPicks} gameData={cfb.gameData} spreadData={cfb.spreadData} spreadPicks={league.spreadPicks} userId={auth.user.id} onSetCaptain={league.setCaptain} onSetSpread={league.setSpreadPick} onRemoveSpread={league.removeSpreadPick} onRefreshSpreads={cfb.refreshSpreads} />} />
             <Route path="/rankings" element={<RankingsPage rankings={cfb.rankings} teams={cfb.teams} records={cfb.records} />} />
+            <Route path="/draft-recap" element={<DraftRecapPage league={lg} members={league.members} draftPicks={league.draftPicks} />} />
             <Route path="/draft"          element={
               <DraftRoom
                 league={lg}
