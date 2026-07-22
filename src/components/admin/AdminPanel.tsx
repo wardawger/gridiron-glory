@@ -65,9 +65,9 @@ export function AdminPanel({
 
   // When team selection changes, populate both id and name
   const handleTeamChange = (teamId: string) => {
-    const pick = draftPicks.find(p => p.team_id === teamId && p.user_id === bonusUserId);
+    const team = userTeams.find(t => t.team_id === teamId);
     setBonusTeamId(teamId);
-    setBonusTeamName(pick?.team_name ?? '');
+    setBonusTeamName(team?.team_name ?? '');
   };
 
   if (!isCommissioner) {
@@ -605,7 +605,8 @@ export function AdminPanel({
                   .sort((a, b) => b.week - a.week || a.user_id.localeCompare(b.user_id))
                   .map(pick => {
                     const mem = members.find(m => m.user_id === pick.user_id);
-                    const team = draftPicks.find(p => p.team_id === pick.team_id && p.user_id === pick.user_id);
+                    const team = rosterAtWeek(pick.user_id, pick.week, draftPicks, freeAgencyMoves)
+                      .find(t => t.team_id === pick.team_id);
                     const spreadLabel = pick.locked_spread > 0
                       ? `+${pick.locked_spread} (underdog)`
                       : `${pick.locked_spread} (favored)`;
