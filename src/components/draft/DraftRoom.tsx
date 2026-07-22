@@ -4,6 +4,7 @@ import type { League, LeagueMember, DraftPick, CfbTeam } from '../../types';
 import { getPickOwner, P4_CONFERENCES, DRAFT_CONF_MIN, DRAFT_CONF_MAX } from '../../services/scoring';
 import { Tooltip } from '../ui/Tooltip';
 import { TeamLogo } from '../ui/TeamLogo';
+import { fireDraftCompleteConfetti } from '../../lib/confetti';
 
 // Re-export from types so DraftRoom can use them
 import { P4_CONFERENCES as P4_CONF_LIST } from '../../types';
@@ -37,6 +38,16 @@ export function DraftRoom({
   const totalPicks    = league.max_teams_per_user * league.draft_order.length;
   const currentPick   = league.draft_current_pick;
   const isDraftOver   = league.draft_status === 'complete';
+
+  // Celebrate the moment the draft actually finishes (not on later visits to an
+  // already-completed draft room).
+  const prevDraftStatus = useRef(league.draft_status);
+  useEffect(() => {
+    if (prevDraftStatus.current !== 'complete' && league.draft_status === 'complete') {
+      fireDraftCompleteConfetti();
+    }
+    prevDraftStatus.current = league.draft_status;
+  }, [league.draft_status]);
 
   const onTheClock = league.draft_status === 'active'
     ? getPickOwner(currentPick, league.draft_order)
