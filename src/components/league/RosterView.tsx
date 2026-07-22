@@ -3,6 +3,7 @@ import { Shield, TrendingUp, TrendingDown, Minus, Star, Calendar, List, X, MapPi
 import type { RosterEntry, CaptainPick, GameData, ScoringSettings, LeagueMember, WeeklyScore, GameResult, SpreadPick, SpreadData } from '../../types';
 import { calcWeeklyScore, scoreGame, didCoverSpread } from '../../services/scoring';
 import { Tooltip } from '../ui/Tooltip';
+import { TeamLogo } from '../ui/TeamLogo';
 
 interface Props {
   member: LeagueMember;
@@ -26,19 +27,6 @@ interface Props {
 }
 
 const WEEKS = Array.from({ length: 16 }, (_, i) => i); // weeks 0–15
-
-// Default logo when a team logo URL fails to load or is missing
-function teamLogoFallback(name: string): string {
-  const initials = name
-    .replace(/[^a-zA-Z ]/g, '')
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map(w => w[0])
-    .join('')
-    .toUpperCase() || '?';
-  return `https://ui-avatars.com/api/?name=${encodeURIComponent(initials)}&background=052e16&color=4ade80&bold=true&size=80&font-size=0.45`;
-}
 
 // Format a startDate ISO string into readable date + time
 function formatGameDate(startDate: string | null | undefined): { date: string; time: string } {
@@ -123,24 +111,14 @@ function GameScoreModal({ game, teamName, teamLogo, week, isCaptain, scoring, on
         {/* Header */}
         <div className="flex items-center gap-3 border-b border-turf-800 px-5 py-4">
           {/* My team */}
-          <img
-            src={teamLogo}
-            alt={teamName}
-            className="h-9 w-9 object-contain flex-shrink-0"
-            onError={e => { (e.target as HTMLImageElement).src = teamLogoFallback(teamName); }}
-          />
+          <TeamLogo src={teamLogo} alt={teamName} fallbackName={teamName} size={36} />
           <div className="flex-1 min-w-0 text-center">
             <div className="text-xs text-turf-500 mb-0.5">Week {week}</div>
             <div className="text-xs text-turf-400">{isHome ? 'vs' : 'at'}</div>
           </div>
           {/* Opponent */}
           <div className="flex flex-col items-center gap-1">
-            <img
-              src={oppLogo ?? teamLogoFallback(game.opponent)}
-              alt={game.opponent}
-              className="h-9 w-9 object-contain flex-shrink-0"
-              onError={e => { (e.target as HTMLImageElement).src = teamLogoFallback(game.opponent); }}
-            />
+            <TeamLogo src={oppLogo} alt={game.opponent} fallbackName={game.opponent} size={36} />
             <span className="text-xs text-turf-400 text-center leading-tight max-w-20 truncate">
               {game.opponent_rank ? `#${game.opponent_rank} ` : ''}{game.opponent}
             </span>
@@ -267,12 +245,7 @@ function ScheduleModal({ team, gameData, captainPicks, userId, currentWeek, onCl
       >
         {/* Header */}
         <div className="sticky top-0 z-10 flex items-center gap-4 border-b border-turf-800 bg-turf-950 px-6 py-4">
-          <img
-            src={team.team_logo}
-            alt={team.team_name}
-            className="h-12 w-12 object-contain"
-            onError={e => { (e.target as HTMLImageElement).src = teamLogoFallback(team.team_name); }}
-          />
+          <TeamLogo src={team.team_logo} alt={team.team_name} fallbackName={team.team_name} size={48} />
           <div className="flex-1 min-w-0">
             <h2 className="font-display text-xl font-bold text-white tracking-wide">{team.team_name}</h2>
             <p className="text-sm text-turf-400">{team.team_conference} · 2026 Schedule</p>
@@ -322,13 +295,8 @@ function ScheduleModal({ team, gameData, captainPicks, userId, currentWeek, onCl
                 </div>
 
                 {/* Opponent logo */}
-                <div className="flex-shrink-0 flex items-center justify-center w-10 h-10 mt-0.5">
-                  <img
-                    src={oppLogo ?? teamLogoFallback(game.opponent)}
-                    alt={game.opponent}
-                    className="w-10 h-10 object-contain"
-                    onError={e => { (e.target as HTMLImageElement).src = teamLogoFallback(game.opponent); }}
-                  />
+                <div className="flex-shrink-0 mt-0.5">
+                  <TeamLogo src={oppLogo} alt={game.opponent} fallbackName={game.opponent} size={40} />
                 </div>
 
                 {/* Main game info */}
@@ -553,12 +521,7 @@ export function RosterView({
                       className="flex items-start gap-3 cursor-pointer hover:opacity-90 transition-opacity"
                       onClick={() => setModalTeam(entry)}
                     >
-                      <img
-                        src={entry.team_logo}
-                        alt={entry.team_name}
-                        className="w-10 h-10 object-contain rounded flex-shrink-0"
-                        onError={e => { (e.target as HTMLImageElement).src = teamLogoFallback(entry.team_name); }}
-                      />
+                      <TeamLogo src={entry.team_logo} alt={entry.team_name} fallbackName={entry.team_name} size={40} />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-white truncate">{entry.team_name}</span>
@@ -593,12 +556,7 @@ export function RosterView({
                       >
                         <div className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-turf-800/60 transition-colors">
                           <div className="flex items-center gap-2 min-w-0">
-                            <img
-                              src={oppLogo ?? teamLogoFallback(game.opponent)}
-                              alt={game.opponent}
-                              className="w-6 h-6 object-contain flex-shrink-0"
-                              onError={e => { (e.target as HTMLImageElement).src = teamLogoFallback(game.opponent); }}
-                            />
+                            <TeamLogo src={oppLogo} alt={game.opponent} fallbackName={game.opponent} size={24} />
                             <div className="text-xs text-turf-400 truncate">
                               {game.result ? (
                                 <span className="flex items-center gap-1">
@@ -815,12 +773,7 @@ export function RosterView({
                             className="flex items-center gap-2 text-left w-full group"
                             onClick={() => setModalTeam(entry)}
                           >
-                            <img
-                              src={entry.team_logo}
-                              alt={entry.team_name}
-                              className="w-6 h-6 object-contain flex-shrink-0"
-                              onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                            />
+                            <TeamLogo src={entry.team_logo} alt={entry.team_name} fallbackName={entry.team_name} size={24} />
                             <span className="font-medium text-white truncate max-w-28 group-hover:text-field-300 transition-colors">
                               {entry.team_name}
                             </span>
@@ -881,12 +834,7 @@ export function RosterView({
                                       });
                                     }}
                                   >
-                                    <img
-                                      src={oppLogo ?? teamLogoFallback(game.opponent)}
-                                      alt={game.opponent}
-                                      className="w-7 h-7 object-contain"
-                                      onError={e => { (e.target as HTMLImageElement).src = teamLogoFallback(game.opponent); }}
-                                    />
+                                    <TeamLogo src={oppLogo} alt={game.opponent} fallbackName={game.opponent} size={28} />
                                   </button>
                                   </Tooltip>
 

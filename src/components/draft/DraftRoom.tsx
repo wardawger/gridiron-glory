@@ -3,6 +3,7 @@ import { Search, Clock, CheckCircle2, Zap, ChevronDown, AlertCircle } from 'luci
 import type { League, LeagueMember, DraftPick, CfbTeam } from '../../types';
 import { getPickOwner, P4_CONFERENCES, DRAFT_CONF_MIN, DRAFT_CONF_MAX } from '../../services/scoring';
 import { Tooltip } from '../ui/Tooltip';
+import { TeamLogo } from '../ui/TeamLogo';
 
 // Re-export from types so DraftRoom can use them
 import { P4_CONFERENCES as P4_CONF_LIST } from '../../types';
@@ -369,12 +370,7 @@ export function DraftRoom({
                       : 'opacity-60 cursor-not-allowed'
                   } ${lastPick === team.id ? 'animate-pick-flash' : ''}`}
                 >
-                  <img
-                    src={team.logo}
-                    alt={team.name}
-                    className="w-8 h-8 object-contain flex-shrink-0"
-                    onError={e => { (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(team.name)}&background=052e16&color=4ade80`; }}
-                  />
+                  <TeamLogo src={team.logo} alt={team.name} fallbackName={team.name} size={32} />
                   <div className="flex-1 min-w-0">
                     <p className={`text-sm font-medium truncate transition-colors ${
                       isBlocked ? 'text-turf-600' : 'text-white group-hover:text-field-300'
@@ -423,12 +419,7 @@ export function DraftRoom({
                   <span className="text-xs text-turf-500 w-20 truncate">{getMemberName(slot.userId)}</span>
                   {slot.draftPick ? (
                     <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                      <img
-                        src={slot.draftPick.team_logo}
-                        className="w-4 h-4 object-contain"
-                        alt=""
-                        onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                      />
+                      <TeamLogo src={slot.draftPick.team_logo} alt="" fallbackName={slot.draftPick.team_name} size={16} />
                       <span className="text-white text-xs truncate">{slot.draftPick.team_name}</span>
                     </div>
                   ) : isNext ? (
@@ -468,8 +459,7 @@ function DraftBoard({ pickSlots, members, rounds, perRound }: {
               <div key={slot.pick} className="card-inner p-2.5 flex items-center gap-2">
                 {slot.draftPick ? (
                   <>
-                    <img src={slot.draftPick.team_logo} className="w-6 h-6 object-contain flex-shrink-0" alt=""
-                      onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                    <TeamLogo src={slot.draftPick.team_logo} alt="" fallbackName={slot.draftPick.team_name} size={24} />
                     <div className="min-w-0">
                       <p className="text-xs font-medium text-white truncate">{slot.draftPick.team_name}</p>
                       <p className="text-xs text-turf-500 truncate">{getMemberName(slot.userId)}</p>

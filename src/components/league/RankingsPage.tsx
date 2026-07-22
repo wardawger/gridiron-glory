@@ -1,6 +1,7 @@
 import { ArrowUp, ArrowDown, Minus } from 'lucide-react';
 import type { APRanking, CfbTeam } from '../../types';
 import { Tooltip, InfoTooltip } from '../ui/Tooltip';
+import { TeamLogo } from '../ui/TeamLogo';
 
 interface Props {
   rankings: APRanking[];
@@ -69,8 +70,6 @@ export function RankingsPage({ rankings, teams, records }: Props) {
             {rankings.map(r => {
               const appTeam = r.team_id ? teamMap.get(r.team_id) : null;
               const rec = r.team_id ? records.get(r.team_id) : null;
-              const logo = appTeam?.logo
-                ?? `https://ui-avatars.com/api/?name=${encodeURIComponent(r.team_name)}&background=052e16&color=4ade80&length=2`;
 
               const trendLabel =
                 r.trend === 'up'   ? `Up from #${r.previous_rank} last week` :
@@ -89,16 +88,7 @@ export function RankingsPage({ rankings, teams, records }: Props) {
                   </td>
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center flex-shrink-0 shadow-sm">
-                        <img
-                          src={logo}
-                          alt={r.team_name}
-                          className="w-7 h-7 object-contain"
-                          onError={e => {
-                            (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(r.team_name)}&background=052e16&color=4ade80&length=2`;
-                          }}
-                        />
-                      </div>
+                      <TeamLogo src={appTeam?.logo} alt={r.team_name} fallbackName={r.team_name} size={36} />
                       <div>
                         <p className="font-medium text-white group-hover:text-field-300 transition-colors">
                           {r.team_name}
