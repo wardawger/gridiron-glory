@@ -3,7 +3,7 @@ import type { User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import type {
   League, LeagueMember, DraftPick, CaptainPick,
-  ManualBonus, SpreadPick, FreeAgencyMove, LeagueRole,
+  ManualBonus, SpreadPick, FreeAgencyMove, LeagueRole, AvatarType,
 } from '../types';
 import { P4_CONFERENCES, DRAFT_CONF_MAX, DEFAULT_SCORING } from '../types';
 import { rosterAtWeek, currentRosters } from '../services/roster';
@@ -564,6 +564,23 @@ export function useLeague(user: User | null) {
     return {};
   };
 
+  // Update the roster avatar for the current league membership only
+  const updateAvatar = async (avatarType: AvatarType, avatarValue: string): Promise<{ error?: string }> => {
+    if (!league || !user) return { error: 'Not ready' };
+
+    const { error: err } = await supabase
+      .from('league_members')
+      .update({ avatar_type: avatarType, avatar_value: avatarValue })
+      .eq('league_id', league.id)
+      .eq('user_id', user.id);
+
+    if (err) return { error: err.message };
+    setMembers(prev => prev.map(m =>
+      m.user_id === user.id ? { ...m, avatar_type: avatarType, avatar_value: avatarValue } : m
+    ));
+    return {};
+  };
+
   return {
     league, allLeagues, allMemberships, selectedLeagueId,
     members, draftPicks, captainPicks, manualBonuses, spreadPicks, freeAgencyMoves,
@@ -571,7 +588,7 @@ export function useLeague(user: User | null) {
     switchLeague, createLeague, sendInvite, startDraft, makeDraftPick, resetDraft,
     setCaptain, addManualBonus, removeManualBonus,
     setSpreadPick, removeSpreadPick, overrideSpreadResult, clearSpreadOverride,
-    updateWeek, updateScoring, removeFromRoster, makeFreeAgencyMove, updateDisplayName,
+    updateWeek, updateScoring, removeFromRoster, makeFreeAgencyMove, updateDisplayName, updateAvatar,
     reload: loadAllLeagues,
   };
 }

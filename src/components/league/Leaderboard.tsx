@@ -7,6 +7,7 @@ import {
 import { Crown, TrendingUp, Star } from 'lucide-react';
 import type { LeaderboardEntry, DraftPick, APRanking } from '../../types';
 import { computeAnalytics, heatColor } from '../../services/analytics';
+import { Avatar } from '../ui/Avatar';
 
 interface Props {
   entries: LeaderboardEntry[];
@@ -216,9 +217,14 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                   : <span className={`font-mono font-bold text-lg ${idx === 1 ? 'text-slate-400' : idx === 2 ? 'text-amber-700' : 'text-turf-600'}`}>{idx + 1}</span>
                 }
               </div>
-              <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${isMe ? 'bg-field-500 text-turf-950' : 'bg-turf-700 text-turf-300'}`}>
-                {entry.display_name[0].toUpperCase()}
-              </div>
+              <Avatar
+                displayName={entry.display_name}
+                avatarType={entry.avatar_type}
+                avatarValue={entry.avatar_value}
+                size={36}
+                bgClassName={isMe ? 'bg-field-500' : 'bg-turf-700'}
+                textClassName={isMe ? 'text-turf-950' : 'text-turf-300'}
+              />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <span className={`font-medium truncate ${isMe ? 'text-field-300' : 'text-white'}`}>{entry.display_name}</span>

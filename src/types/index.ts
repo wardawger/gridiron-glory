@@ -25,13 +25,29 @@ export interface League {
   created_at: string;
 }
 
+export type AvatarType = 'initial' | 'emoji' | 'logo' | 'upload';
+
 export interface LeagueMember {
   league_id: string;
   user_id: string;
   display_name: string;
   role: LeagueRole;
   joined_at: string;
+  avatar_type: AvatarType;
+  avatar_value: string; // emoji char ('emoji'); image URL ('logo' or 'upload'); unused for 'initial'
 }
+
+// A curated set of sports-flavored emoji for the roster avatar picker
+export const AVATAR_EMOJI_OPTIONS: string[] = [
+  '🏈', '🏆', '🥇', '🔥', '⚡', '⭐', '👑', '🎯',
+  '💪', '🚀', '🛡️', '⚔️', '🐐', '🦅', '🦁', '🐯',
+  '🐻', '🐺', '🦂', '💀', '🥊', '🍀', '😈', '🤠',
+];
+
+export const AVATAR_MAX_FILE_BYTES = 2 * 1024 * 1024; // 2MB
+export const AVATAR_MIN_DIMENSION  = 100;              // px
+export const AVATAR_MAX_DIMENSION  = 2048;             // px
+export const AVATAR_ALLOWED_MIME_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
 
 // ─── Scoring ───────────────────────────────────────────────────────────────
 
@@ -433,6 +449,8 @@ export interface ScoreBreakdown {
 export interface LeaderboardEntry {
   user_id: string;
   display_name: string;
+  avatar_type: AvatarType;
+  avatar_value: string;
   total_points: number;
   weekly_scores: WeeklyScore[];
   bonus_points: number;

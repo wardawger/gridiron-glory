@@ -2,6 +2,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { Trophy, Users, Shield, BarChart3, LogOut, RefreshCw, Zap, ChevronDown, Plus, History, ArrowLeftRight, Award } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import type { League, LeagueMember } from '../../types';
+import { Avatar } from '../ui/Avatar';
 
 interface Props {
   league: League | null;
@@ -149,9 +150,12 @@ export function Header({
               className="flex items-center gap-2 px-1.5 py-1 rounded-lg hover:bg-turf-800 transition-colors group"
               title="My Account"
             >
-              <div className="w-6 h-6 rounded-full bg-field-900 flex items-center justify-center text-field-400 font-bold text-xs flex-shrink-0">
-                {displayName?.[0]?.toUpperCase() ?? '?'}
-              </div>
+              <Avatar
+                displayName={myMembership?.display_name ?? displayName ?? '?'}
+                avatarType={myMembership?.avatar_type}
+                avatarValue={myMembership?.avatar_value}
+                size={24}
+              />
               <span className="text-sm text-turf-400 group-hover:text-white transition-colors hidden sm:inline">{displayName}</span>
             </Link>
             <button onClick={onSignOut} className="btn-ghost btn-sm">

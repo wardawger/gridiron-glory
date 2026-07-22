@@ -131,7 +131,9 @@ export default function App() {
                 myMembership={league.myMembership}
                 allLeagues={league.allLeagues}
                 allMemberships={league.allMemberships}
+                teams={cfb.teams}
                 onUpdateDisplayName={league.updateDisplayName}
+                onUpdateAvatar={league.updateAvatar}
               />
             } />
             <Route path="/draft-recap" element={<DraftRecapPage league={lg} members={league.members} draftPicks={league.draftPicks} />} />

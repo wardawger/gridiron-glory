@@ -240,6 +240,8 @@ export function buildLeaderboard(
       return {
         user_id:       member.user_id,
         display_name:  member.display_name,
+        avatar_type:   member.avatar_type,
+        avatar_value:  member.avatar_value,
         total_points:  weeklyTotal + bonusPoints + statPoints,
         weekly_scores: weekly,
         bonus_points:  bonusPoints,

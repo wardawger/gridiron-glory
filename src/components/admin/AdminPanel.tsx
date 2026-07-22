@@ -6,6 +6,7 @@ import type {
 } from '../../types';
 import { BONUS_LABELS, BONUS_DEFAULT_POINTS, normalizeScoring, STAT_BONUS_CATEGORIES, STAT_BONUS_LABELS } from '../../types';
 import { rosterAtWeek } from '../../services/roster';
+import { Avatar } from '../ui/Avatar';
 
 interface Props {
   league: League;
@@ -209,9 +210,7 @@ export function AdminPanel({
           <div className="card divide-y divide-turf-800">
             {members.map(m => (
               <div key={m.user_id} className="flex items-center gap-4 px-5 py-3">
-                <div className="w-8 h-8 rounded-full bg-field-900 flex items-center justify-center text-field-400 font-bold text-sm">
-                  {m.display_name[0].toUpperCase()}
-                </div>
+                <Avatar displayName={m.display_name} avatarType={m.avatar_type} avatarValue={m.avatar_value} size={32} />
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-white truncate">{m.display_name}</p>
                   <p className="text-xs text-turf-500">{new Date(m.joined_at).toLocaleDateString()}</p>

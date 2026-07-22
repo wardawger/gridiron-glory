@@ -53,6 +53,8 @@ create table league_members (
   display_name  text not null,
   role          text default 'member',   -- commissioner | member
   joined_at     timestamptz default now(),
+  avatar_type   text not null default 'initial' check (avatar_type in ('initial', 'emoji', 'logo', 'upload')),
+  avatar_value  text not null default '', -- emoji char, or image URL for logo/upload
   unique(league_id, user_id)
 );
 
@@ -211,7 +213,39 @@ create policy "Users can make their own free agency moves"
   );
 
 
--- ── 7. INVITES ────────────────────────────────────────────────
+-- ── 7. AVATAR STORAGE ─────────────────────────────────────────
+-- Public-read bucket for uploaded roster avatar photos.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('avatars', 'avatars', true, 2097152, array['image/png','image/jpeg','image/webp','image/gif'])
+on conflict (id) do nothing;
+
+create policy "Public can view avatar images"
+  on storage.objects for select
+  using (bucket_id = 'avatars');
+
+create policy "Users can upload their own avatar"
+  on storage.objects for insert
+  with check (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+create policy "Users can replace their own avatar"
+  on storage.objects for update
+  using (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+create policy "Users can delete their own avatar"
+  on storage.objects for delete
+  using (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+
+-- ── 8. INVITES ────────────────────────────────────────────────
 create table invites (
   id             uuid primary key default gen_random_uuid(),
   league_id      uuid references leagues(id) on delete cascade,
@@ -241,7 +275,7 @@ create policy "Anyone can mark invite accepted"
   with check (accepted = true);
 
 
--- ── 8. ENABLE REALTIME ────────────────────────────────────────
+-- ── 9. ENABLE REALTIME ────────────────────────────────────────
 -- Go to: Supabase Dashboard → Database → Replication
 -- Toggle ON for: draft_picks, leagues, captain_picks, free_agency_moves
 -- (Or run these if using CLI)

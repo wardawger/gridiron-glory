@@ -4,6 +4,7 @@ import type { RosterEntry, CaptainPick, GameData, ScoringSettings, LeagueMember,
 import { calcWeeklyScore, scoreGame, didCoverSpread } from '../../services/scoring';
 import { Tooltip } from '../ui/Tooltip';
 import { TeamLogo } from '../ui/TeamLogo';
+import { Avatar } from '../ui/Avatar';
 
 interface Props {
   member: LeagueMember;
@@ -429,9 +430,14 @@ export function RosterView({
         {/* Header */}
         <div className="card p-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-field-500 flex items-center justify-center text-turf-950 font-bold text-lg">
-              {member.display_name[0].toUpperCase()}
-            </div>
+            <Avatar
+              displayName={member.display_name}
+              avatarType={member.avatar_type}
+              avatarValue={member.avatar_value}
+              size={40}
+              bgClassName="bg-field-500"
+              textClassName="text-turf-950"
+            />
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="font-display text-2xl tracking-wide text-white">{member.display_name}</h2>
