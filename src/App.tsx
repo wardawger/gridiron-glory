@@ -4,6 +4,7 @@ import { useLeague }   from './hooks/useLeague';
 import { useCfbData }  from './hooks/useCfbData';
 import { Header }      from './components/layout/Header';
 import { AuthPage }         from './pages/AuthPage';
+import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { CreateLeaguePage } from './pages/CreateLeaguePage';
 import { HomePage }         from './pages/HomePage';
 import { RosterPage }       from './pages/RosterPage';
@@ -18,7 +19,24 @@ export default function App() {
   const league = useLeague(auth.user);
   const cfb    = useCfbData();
 
-  if (auth.loading || (auth.user && league.loading)) {
+  if (auth.loading) {
+    return (
+      <div className="min-h-dvh flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3 text-turf-400">
+          <div className="w-10 h-10 rounded-xl bg-field-500 flex items-center justify-center animate-pulse">
+            <span className="font-display text-turf-950 text-2xl">G</span>
+          </div>
+          <Loader2 className="w-5 h-5 animate-spin" />
+        </div>
+      </div>
+    );
+  }
+
+  if (auth.passwordRecovery) {
+    return <ResetPasswordPage auth={auth} />;
+  }
+
+  if (auth.user && league.loading) {
     return (
       <div className="min-h-dvh flex items-center justify-center">
         <div className="flex flex-col items-center gap-3 text-turf-400">

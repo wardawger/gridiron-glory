@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import type { useAuth } from '../hooks/useAuth';
 
-type Mode = 'login' | 'signup';
+type Mode = 'login' | 'signup' | 'forgot';
 
 interface Props {
   auth: ReturnType<typeof useAuth>;
@@ -23,11 +23,15 @@ export function AuthPage({ auth }: Props) {
     if (mode === 'login') {
       const err = await auth.signIn(email, password);
       if (err) setMsg({ type: 'error', text: err.message });
-    } else {
+    } else if (mode === 'signup') {
       if (!name.trim()) { setMsg({ type: 'error', text: 'Display name required' }); setSubmitting(false); return; }
       const err = await auth.signUp(email, password, name.trim());
       if (err) setMsg({ type: 'error', text: err.message });
       else setMsg({ type: 'success', text: 'Check your email to confirm your account, then sign in.' });
+    } else {
+      const err = await auth.resetPasswordForEmail(email);
+      if (err) setMsg({ type: 'error', text: err.message });
+      else setMsg({ type: 'success', text: 'Check your email for a password reset link.' });
     }
     setSubmitting(false);
   };
@@ -49,21 +53,32 @@ export function AuthPage({ auth }: Props) {
 
       {/* Card */}
       <div className="w-full max-w-sm card p-6 animate-slide-up">
-        <div className="flex gap-1 mb-6 bg-turf-800 p-1 rounded-lg">
-          {(['login', 'signup'] as Mode[]).map(m => (
-            <button
-              key={m}
-              onClick={() => { setMode(m); setMsg(null); }}
-              className={`flex-1 py-1.5 rounded-md text-sm font-medium transition-all ${
-                mode === m
-                  ? 'bg-field-500 text-turf-950'
-                  : 'text-turf-400 hover:text-white'
-              }`}
-            >
-              {m === 'login' ? 'Sign In' : 'Sign Up'}
-            </button>
-          ))}
-        </div>
+        {mode !== 'forgot' && (
+          <div className="flex gap-1 mb-6 bg-turf-800 p-1 rounded-lg">
+            {(['login', 'signup'] as Mode[]).map(m => (
+              <button
+                key={m}
+                onClick={() => { setMode(m); setMsg(null); }}
+                className={`flex-1 py-1.5 rounded-md text-sm font-medium transition-all ${
+                  mode === m
+                    ? 'bg-field-500 text-turf-950'
+                    : 'text-turf-400 hover:text-white'
+                }`}
+              >
+                {m === 'login' ? 'Sign In' : 'Sign Up'}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {mode === 'forgot' && (
+          <div className="mb-6">
+            <h2 className="text-lg font-semibold text-white">Reset your password</h2>
+            <p className="text-turf-400 text-sm mt-1">
+              Enter your email and we'll send you a link to reset your password.
+            </p>
+          </div>
+        )}
 
         <form onSubmit={handle} className="space-y-4">
           {mode === 'signup' && (
@@ -90,18 +105,30 @@ export function AuthPage({ auth }: Props) {
               required
             />
           </div>
-          <div>
-            <label className="label">Password</label>
-            <input
-              className="input"
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              required
-              minLength={6}
-            />
-          </div>
+          {mode !== 'forgot' && (
+            <div>
+              <label className="label">Password</label>
+              <input
+                className="input"
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                required
+                minLength={6}
+              />
+            </div>
+          )}
+
+          {mode === 'login' && (
+            <button
+              type="button"
+              onClick={() => { setMode('forgot'); setMsg(null); }}
+              className="text-sm text-turf-400 hover:text-field-400 transition-colors -mt-2"
+            >
+              Forgot password?
+            </button>
+          )}
 
           {msg && (
             <div className={`text-sm rounded-lg px-3 py-2 ${
@@ -115,8 +142,18 @@ export function AuthPage({ auth }: Props) {
 
           <button type="submit" disabled={submitting} className="btn-primary w-full btn-lg">
             {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-            {mode === 'login' ? 'Sign In' : 'Create Account'}
+            {mode === 'login' ? 'Sign In' : mode === 'signup' ? 'Create Account' : 'Send Reset Link'}
           </button>
+
+          {mode === 'forgot' && (
+            <button
+              type="button"
+              onClick={() => { setMode('login'); setMsg(null); }}
+              className="text-sm text-turf-400 hover:text-field-400 transition-colors w-full text-center"
+            >
+              Back to sign in
+            </button>
+          )}
         </form>
       </div>
     </div>
