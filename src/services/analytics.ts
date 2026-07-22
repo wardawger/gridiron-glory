@@ -26,6 +26,14 @@ export interface UndraftedTeam {
   rank: number;
 }
 
+export interface DraftValuePoint {
+  team_name: string;
+  pick_number: number;
+  rank: number;
+  display_name: string;
+  user_id: string;
+}
+
 // Compute per-user analytics and undrafted top teams
 export function computeAnalytics(
   entries: LeaderboardEntry[],
@@ -34,7 +42,9 @@ export function computeAnalytics(
 ): {
   analytics: RosterAnalytics[];
   undrafted: UndraftedTeam[];
+  scatterPoints: DraftValuePoint[];
 } {
+  const scatterPoints: DraftValuePoint[] = [];
   const rankMap = new Map<string, number>(); // team_id → AP rank
   const rankByName = new Map<string, number>(); // team_name → AP rank
   apRankings.forEach(r => {
@@ -98,6 +108,10 @@ export function computeAnalytics(
       if (pickNum != null && apRank != null && apRank < 999) {
         overUnderTotal += pickNum - apRank;
         rankedCount++;
+        scatterPoints.push({
+          team_name: t.team_name, pick_number: pickNum, rank: apRank,
+          display_name: entry.display_name, user_id: entry.user_id,
+        });
       }
     });
 
@@ -151,7 +165,7 @@ export function computeAnalytics(
     .slice(0, 10)
     .map(r => ({ team_name: r.team_name, rank: r.rank }));
 
-  return { analytics, undrafted };
+  return { analytics, undrafted, scatterPoints };
 }
 
 // ─── Statistical bonus board (Top 3 / Bottom 3 per category) ──────────────

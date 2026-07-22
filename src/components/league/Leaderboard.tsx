@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   Cell, RadarChart, Radar, PolarGrid, PolarAngleAxis, Legend,
+  LineChart, Line, ScatterChart, Scatter,
 } from 'recharts';
 import { Crown, TrendingUp, Star } from 'lucide-react';
 import type { LeaderboardEntry, DraftPick, APRanking } from '../../types';
@@ -26,6 +27,18 @@ const CustomTooltip = ({ active, payload, label }: any) => {
     <div className="bg-turf-900 border border-turf-700 rounded-lg px-3 py-2 text-sm shadow-xl shadow-black/40">
       <p className="font-medium text-white mb-1">{label}</p>
       <p className="text-field-400 font-mono">{payload[0].value} pts</p>
+    </div>
+  );
+};
+
+const ScatterTooltip = ({ active, payload }: any) => {
+  if (!active || !payload?.length) return null;
+  const p = payload[0].payload;
+  return (
+    <div className="bg-turf-900 border border-turf-700 rounded-lg px-3 py-2 text-sm shadow-xl shadow-black/40">
+      <p className="font-medium text-white mb-1">{p.team_name}</p>
+      <p className="text-turf-400 text-xs">{p.display_name.split(' ')[0]}</p>
+      <p className="text-turf-300 font-mono text-xs mt-1">Pick #{p.pick_number} · AP #{p.rank}</p>
     </div>
   );
 };
@@ -97,13 +110,13 @@ function AnalyticsRow({ label, tooltip, values }: AnalyticsRowProps) {
 
 // ── Main component ────────────────────────────────────────────────────────
 
-type AnalyticsTab = 'table' | 'radar' | 'weekly';
+type AnalyticsTab = 'table' | 'graphs' | 'weekly';
 
 export function Leaderboard({ entries, currentWeek, userId, confChampComplete, draftPicks, rankings }: Props) {
   const navigate = useNavigate();
   const [analyticsTab, setAnalyticsTab] = useState<AnalyticsTab>('table');
 
-  const { analytics, undrafted } = useMemo(
+  const { analytics, undrafted, scatterPoints } = useMemo(
     () => computeAnalytics(entries, draftPicks, rankings),
     [entries, draftPicks, rankings]
   );
@@ -153,6 +166,31 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
       return row;
     });
   }, [analytics]);
+
+  // Season trend — cumulative points per manager across weeks
+  const trendData = useMemo(() => {
+    const weeks = Array.from({ length: currentWeek + 1 }, (_, i) => i);
+    const running: Record<string, number> = {};
+    entries.forEach(e => { running[e.display_name.split(' ')[0]] = 0; });
+    return weeks.map(w => {
+      const row: Record<string, any> = { week: `Wk ${w}` };
+      entries.forEach(e => {
+        const name = e.display_name.split(' ')[0];
+        running[name] += e.weekly_scores.find(ws => ws.week === w)?.points ?? 0;
+        row[name] = running[name];
+      });
+      return row;
+    });
+  }, [entries, currentWeek]);
+
+  // Draft value scatter — one series per manager so each gets its own color/legend entry
+  const scatterByManager = useMemo(() => {
+    return entries.map((e, i) => ({
+      name: e.display_name.split(' ')[0],
+      color: PLAYER_COLORS[i] ?? '#22c55e',
+      data: scatterPoints.filter(p => p.user_id === e.user_id),
+    })).filter(m => m.data.length > 0);
+  }, [entries, scatterPoints]);
 
   // Heat map value arrays
   const avgRankValues   = analytics.map(a => a.avg_rank);
@@ -264,7 +302,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
           <div className="flex items-center justify-between px-5 py-4 border-b border-turf-800">
             <h2 className="section-title text-xl">Roster Analytics</h2>
             <div className="flex gap-1 bg-turf-800 p-1 rounded-lg">
-              {(['table', 'weekly', 'radar'] as const).map(id => (
+              {(['table', 'weekly', 'graphs'] as const).map(id => (
                 <button
                   key={id}
                   onClick={() => setAnalyticsTab(id)}
@@ -497,48 +535,127 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
             </div>
           )}
 
-          {/* ── RADAR VIEW ── */}
-          {analyticsTab === 'radar' && (
-            <div className="p-5">
-              <p className="text-xs text-turf-500 mb-4">Normalized roster quality across 5 dimensions (higher = better)</p>
-              {radarData.length === 0 ? (
-                <p className="text-turf-600 text-sm text-center py-8">No ranking data yet</p>
-              ) : (
-                <div className="h-72">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <RadarChart data={radarData} margin={{ top: 8, right: 24, left: 24, bottom: 8 }}>
-                      <PolarGrid stroke="#30363d" />
-                      <PolarAngleAxis dataKey="metric" tick={{ fill: '#6c757d', fontSize: 11 }} />
-                      <Tooltip
-                        contentStyle={{
-                          background: '#21262d',
-                          border: '1px solid #30363d',
-                          borderRadius: 8,
-                          fontSize: 12,
-                          boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
-                        }}
-                        labelStyle={{ color: '#fff', fontWeight: 600 }}
-                        itemStyle={{ color: '#adb5bd' }}
-                      />
-                      <Legend
-                        wrapperStyle={{ fontSize: 12, paddingTop: 8 }}
-                        formatter={(value) => <span style={{ color: '#adb5bd' }}>{value}</span>}
-                      />
-                      {entries.map((e, i) => (
-                        <Radar
-                          key={e.user_id}
-                          name={e.display_name.split(' ')[0]}
-                          dataKey={e.display_name.split(' ')[0]}
-                          stroke={PLAYER_COLORS[i] ?? '#22c55e'}
-                          fill={PLAYER_COLORS[i] ?? '#22c55e'}
-                          fillOpacity={0.12}
-                          strokeWidth={2}
+          {/* ── GRAPHS VIEW ── */}
+          {analyticsTab === 'graphs' && (
+            <div className="p-5 space-y-8">
+              {/* Radar */}
+              <div>
+                <p className="text-xs text-turf-500 mb-4">Normalized roster quality across 5 dimensions (higher = better)</p>
+                {radarData.length === 0 ? (
+                  <p className="text-turf-600 text-sm text-center py-8">No ranking data yet</p>
+                ) : (
+                  <div className="h-72">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RadarChart data={radarData} margin={{ top: 8, right: 24, left: 24, bottom: 8 }}>
+                        <PolarGrid stroke="#30363d" />
+                        <PolarAngleAxis dataKey="metric" tick={{ fill: '#6c757d', fontSize: 11 }} />
+                        <Tooltip
+                          contentStyle={{
+                            background: '#21262d',
+                            border: '1px solid #30363d',
+                            borderRadius: 8,
+                            fontSize: 12,
+                            boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+                          }}
+                          labelStyle={{ color: '#fff', fontWeight: 600 }}
+                          itemStyle={{ color: '#adb5bd' }}
                         />
-                      ))}
-                    </RadarChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
+                        <Legend
+                          wrapperStyle={{ fontSize: 12, paddingTop: 8 }}
+                          formatter={(value) => <span style={{ color: '#adb5bd' }}>{value}</span>}
+                        />
+                        {entries.map((e, i) => (
+                          <Radar
+                            key={e.user_id}
+                            name={e.display_name.split(' ')[0]}
+                            dataKey={e.display_name.split(' ')[0]}
+                            stroke={PLAYER_COLORS[i] ?? '#22c55e'}
+                            fill={PLAYER_COLORS[i] ?? '#22c55e'}
+                            fillOpacity={0.12}
+                            strokeWidth={2}
+                          />
+                        ))}
+                      </RadarChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+              </div>
+
+              {/* Season trend */}
+              <div>
+                <p className="text-xs text-turf-500 mb-4">Cumulative points across the season</p>
+                {trendData.length === 0 ? (
+                  <p className="text-turf-600 text-sm text-center py-8">No weekly data yet — check back once games are played</p>
+                ) : (
+                  <div className="h-72">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={trendData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                        <XAxis dataKey="week" tick={{ fill: '#6c757d', fontSize: 11 }} axisLine={false} tickLine={false} />
+                        <YAxis tick={{ fill: '#6c757d', fontSize: 11 }} axisLine={false} tickLine={false} />
+                        <Tooltip
+                          contentStyle={{
+                            background: '#21262d',
+                            border: '1px solid #30363d',
+                            borderRadius: 8,
+                            fontSize: 12,
+                            boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+                          }}
+                          labelStyle={{ color: '#fff', marginBottom: 4, fontWeight: 600 }}
+                          itemStyle={{ color: '#adb5bd' }}
+                        />
+                        <Legend
+                          wrapperStyle={{ fontSize: 12, paddingTop: 12 }}
+                          formatter={(value) => <span style={{ color: '#adb5bd' }}>{value}</span>}
+                        />
+                        {entries.map((e, i) => (
+                          <Line
+                            key={e.user_id}
+                            type="monotone"
+                            dataKey={e.display_name.split(' ')[0]}
+                            stroke={PLAYER_COLORS[i] ?? '#22c55e'}
+                            strokeWidth={2}
+                            dot={{ r: 2 }}
+                            activeDot={{ r: 4 }}
+                          />
+                        ))}
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+              </div>
+
+              {/* Draft value scatter */}
+              <div>
+                <p className="text-xs text-turf-500 mb-4">Draft pick number vs. AP rank — points below the diagonal were drafted later than their rank suggests</p>
+                {scatterByManager.length === 0 ? (
+                  <p className="text-turf-600 text-sm text-center py-8">No ranking data yet</p>
+                ) : (
+                  <div className="h-72">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ScatterChart margin={{ top: 8, right: 24, left: 0, bottom: 8 }}>
+                        <XAxis
+                          type="number" dataKey="pick_number" name="Pick"
+                          tick={{ fill: '#6c757d', fontSize: 11 }} axisLine={false} tickLine={false}
+                          label={{ value: 'Pick #', position: 'insideBottom', offset: -4, fill: '#6c757d', fontSize: 11 }}
+                        />
+                        <YAxis
+                          type="number" dataKey="rank" name="AP Rank" reversed
+                          tick={{ fill: '#6c757d', fontSize: 11 }} axisLine={false} tickLine={false}
+                          label={{ value: 'AP rank', angle: -90, position: 'insideLeft', fill: '#6c757d', fontSize: 11 }}
+                        />
+                        <Tooltip cursor={{ strokeDasharray: '3 3', stroke: '#495057' }} content={<ScatterTooltip />} />
+                        <Legend
+                          wrapperStyle={{ fontSize: 12, paddingTop: 8 }}
+                          formatter={(value) => <span style={{ color: '#adb5bd' }}>{value}</span>}
+                        />
+                        {scatterByManager.map(m => (
+                          <Scatter key={m.name} name={m.name} data={m.data} fill={m.color} />
+                        ))}
+                      </ScatterChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
