@@ -156,12 +156,13 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
   // Heat map value arrays
   const avgRankValues   = analytics.map(a => a.avg_rank);
   const top25Values     = analytics.map(a => a.top25_avg);
-  const mid50Values     = analytics.map(a => a.mid50_avg);
   const bot25Values     = analytics.map(a => a.bot25_avg);
   const bestPickValues  = analytics.map(a => a.best_pick?.points ?? 0);
   const worstPickValues = analytics.map(a => a.worst_pick?.points ?? 0);
   const ouValues        = analytics.map(a => a.over_under_pts);
   const ouAvgValues     = analytics.map(a => a.over_under_avg);
+  const recordValues    = analytics.map(a => a.wins - a.losses);
+  const captainEffValues = analytics.map(a => a.captain_efficiency ?? 0);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -314,21 +315,33 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                   />
 
                   <AnalyticsRow
-                    label="Middle 50% Rank"
-                    tooltip="Average AP rank of your middle-half teams. Shows the depth of your roster."
-                    values={analytics.map((a, i) => ({
-                      display: a.mid50_avg > 0 ? a.mid50_avg.toFixed(1) : '—',
-                      color: heatColor(a.mid50_avg, mid50Values.filter(v => v > 0), false),
-                      textColor: PLAYER_COLORS[i],
-                    }))}
-                  />
-
-                  <AnalyticsRow
                     label="Bottom 25% Rank"
                     tooltip="Average AP rank of your bottom-quartile teams. Lower numbers here mean even your worst picks are decent."
                     values={analytics.map((a, i) => ({
                       display: a.bot25_avg > 0 ? a.bot25_avg.toFixed(1) : '—',
                       color: heatColor(a.bot25_avg, bot25Values.filter(v => v > 0), false),
+                      textColor: PLAYER_COLORS[i],
+                    }))}
+                  />
+
+                  <tr><td colSpan={analytics.length + 1} className="py-1 bg-turf-800/30" /></tr>
+
+                  <AnalyticsRow
+                    label="Win/Loss Record"
+                    tooltip="Combined win-loss record across every completed game your rostered teams have played this season."
+                    values={analytics.map((a, i) => ({
+                      display: (a.wins > 0 || a.losses > 0) ? `${a.wins}-${a.losses}` : '—',
+                      color: heatColor(a.wins - a.losses, recordValues, true),
+                      textColor: PLAYER_COLORS[i],
+                    }))}
+                  />
+
+                  <AnalyticsRow
+                    label="Captain Efficiency"
+                    tooltip="How much of the best possible captain bonus you actually captured — 100% means you picked the highest-scoring eligible team as captain every week (ignoring the twice-per-team season limit)."
+                    values={analytics.map((a, i) => ({
+                      display: a.captain_efficiency !== null ? `${a.captain_efficiency}%` : '—',
+                      color: a.captain_efficiency !== null ? heatColor(a.captain_efficiency, captainEffValues, true) : 'transparent',
                       textColor: PLAYER_COLORS[i],
                     }))}
                   />

@@ -5,7 +5,6 @@ export interface RosterAnalytics {
   display_name: string;
   avg_rank: number;
   top25_avg: number;
-  mid50_avg: number;
   bot25_avg: number;
   best_pick: { team_name: string; points: number } | null;
   worst_pick: { team_name: string; points: number } | null;
@@ -14,6 +13,11 @@ export interface RosterAnalytics {
   over_under_pts: number;
   over_under_avg: number;
   draft_pick_numbers: number[];
+  wins: number;
+  losses: number;
+  captain_actual: number;
+  captain_optimal: number;
+  captain_efficiency: number | null; // % of best-possible captain bonus actually captured
 }
 
 export interface UndraftedTeam {
@@ -70,13 +74,11 @@ export function computeAnalytics(
     const n = teamRanks.length;
     const top25n  = Math.max(1, Math.ceil(n * 0.25));
     const bot25n  = Math.max(1, Math.ceil(n * 0.25));
-    const mid50n  = Math.max(1, n - top25n - bot25n);
 
     const avg = (arr: number[]) => arr.length ? +(arr.reduce((s, v) => s + v, 0) / arr.length).toFixed(1) : 0;
 
     const top25Ranks  = teamRanks.slice(0, top25n).map(t => t.rank);
-    const mid50Ranks  = teamRanks.slice(top25n, top25n + mid50n).map(t => t.rank);
-    const bot25Ranks  = teamRanks.slice(top25n + mid50n).map(t => t.rank);
+    const bot25Ranks  = teamRanks.slice(n - bot25n).map(t => t.rank);
     const allRanks    = teamRanks.map(t => t.rank).filter(r => r < 999);
     const rankedTeams = teamRanks.filter(t => t.rank < 999);
 
@@ -98,12 +100,35 @@ export function computeAnalytics(
       }
     });
 
+    // Win/loss record across every completed game any rostered team played this season
+    let wins = 0, losses = 0;
+    // Captain efficiency: actual captain bonus captured vs. the best possible each week
+    // (highest-scoring eligible team), ignoring the twice-per-team season cap.
+    let captainActual = 0;
+    let captainOptimal = 0;
+    entry.weekly_scores.forEach(ws => {
+      let weekBest = -Infinity;
+      let hasGame = false;
+      ws.breakdown.forEach(b => {
+        if (!b.game?.completed) return;
+        if (b.game.result === 'W') wins++;
+        else if (b.game.result === 'L') losses++;
+
+        const gamePts  = b.points - b.spread_points;
+        const basePts  = b.is_captain ? gamePts / 2 : gamePts;
+        hasGame = true;
+        if (basePts > weekBest) weekBest = basePts;
+        if (b.is_captain) captainActual += basePts;
+      });
+      if (hasGame) captainOptimal += Math.max(weekBest, 0);
+    });
+    const captainEfficiency = captainOptimal > 0 ? Math.round((captainActual / captainOptimal) * 100) : null;
+
     return {
       user_id:      entry.user_id,
       display_name: entry.display_name,
       avg_rank:     avg(allRanks),
       top25_avg:    avg(top25Ranks),
-      mid50_avg:    avg(mid50Ranks),
       bot25_avg:    avg(bot25Ranks),
       best_pick:    teamPtsArr[0] ?? null,
       worst_pick:   teamPtsArr[teamPtsArr.length - 1] ?? null,
@@ -112,6 +137,10 @@ export function computeAnalytics(
       over_under_pts: overUnderTotal,
       over_under_avg: rankedCount > 0 ? +(overUnderTotal / rankedCount).toFixed(1) : 0,
       draft_pick_numbers: roster.map(t => pickMap.get(t.team_id) ?? 0).filter(Boolean).sort((a, b) => a - b),
+      wins, losses,
+      captain_actual: captainActual,
+      captain_optimal: captainOptimal,
+      captain_efficiency: captainEfficiency,
     };
   });
 
