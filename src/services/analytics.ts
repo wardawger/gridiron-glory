@@ -1,4 +1,4 @@
-import type { LeaderboardEntry, DraftPick } from '../types';
+import type { LeaderboardEntry, DraftPick, LeagueMember, RosterEntry, StatRankingBonus } from '../types';
 
 export interface RosterAnalytics {
   user_id: string;
@@ -151,6 +151,75 @@ export function computeAnalytics(
     .map(r => ({ team_name: r.team_name, rank: r.rank }));
 
   return { analytics, undrafted };
+}
+
+// ─── Statistical bonus board (Top 3 / Bottom 3 per category) ──────────────
+
+export interface StatBoardEntry {
+  team_id: string;
+  team_name: string;
+  team_logo: string;
+  owner_name: string;
+  rank: number;
+  value: number;
+  points: number;
+}
+
+export interface StatCategoryBoard {
+  stat: string;
+  label: string;
+  top: StatBoardEntry[];
+  bottom: StatBoardEntry[];
+}
+
+const STAT_CATEGORY_LABELS: Record<string, string> = {
+  qbr:            'QBR (Passer Rating)',
+  rushing_tds:    'Rushing TDs',
+  receiving_tds:  'Receiving TDs',
+  def_ints:       'Defensive INTs',
+  sacks:          'Sacks',
+};
+const STAT_CATEGORY_ORDER = ['qbr', 'rushing_tds', 'receiving_tds', 'def_ints', 'sacks'];
+
+// Reshapes calcStatRankingBonuses' per-user output into per-category
+// leaderboards, so the UI can show *why* a bonus was awarded, not just
+// the lump sum.
+export function buildStatBonusBoard(
+  statBonusesByUser: Map<string, StatRankingBonus[]>,
+  rosters: Map<string, RosterEntry[]>,
+  members: LeagueMember[],
+): StatCategoryBoard[] {
+  const memberName = (uid: string) => members.find(m => m.user_id === uid)?.display_name ?? 'Unknown';
+
+  const boards = new Map<string, StatCategoryBoard>(
+    STAT_CATEGORY_ORDER.map(stat => [stat, { stat, label: STAT_CATEGORY_LABELS[stat], top: [], bottom: [] }])
+  );
+
+  statBonusesByUser.forEach((bonuses, userId) => {
+    const roster = rosters.get(userId) ?? [];
+    bonuses.forEach(b => {
+      const board = boards.get(b.stat);
+      if (!board) return;
+      const team = roster.find(t => t.team_id === b.team_id);
+      const entry: StatBoardEntry = {
+        team_id:    b.team_id,
+        team_name:  b.team_name,
+        team_logo:  team?.team_logo ?? '',
+        owner_name: memberName(userId),
+        rank:       b.rank,
+        value:      b.value,
+        points:     b.points,
+      };
+      (b.points > 0 ? board.top : board.bottom).push(entry);
+    });
+  });
+
+  boards.forEach(board => {
+    board.top.sort((a, b) => a.rank - b.rank);
+    board.bottom.sort((a, b) => a.rank - b.rank);
+  });
+
+  return STAT_CATEGORY_ORDER.map(stat => boards.get(stat)!);
 }
 
 // Color scale: green (good) → yellow → red (bad), normalized to array

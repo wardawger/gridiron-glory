@@ -188,6 +188,7 @@ export function useLeague(user: User | null) {
           spread_max_per_week: 2, spread_max_per_team: 3, spread_allow_captain_stack: false,
           free_agency_enabled: false, fa_max_moves_per_season: 10, fa_max_moves_per_week: 2,
           fa_penalty_enabled: false, fa_penalty_points: 3,
+          stat_bonus_points: 3,
         },
       })
       .select()

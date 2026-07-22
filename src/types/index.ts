@@ -55,6 +55,8 @@ export interface ScoringSettings {
   fa_max_moves_per_week: number;   // max adds/drops per user per week
   fa_penalty_enabled: boolean;
   fa_penalty_points: number;       // points subtracted the week a swap is made (entered as a positive number)
+  // Statistical ranking bonus settings (Top 3 / Bottom 3 per category, among all drafted teams)
+  stat_bonus_points: number;       // points awarded/deducted for a Top 3 / Bottom 3 finish
 }
 
 export const DEFAULT_SCORING: ScoringSettings = {
@@ -77,6 +79,7 @@ export const DEFAULT_SCORING: ScoringSettings = {
   fa_max_moves_per_week: 2,
   fa_penalty_enabled: false,
   fa_penalty_points: 3,
+  stat_bonus_points: 3,
 };
 
 // ─── Draft ─────────────────────────────────────────────────────────────────

@@ -295,6 +295,32 @@ export function AdminPanel({
             </div>
           </div>
 
+          {/* Statistical ranking bonus settings */}
+          <div className="card p-5 space-y-4">
+            <div>
+              <h3 className="font-medium text-white text-sm">Statistical Ranking Bonuses</h3>
+              <p className="text-xs text-turf-400 mt-0.5">
+                Automatically awarded to whoever owns the Top 3 / Bottom 3 team in QBR, Rushing TDs,
+                Receiving TDs, Defensive INTs, and Sacks (among all drafted teams). Shown as a live
+                preview until conference championship week, then locks in.
+              </p>
+            </div>
+            <div className="w-40">
+              <label className="label">Points per Finish</label>
+              <input
+                className="input font-mono"
+                type="number"
+                min="0"
+                step="0.5"
+                value={scoring.stat_bonus_points}
+                onChange={e => setScoring(prev => ({ ...prev, stat_bonus_points: parseFloat(e.target.value) || 0 }))}
+              />
+              <p className="text-xs text-turf-600 mt-0.5">
+                +{scoring.stat_bonus_points} for Top 3, −{scoring.stat_bonus_points} for Bottom 3
+              </p>
+            </div>
+          </div>
+
           {/* Spread betting settings */}
           <div className="card p-5 space-y-4">
             <div className="flex items-center justify-between">

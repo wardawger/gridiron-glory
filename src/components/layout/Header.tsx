@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Trophy, Users, Shield, BarChart3, LogOut, RefreshCw, Zap, ChevronDown, Plus, History, ArrowLeftRight } from 'lucide-react';
+import { Trophy, Users, Shield, BarChart3, LogOut, RefreshCw, Zap, ChevronDown, Plus, History, ArrowLeftRight, Award } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import type { League, LeagueMember } from '../../types';
 
@@ -38,6 +38,7 @@ export function Header({
     { to: '/roster',    label: 'My Roster',  icon: Users },
     { to: '/rankings',  label: 'AP Top 25',  icon: BarChart3 },
     { to: '/draft-recap', label: 'Draft Recap', icon: History },
+    { to: '/stat-bonuses', label: 'Stat Bonuses', icon: Award },
     ...(league?.scoring.free_agency_enabled
       ? [{ to: '/free-agency', label: 'Free Agency', icon: ArrowLeftRight }]
       : []),
