@@ -1,8 +1,9 @@
 import { useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { RosterView } from '../components/league/RosterView';
-import type { League, LeagueMember, DraftPick, CaptainPick, GameData, SpreadPick, SpreadData } from '../types';
+import type { League, LeagueMember, DraftPick, CaptainPick, GameData, SpreadPick, SpreadData, FreeAgencyMove } from '../types';
 import { calcWeeklyScore } from '../services/scoring';
+import { rosterAtWeek } from '../services/roster';
 
 interface Props {
   league: League;
@@ -12,6 +13,7 @@ interface Props {
   gameData: GameData;
   spreadData: Record<number, SpreadData>;
   spreadPicks: SpreadPick[];
+  freeAgencyMoves: FreeAgencyMove[];
   userId: string;
   onSetCaptain: (week: number, teamId: string) => void;
   onSetSpread: (week: number, teamId: string, lockedSpread: number) => Promise<{ error?: string }>;
@@ -21,26 +23,25 @@ interface Props {
 
 export function RosterPage({
   league, members, draftPicks, captainPicks, gameData,
-  spreadData, spreadPicks,
+  spreadData, spreadPicks, freeAgencyMoves,
   userId, onSetCaptain, onSetSpread, onRemoveSpread, onRefreshSpreads,
 }: Props) {
   const { userId: paramUserId } = useParams<{ userId?: string }>();
   const targetId = paramUserId ?? userId;
   const member   = members.find(m => m.user_id === targetId);
 
+  // Current holdings (drafted + any free agency swaps applied through the current week)
   const roster = useMemo(
-    () => draftPicks.filter(p => p.user_id === targetId).map(p => ({
-      team_id: p.team_id, team_name: p.team_name,
-      team_logo: p.team_logo, team_conference: p.team_conference, team_color: '#052e16',
-    })),
-    [draftPicks, targetId]
+    () => rosterAtWeek(targetId, league.current_week, draftPicks, freeAgencyMoves),
+    [draftPicks, freeAgencyMoves, targetId, league.current_week]
   );
 
   const weeklyScores = useMemo(() => {
-    return Array.from({ length: 18 }, (_, i) =>
-      calcWeeklyScore(targetId, i, roster, captainPicks, gameData, league.scoring, spreadPicks)
-    );
-  }, [targetId, roster, captainPicks, gameData, league.scoring, spreadPicks]);
+    return Array.from({ length: 18 }, (_, i) => {
+      const weekRoster = rosterAtWeek(targetId, i, draftPicks, freeAgencyMoves);
+      return calcWeeklyScore(targetId, i, weekRoster, captainPicks, gameData, league.scoring, spreadPicks, freeAgencyMoves);
+    });
+  }, [targetId, draftPicks, freeAgencyMoves, captainPicks, gameData, league.scoring, spreadPicks]);
 
   const captainUsage = useMemo(() => {
     const map = new Map<string, number>();
@@ -75,6 +76,7 @@ export function RosterPage({
       scoring={league.scoring}
       currentWeek={league.current_week}
       weeklyScores={weeklyScores}
+      freeAgencyMoves={freeAgencyMoves}
       isOwner={isOwner}
       onSetCaptain={targetId === userId ? onSetCaptain : undefined}
       captainUsage={captainUsage}

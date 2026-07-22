@@ -13,6 +13,7 @@ import { DraftRoom }        from './components/draft/DraftRoom';
 import { AdminPanel }       from './components/admin/AdminPanel';
 import { RankingsPage }     from './components/league/RankingsPage';
 import { DraftRecapPage }   from './components/league/DraftRecapPage';
+import { FreeAgencyPage }   from './components/league/FreeAgencyPage';
 import { Loader2 }          from 'lucide-react';
 
 export default function App() {
@@ -110,6 +111,7 @@ export default function App() {
                 captainPicks={league.captainPicks}
                 manualBonuses={league.manualBonuses}
                 spreadPicks={league.spreadPicks}
+                freeAgencyMoves={league.freeAgencyMoves}
                 gameData={cfb.gameData}
                 seasonStats={cfb.seasonStats}
                 rankings={cfb.rankings}
@@ -117,10 +119,21 @@ export default function App() {
                 cfbLoading={cfb.loading}
               />
             } />
-            <Route path="/roster"         element={<RosterPage league={lg} members={league.members} draftPicks={league.draftPicks} captainPicks={league.captainPicks} gameData={cfb.gameData} spreadData={cfb.spreadData} spreadPicks={league.spreadPicks} userId={auth.user.id} onSetCaptain={league.setCaptain} onSetSpread={league.setSpreadPick} onRemoveSpread={league.removeSpreadPick} onRefreshSpreads={cfb.refreshSpreads} />} />
-            <Route path="/roster/:userId" element={<RosterPage league={lg} members={league.members} draftPicks={league.draftPicks} captainPicks={league.captainPicks} gameData={cfb.gameData} spreadData={cfb.spreadData} spreadPicks={league.spreadPicks} userId={auth.user.id} onSetCaptain={league.setCaptain} onSetSpread={league.setSpreadPick} onRemoveSpread={league.removeSpreadPick} onRefreshSpreads={cfb.refreshSpreads} />} />
+            <Route path="/roster"         element={<RosterPage league={lg} members={league.members} draftPicks={league.draftPicks} captainPicks={league.captainPicks} gameData={cfb.gameData} spreadData={cfb.spreadData} spreadPicks={league.spreadPicks} freeAgencyMoves={league.freeAgencyMoves} userId={auth.user.id} onSetCaptain={league.setCaptain} onSetSpread={league.setSpreadPick} onRemoveSpread={league.removeSpreadPick} onRefreshSpreads={cfb.refreshSpreads} />} />
+            <Route path="/roster/:userId" element={<RosterPage league={lg} members={league.members} draftPicks={league.draftPicks} captainPicks={league.captainPicks} gameData={cfb.gameData} spreadData={cfb.spreadData} spreadPicks={league.spreadPicks} freeAgencyMoves={league.freeAgencyMoves} userId={auth.user.id} onSetCaptain={league.setCaptain} onSetSpread={league.setSpreadPick} onRemoveSpread={league.removeSpreadPick} onRefreshSpreads={cfb.refreshSpreads} />} />
             <Route path="/rankings" element={<RankingsPage rankings={cfb.rankings} teams={cfb.teams} records={cfb.records} />} />
             <Route path="/draft-recap" element={<DraftRecapPage league={lg} members={league.members} draftPicks={league.draftPicks} />} />
+            <Route path="/free-agency" element={
+              <FreeAgencyPage
+                league={lg}
+                members={league.members}
+                draftPicks={league.draftPicks}
+                freeAgencyMoves={league.freeAgencyMoves}
+                teams={cfb.teams}
+                userId={auth.user.id}
+                onMakeMove={league.makeFreeAgencyMove}
+              />
+            } />
             <Route path="/draft"          element={
               <DraftRoom
                 league={lg}
@@ -140,6 +153,7 @@ export default function App() {
                 draftPicks={league.draftPicks}
                 manualBonuses={league.manualBonuses}
                 spreadPicks={league.spreadPicks}
+                freeAgencyMoves={league.freeAgencyMoves}
                 isCommissioner={league.isCommissioner}
                 onSendInvite={league.sendInvite}
                 onUpdateWeek={league.updateWeek}

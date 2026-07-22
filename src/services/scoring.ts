@@ -2,8 +2,9 @@ import type {
   ScoringSettings, GameResult, WeeklyScore, ScoreBreakdown,
   LeaderboardEntry, LeagueMember, RosterEntry, CaptainPick,
   GameData, ManualBonus, TeamSeasonStats, StatRankingBonus,
-  SpreadPick,
+  SpreadPick, DraftPick, FreeAgencyMove,
 } from '../types';
+import { rosterAtWeek, currentRosters } from './roster';
 
 export { P4_CONFERENCES, DRAFT_CONF_MIN, DRAFT_CONF_MAX } from '../types';
 
@@ -80,6 +81,7 @@ export function calcWeeklyScore(
   gameData: GameData,
   settings: ScoringSettings,
   spreadPicks: SpreadPick[] = [],
+  freeAgencyMoves: FreeAgencyMove[] = [],
 ): WeeklyScore {
   const captainPick = captainPicks.find(
     p => p.user_id === userId && p.week === week
@@ -123,13 +125,18 @@ export function calcWeeklyScore(
     };
   });
 
+  const faPoints = freeAgencyMoves
+    .filter(m => m.user_id === userId && m.week === week)
+    .reduce((s, m) => s + m.penalty_points, 0);
+
   return {
     user_id:         userId,
     week,
-    points:          breakdown.reduce((s, b) => s + b.points, 0),
+    points:          breakdown.reduce((s, b) => s + b.points, 0) + faPoints,
     captain_team_id: captainTeamId,
     spread_team_ids: spreadTeamIds,
     breakdown,
+    fa_points:       faPoints,
   };
 }
 
@@ -191,7 +198,7 @@ export function calcStatRankingBonuses(
 
 export function buildLeaderboard(
   members: LeagueMember[],
-  rosters: Map<string, RosterEntry[]>,
+  draftPicks: DraftPick[],
   captainPicks: CaptainPick[],
   gameData: GameData,
   settings: ScoringSettings,
@@ -199,8 +206,11 @@ export function buildLeaderboard(
   seasonStats: Map<string, TeamSeasonStats>,
   confChampComplete: boolean,
   spreadPicks: SpreadPick[] = [],
+  freeAgencyMoves: FreeAgencyMove[] = [],
+  currentWeek = 0,
   totalWeeks = 17,
 ): LeaderboardEntry[] {
+  const rosters = currentRosters(members, draftPicks, freeAgencyMoves, currentWeek);
   const statBonuses = calcStatRankingBonuses(rosters, seasonStats, !confChampComplete);
 
   return members
@@ -209,8 +219,9 @@ export function buildLeaderboard(
       const weekly: WeeklyScore[] = [];
 
       for (let w = 0; w <= totalWeeks; w++) {
+        const weekRoster = rosterAtWeek(member.user_id, w, draftPicks, freeAgencyMoves);
         weekly.push(calcWeeklyScore(
-          member.user_id, w, roster, captainPicks, gameData, settings, spreadPicks
+          member.user_id, w, weekRoster, captainPicks, gameData, settings, spreadPicks, freeAgencyMoves
         ));
       }
 

@@ -49,6 +49,12 @@ export interface ScoringSettings {
   spread_max_per_week: number;    // max spread picks per user per week
   spread_max_per_team: number;    // max times one team can be spread-picked all season
   spread_allow_captain_stack: boolean; // allow spread + captain on same team same week
+  // Free agency settings
+  free_agency_enabled: boolean;
+  fa_max_moves_per_season: number; // max adds/drops per user for the whole season
+  fa_max_moves_per_week: number;   // max adds/drops per user per week
+  fa_penalty_enabled: boolean;
+  fa_penalty_points: number;       // points subtracted the week a swap is made (entered as a positive number)
 }
 
 export const DEFAULT_SCORING: ScoringSettings = {
@@ -65,6 +71,12 @@ export const DEFAULT_SCORING: ScoringSettings = {
   spread_max_per_week: 2,
   spread_max_per_team: 3,
   spread_allow_captain_stack: false,
+  // Free agency defaults — off until commissioner enables
+  free_agency_enabled: false,
+  fa_max_moves_per_season: 10,
+  fa_max_moves_per_week: 2,
+  fa_penalty_enabled: false,
+  fa_penalty_points: 3,
 };
 
 // ─── Draft ─────────────────────────────────────────────────────────────────
@@ -88,6 +100,25 @@ export interface DraftPick {
   round: number;
   pick_number: number;
   picked_at: string;
+}
+
+// ─── Free Agency ───────────────────────────────────────────────────────────
+
+export interface FreeAgencyMove {
+  id: string;
+  league_id: string;
+  user_id: string;
+  week: number;
+  dropped_team_id: string;
+  dropped_team_name: string;
+  dropped_team_logo: string;
+  dropped_team_conference: string;
+  added_team_id: string;
+  added_team_name: string;
+  added_team_logo: string;
+  added_team_conference: string;
+  penalty_points: number; // <= 0, captured at time of the move
+  created_at: string;
 }
 
 // ─── Roster / Captain ──────────────────────────────────────────────────────
@@ -337,6 +368,7 @@ export interface WeeklyScore {
   captain_team_id: string | null;
   spread_team_ids: string[];
   breakdown: ScoreBreakdown[];
+  fa_points: number; // free agency penalty applied this week (<= 0)
 }
 
 export interface ScoreBreakdown {

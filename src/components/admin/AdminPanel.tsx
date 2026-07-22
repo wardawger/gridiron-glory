@@ -1,10 +1,11 @@
 import { useState, useMemo } from 'react';
 import { Shield, UserPlus, Copy, Check, Trash2, Plus, Mail, Settings, Gift, RotateCcw, AlertTriangle } from 'lucide-react';
 import type {
-  League, LeagueMember, ManualBonus, DraftPick, SpreadPick,
+  League, LeagueMember, ManualBonus, DraftPick, SpreadPick, FreeAgencyMove,
   BonusType, ScoringSettings,
 } from '../../types';
-import { BONUS_LABELS, BONUS_DEFAULT_POINTS } from '../../types';
+import { BONUS_LABELS, BONUS_DEFAULT_POINTS, DEFAULT_SCORING } from '../../types';
+import { rosterAtWeek } from '../../services/roster';
 
 interface Props {
   league: League;
@@ -12,6 +13,7 @@ interface Props {
   draftPicks: DraftPick[];
   manualBonuses: ManualBonus[];
   spreadPicks: SpreadPick[];
+  freeAgencyMoves: FreeAgencyMove[];
   isCommissioner: boolean;
   onSendInvite: (email: string) => Promise<{ token?: string; error?: string }>;
   onUpdateWeek: (week: number) => void;
@@ -27,7 +29,7 @@ interface Props {
 type Tab = 'members' | 'scoring' | 'bonuses';
 
 export function AdminPanel({
-  league, members, draftPicks, manualBonuses, spreadPicks, isCommissioner,
+  league, members, draftPicks, manualBonuses, spreadPicks, freeAgencyMoves, isCommissioner,
   onSendInvite, onUpdateWeek, onUpdateScoring, onAddBonus, onRemoveBonus, onResetDraft,
   onOverrideSpread, onClearSpreadOverride,
 }: Props) {
@@ -38,7 +40,7 @@ export function AdminPanel({
   const [inviting, setInviting] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [resetError, setResetError] = useState('');
-  const [scoring, setScoring]   = useState<ScoringSettings>(league.scoring);
+  const [scoring, setScoring]   = useState<ScoringSettings>({ ...DEFAULT_SCORING, ...league.scoring });
   const [bonusUserId, setBonusUser]       = useState('');
   const [bonusType, setBonusType]         = useState<BonusType>('win_bowl');
   const [bonusTeamId, setBonusTeamId]     = useState('');
@@ -46,13 +48,13 @@ export function AdminPanel({
   const [bonusPoints, setBonusPoints]     = useState<number>(5);
   const [bonusNote, setBonusNote]         = useState('');
 
-  // Teams drafted by the currently selected user
+  // Teams currently rostered by the selected user (draft + free agency swaps)
   const userTeams = useMemo(() => {
     if (!bonusUserId) return [];
-    return draftPicks
-      .filter(p => p.user_id === bonusUserId)
+    return rosterAtWeek(bonusUserId, league.current_week, draftPicks, freeAgencyMoves)
+      .map(t => ({ team_id: t.team_id, team_name: t.team_name }))
       .sort((a, b) => a.team_name.localeCompare(b.team_name));
-  }, [draftPicks, bonusUserId]);
+  }, [draftPicks, freeAgencyMoves, bonusUserId, league.current_week]);
 
   // When user changes, reset team selection
   const handleUserChange = (uid: string) => {
@@ -395,6 +397,85 @@ export function AdminPanel({
                     <p className="text-xs text-turf-600 mt-0.5">Pick spread on captain's team</p>
                   </div>
                 </div>
+              </div>
+            )}
+          </div>
+
+          {/* Free agency settings */}
+          <div className="card p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-medium text-white text-sm">Free Agency</h3>
+                <p className="text-xs text-turf-400 mt-0.5">Let managers drop a rostered team and add an available one</p>
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <span className="text-xs text-turf-400">{scoring.free_agency_enabled ? 'Enabled' : 'Disabled'}</span>
+                <button
+                  onClick={() => setScoring(prev => ({ ...prev, free_agency_enabled: !prev.free_agency_enabled }))}
+                  className={`relative w-10 h-5 rounded-full transition-colors ${scoring.free_agency_enabled ? 'bg-field-500' : 'bg-turf-700'}`}
+                >
+                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${scoring.free_agency_enabled ? 'left-5' : 'left-0.5'}`} />
+                </button>
+              </label>
+            </div>
+
+            {scoring.free_agency_enabled && (
+              <div className="space-y-4 pt-2 border-t border-turf-800">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="label">Max Adds/Drops / Season</label>
+                    <input
+                      className="input font-mono"
+                      type="number"
+                      min="0"
+                      value={scoring.fa_max_moves_per_season}
+                      onChange={e => setScoring(prev => ({ ...prev, fa_max_moves_per_season: parseInt(e.target.value) || 0 }))}
+                    />
+                  </div>
+                  <div>
+                    <label className="label">Max Adds/Drops / Week</label>
+                    <input
+                      className="input font-mono"
+                      type="number"
+                      min="0"
+                      value={scoring.fa_max_moves_per_week}
+                      onChange={e => setScoring(prev => ({ ...prev, fa_max_moves_per_week: parseInt(e.target.value) || 0 }))}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-white">Point Penalty</p>
+                    <p className="text-xs text-turf-600 mt-0.5">Subtract points the week a swap is made</p>
+                  </div>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <span className="text-xs text-turf-400">{scoring.fa_penalty_enabled ? 'Enabled' : 'Disabled'}</span>
+                    <button
+                      onClick={() => setScoring(prev => ({ ...prev, fa_penalty_enabled: !prev.fa_penalty_enabled }))}
+                      className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${scoring.fa_penalty_enabled ? 'bg-field-500' : 'bg-turf-700'}`}
+                    >
+                      <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${scoring.fa_penalty_enabled ? 'left-5' : 'left-0.5'}`} />
+                    </button>
+                  </label>
+                </div>
+
+                {scoring.fa_penalty_enabled && (
+                  <div>
+                    <label className="label">Penalty Points</label>
+                    <input
+                      className="input font-mono"
+                      type="number"
+                      min="0"
+                      step="0.5"
+                      value={scoring.fa_penalty_points}
+                      onChange={e => setScoring(prev => ({ ...prev, fa_penalty_points: parseFloat(e.target.value) || 0 }))}
+                    />
+                    <p className="text-xs text-turf-600 mt-0.5">
+                      −{scoring.fa_penalty_points} pts applied the week of each add/drop
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>

@@ -170,7 +170,43 @@ create policy "Commissioner can manage bonuses"
   ));
 
 
--- ── 6. INVITES ────────────────────────────────────────────────
+-- ── 6. FREE AGENCY MOVES ──────────────────────────────────────
+create table free_agency_moves (
+  id                        uuid primary key default gen_random_uuid(),
+  league_id                 uuid references leagues(id) on delete cascade,
+  user_id                   uuid references auth.users(id),
+  week                      integer not null,
+  dropped_team_id           text not null,
+  dropped_team_name         text not null,
+  dropped_team_logo         text not null default '',
+  dropped_team_conference   text not null default '',
+  added_team_id             text not null,
+  added_team_name           text not null,
+  added_team_logo           text not null default '',
+  added_team_conference     text not null default '',
+  penalty_points            numeric not null default 0,
+  created_at                timestamptz default now()
+);
+
+alter table free_agency_moves enable row level security;
+
+create policy "Members can view all free agency moves in their league"
+  on free_agency_moves for select
+  using (league_id in (
+    select league_id from league_members where user_id = auth.uid()
+  ));
+
+create policy "Users can make their own free agency moves"
+  on free_agency_moves for insert
+  with check (
+    user_id = auth.uid()
+    and league_id in (
+      select league_id from league_members where user_id = auth.uid()
+    )
+  );
+
+
+-- ── 7. INVITES ────────────────────────────────────────────────
 create table invites (
   id             uuid primary key default gen_random_uuid(),
   league_id      uuid references leagues(id) on delete cascade,
@@ -200,13 +236,14 @@ create policy "Anyone can mark invite accepted"
   with check (accepted = true);
 
 
--- ── 7. ENABLE REALTIME ────────────────────────────────────────
+-- ── 8. ENABLE REALTIME ────────────────────────────────────────
 -- Go to: Supabase Dashboard → Database → Replication
--- Toggle ON for: draft_picks, leagues, captain_picks
+-- Toggle ON for: draft_picks, leagues, captain_picks, free_agency_moves
 -- (Or run these if using CLI)
 -- alter publication supabase_realtime add table draft_picks;
 -- alter publication supabase_realtime add table leagues;
 -- alter publication supabase_realtime add table captain_picks;
+-- alter publication supabase_realtime add table free_agency_moves;
 
 -- ============================================================
 -- DONE. Now:

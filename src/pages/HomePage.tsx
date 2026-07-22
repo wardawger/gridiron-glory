@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Leaderboard } from '../components/league/Leaderboard';
-import type { League, LeagueMember, CaptainPick, GameData, ManualBonus, DraftPick, TeamSeasonStats, APRanking, SpreadPick } from '../types';
+import type { League, LeagueMember, CaptainPick, GameData, ManualBonus, DraftPick, TeamSeasonStats, APRanking, SpreadPick, FreeAgencyMove } from '../types';
 import { buildLeaderboard } from '../services/scoring';
 
 interface Props {
@@ -11,6 +11,7 @@ interface Props {
   captainPicks: CaptainPick[];
   manualBonuses: ManualBonus[];
   spreadPicks: SpreadPick[];
+  freeAgencyMoves: FreeAgencyMove[];
   gameData: GameData;
   seasonStats: Map<string, TeamSeasonStats>;
   rankings: APRanking[];
@@ -19,29 +20,18 @@ interface Props {
 }
 
 export function HomePage({
-  league, members, draftPicks, captainPicks, manualBonuses, spreadPicks,
+  league, members, draftPicks, captainPicks, manualBonuses, spreadPicks, freeAgencyMoves,
   gameData, seasonStats, rankings, userId, cfbLoading,
 }: Props) {
-  const rosters = useMemo(() => {
-    const map = new Map<string, { team_id: string; team_name: string; team_logo: string; team_conference: string; team_color: string }[]>();
-    draftPicks.forEach(p => {
-      if (!map.has(p.user_id)) map.set(p.user_id, []);
-      map.get(p.user_id)!.push({
-        team_id: p.team_id, team_name: p.team_name,
-        team_logo: p.team_logo, team_conference: p.team_conference, team_color: '#052e16',
-      });
-    });
-    return map;
-  }, [draftPicks]);
-
   const confChampComplete = league.current_week >= 15;
 
   const leaderboard = useMemo(
     () => buildLeaderboard(
-      members, rosters, captainPicks, gameData,
-      league.scoring, manualBonuses, seasonStats, confChampComplete, spreadPicks
+      members, draftPicks, captainPicks, gameData,
+      league.scoring, manualBonuses, seasonStats, confChampComplete, spreadPicks,
+      freeAgencyMoves, league.current_week
     ),
-    [members, rosters, captainPicks, gameData, league.scoring, manualBonuses, seasonStats, confChampComplete, spreadPicks]
+    [members, draftPicks, captainPicks, gameData, league.scoring, manualBonuses, seasonStats, confChampComplete, spreadPicks, freeAgencyMoves, league.current_week]
   );
 
   return (

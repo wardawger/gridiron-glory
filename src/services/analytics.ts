@@ -37,7 +37,8 @@ export function computeAnalytics(
     rankByName.set(r.team_name.toLowerCase(), r.rank);
   });
 
-  const draftedTeamIds = new Set(draftPicks.map(p => p.team_id));
+  // Currently-rostered team ids (draft + free agency swaps), not just original draft picks
+  const draftedTeamIds = new Set(entries.flatMap(e => e.roster.map(t => t.team_id)));
 
   // Per-user total points per team (summed across all weeks)
   const teamPointsMap = new Map<string, Map<string, number>>(); // userId → teamId → pts

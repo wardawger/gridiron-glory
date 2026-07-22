@@ -3,8 +3,10 @@ import type { User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import type {
   League, LeagueMember, DraftPick, CaptainPick,
-  ManualBonus, RosterEntry, SpreadPick,
+  ManualBonus, SpreadPick, FreeAgencyMove,
 } from '../types';
+import { P4_CONFERENCES, DRAFT_CONF_MAX } from '../types';
+import { rosterAtWeek, currentRosters } from '../services/roster';
 
 export function useLeague(user: User | null) {
   const [allLeagues, setAllLeagues]     = useState<League[]>([]);
@@ -14,22 +16,13 @@ export function useLeague(user: User | null) {
   const [captainPicks, setCaptainPicks] = useState<CaptainPick[]>([]);
   const [manualBonuses, setManualBonuses] = useState<ManualBonus[]>([]);
   const [spreadPicks, setSpreadPicks]   = useState<SpreadPick[]>([]);
+  const [freeAgencyMoves, setFreeAgencyMoves] = useState<FreeAgencyMove[]>([]);
   const [loading, setLoading]           = useState(true);
   const [error, setError]               = useState<string | null>(null);
 
   const league = allLeagues.find(l => l.id === selectedLeagueId) ?? null;
 
-  const rosters = new Map<string, RosterEntry[]>();
-  draftPicks.forEach(pick => {
-    if (!rosters.has(pick.user_id)) rosters.set(pick.user_id, []);
-    rosters.get(pick.user_id)!.push({
-      team_id:         pick.team_id,
-      team_name:       pick.team_name,
-      team_logo:       pick.team_logo,
-      team_conference: pick.team_conference,
-      team_color:      '#052e16',
-    });
-  });
+  const rosters = currentRosters(members, draftPicks, freeAgencyMoves, league?.current_week ?? 0);
 
   const myMembership = members.find(m => m.user_id === user?.id);
   const isCommissioner = myMembership?.role === 'commissioner';
@@ -39,10 +32,16 @@ export function useLeague(user: User | null) {
   const userRef   = useRef(user);
   const captainPicksRef = useRef(captainPicks);
   const spreadPicksRef  = useRef(spreadPicks);
+  const membersRef      = useRef(members);
+  const draftPicksRef   = useRef(draftPicks);
+  const freeAgencyMovesRef = useRef(freeAgencyMoves);
   leagueRef.current       = league;
   userRef.current         = user;
   captainPicksRef.current = captainPicks;
   spreadPicksRef.current  = spreadPicks;
+  membersRef.current      = members;
+  draftPicksRef.current   = draftPicks;
+  freeAgencyMovesRef.current = freeAgencyMoves;
 
   const loadAllLeagues = useCallback(async () => {
     if (!user) { setLoading(false); return; }
@@ -80,12 +79,13 @@ export function useLeague(user: User | null) {
   }, [user]);
 
   const loadLeagueData = useCallback(async (leagueId: string) => {
-    const [membersRes, picksRes, captainRes, bonusRes, spreadRes] = await Promise.all([
+    const [membersRes, picksRes, captainRes, bonusRes, spreadRes, faRes] = await Promise.all([
       supabase.from('league_members').select('*').eq('league_id', leagueId),
       supabase.from('draft_picks').select('*').eq('league_id', leagueId).order('pick_number'),
       supabase.from('captain_picks').select('*').eq('league_id', leagueId),
       supabase.from('manual_bonuses').select('*').eq('league_id', leagueId),
       supabase.from('spread_picks').select('*').eq('league_id', leagueId),
+      supabase.from('free_agency_moves').select('*').eq('league_id', leagueId),
     ]);
 
     if (membersRes.data)  setMembers(membersRes.data);
@@ -93,6 +93,7 @@ export function useLeague(user: User | null) {
     if (captainRes.data)  setCaptainPicks(captainRes.data);
     if (bonusRes.data)    setManualBonuses(bonusRes.data);
     if (spreadRes.data)   setSpreadPicks(spreadRes.data);
+    if (faRes.data)       setFreeAgencyMoves(faRes.data);
   }, []);
 
   useEffect(() => { loadAllLeagues(); }, [loadAllLeagues]);
@@ -111,6 +112,7 @@ export function useLeague(user: User | null) {
     setCaptainPicks([]);
     setManualBonuses([]);
     setSpreadPicks([]);
+    setFreeAgencyMoves([]);
   };
 
   // Real-time subscriptions
@@ -148,6 +150,16 @@ export function useLeague(user: User | null) {
         supabase.from('spread_picks').select('*').eq('league_id', league.id)
           .then(({ data }) => { if (data) setSpreadPicks(data); });
       })
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'free_agency_moves',
+        filter: `league_id=eq.${league.id}`,
+      }, payload => {
+        setFreeAgencyMoves(prev =>
+          prev.some(m => m.id === (payload.new as FreeAgencyMove).id)
+            ? prev
+            : [...prev, payload.new as FreeAgencyMove]
+        );
+      })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
@@ -171,6 +183,8 @@ export function useLeague(user: User | null) {
           win: 1, win_ranked: 1, win_top15: 2, win_top5: 3, loss: -1, loss_g5: -5,
           spread_enabled: false, spread_points: 2, spread_is_multiplier: false,
           spread_max_per_week: 2, spread_max_per_team: 3, spread_allow_captain_stack: false,
+          free_agency_enabled: false, fa_max_moves_per_season: 10, fa_max_moves_per_week: 2,
+          fa_penalty_enabled: false, fa_penalty_points: 3,
         },
       })
       .select()
@@ -429,6 +443,76 @@ export function useLeague(user: User | null) {
     return {};
   };
 
+  // ── Free agency actions ──────────────────────────────────────────────────
+
+  const makeFreeAgencyMove = useCallback(async (
+    droppedTeamId: string, droppedTeamName: string,
+    addedTeamId: string, addedTeamName: string, addedTeamLogo: string, addedTeamConference: string,
+  ): Promise<{ error?: string }> => {
+    const league  = leagueRef.current;
+    const user    = userRef.current;
+    const members = membersRef.current;
+    const draftPicks = draftPicksRef.current;
+    const moves   = freeAgencyMovesRef.current;
+    if (!league || !user) return { error: 'Not ready' };
+
+    const settings = league.scoring;
+    if (!settings.free_agency_enabled) return { error: 'Free agency is not enabled for this league' };
+
+    const week = league.current_week;
+    const myMoves = moves.filter(m => m.user_id === user.id);
+    if (myMoves.length >= settings.fa_max_moves_per_season) {
+      return { error: `You've reached the season limit of ${settings.fa_max_moves_per_season} moves` };
+    }
+    const myMovesThisWeek = myMoves.filter(m => m.week === week);
+    if (myMovesThisWeek.length >= settings.fa_max_moves_per_week) {
+      return { error: `You've reached this week's limit of ${settings.fa_max_moves_per_week} moves` };
+    }
+
+    const myRoster = rosterAtWeek(user.id, week, draftPicks, moves);
+    if (!myRoster.some(t => t.team_id === droppedTeamId)) {
+      return { error: 'You do not currently own that team' };
+    }
+
+    const allRosters = currentRosters(members, draftPicks, moves, week);
+    const isTaken = Array.from(allRosters.values()).some(r => r.some(t => t.team_id === addedTeamId));
+    if (isTaken) return { error: 'That team is already owned by another manager' };
+
+    const isP4 = (P4_CONFERENCES as readonly string[]).includes(addedTeamConference);
+    if (isP4) {
+      const droppedTeam = myRoster.find(t => t.team_id === droppedTeamId);
+      const currentConfCount = myRoster.filter(t => t.team_conference === addedTeamConference).length;
+      const newConfCount = currentConfCount
+        - (droppedTeam?.team_conference === addedTeamConference ? 1 : 0)
+        + 1;
+      if (newConfCount > DRAFT_CONF_MAX) {
+        return { error: `Max ${DRAFT_CONF_MAX} teams from ${addedTeamConference}` };
+      }
+    }
+
+    const droppedTeam = myRoster.find(t => t.team_id === droppedTeamId)!;
+    const penaltyPoints = settings.fa_penalty_enabled ? -Math.abs(settings.fa_penalty_points) : 0;
+
+    const { data, error: err } = await supabase.from('free_agency_moves').insert({
+      league_id:              league.id,
+      user_id:                user.id,
+      week,
+      dropped_team_id:        droppedTeamId,
+      dropped_team_name:      droppedTeam.team_name,
+      dropped_team_logo:      droppedTeam.team_logo,
+      dropped_team_conference: droppedTeam.team_conference,
+      added_team_id:          addedTeamId,
+      added_team_name:        addedTeamName,
+      added_team_logo:        addedTeamLogo,
+      added_team_conference:  addedTeamConference,
+      penalty_points:         penaltyPoints,
+    }).select().single();
+
+    if (err) return { error: err.message };
+    if (data) setFreeAgencyMoves(prev => [...prev, data as FreeAgencyMove]);
+    return {};
+  }, []);
+
   const addManualBonus = async (bonus: Omit<ManualBonus, 'id' | 'awarded_at' | 'awarded_by' | 'league_id'>) => {
     if (!league || !user) return;
     const { data, error } = await supabase.from('manual_bonuses').insert({
@@ -466,11 +550,11 @@ export function useLeague(user: User | null) {
 
   return {
     league, allLeagues, selectedLeagueId,
-    members, draftPicks, captainPicks, manualBonuses, spreadPicks,
+    members, draftPicks, captainPicks, manualBonuses, spreadPicks, freeAgencyMoves,
     rosters, myMembership, isCommissioner, loading, error,
     switchLeague, createLeague, sendInvite, startDraft, makeDraftPick, resetDraft,
     setCaptain, addManualBonus, removeManualBonus,
     setSpreadPick, removeSpreadPick, overrideSpreadResult, clearSpreadOverride,
-    updateWeek, updateScoring, removeFromRoster, reload: loadAllLeagues,
+    updateWeek, updateScoring, removeFromRoster, makeFreeAgencyMove, reload: loadAllLeagues,
   };
 }

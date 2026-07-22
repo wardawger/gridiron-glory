@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from 'react';
 import { Shield, TrendingUp, TrendingDown, Minus, Star, Calendar, List, X, MapPin, Tv, Clock, Zap, Coins } from 'lucide-react';
-import type { RosterEntry, CaptainPick, GameData, ScoringSettings, LeagueMember, WeeklyScore, GameResult, SpreadPick, SpreadData } from '../../types';
+import type { RosterEntry, CaptainPick, GameData, ScoringSettings, LeagueMember, WeeklyScore, GameResult, SpreadPick, SpreadData, FreeAgencyMove } from '../../types';
 import { calcWeeklyScore, scoreGame, didCoverSpread } from '../../services/scoring';
 import { Tooltip } from '../ui/Tooltip';
 import { TeamLogo } from '../ui/TeamLogo';
@@ -23,6 +23,7 @@ interface Props {
   onSetSpread?: (week: number, teamId: string, lockedSpread: number) => Promise<{ error?: string }>;
   onRemoveSpread?: (week: number, teamId: string) => Promise<{ error?: string }>;
   onRefreshSpreads: (week: number) => Promise<void>;
+  freeAgencyMoves: FreeAgencyMove[];
   viewUserId: string;
 }
 
@@ -364,7 +365,8 @@ function ScheduleModal({ team, gameData, captainPicks, userId, currentWeek, onCl
 export function RosterView({
   member, roster, captainPicks, gameData, scoring,
   currentWeek, weeklyScores, isOwner, onSetCaptain, captainUsage,
-  spreadData, spreadPicks, spreadUsage, onSetSpread, onRemoveSpread, onRefreshSpreads, viewUserId,
+  spreadData, spreadPicks, spreadUsage, onSetSpread, onRemoveSpread, onRefreshSpreads,
+  freeAgencyMoves, viewUserId,
 }: Props) {
   const [view, setView] = useState<'week' | 'schedule'>('week');
   const [modalTeam, setModalTeam] = useState<RosterEntry | null>(null);
@@ -384,8 +386,8 @@ export function RosterView({
   }, [scoring.spread_enabled, currentWeek]);
 
   const currentScore = useMemo(
-    () => calcWeeklyScore(member.user_id, currentWeek, roster, captainPicks, gameData, scoring, spreadPicks),
-    [member.user_id, currentWeek, roster, captainPicks, gameData, scoring, spreadPicks]
+    () => calcWeeklyScore(member.user_id, currentWeek, roster, captainPicks, gameData, scoring, spreadPicks, freeAgencyMoves),
+    [member.user_id, currentWeek, roster, captainPicks, gameData, scoring, spreadPicks, freeAgencyMoves]
   );
 
   const captainThisWeek = captainPicks.find(
@@ -463,7 +465,11 @@ export function RosterView({
                         ? 'bg-red-900/30 text-red-400'
                         : 'bg-turf-900 text-turf-600'
                     }`}
-                    title={`Week ${ws.week}: ${ws.points} pts`}
+                    title={
+                      ws.fa_points !== 0
+                        ? `Week ${ws.week}: ${ws.points} pts (includes ${ws.fa_points} free agency penalty)`
+                        : `Week ${ws.week}: ${ws.points} pts`
+                    }
                   >
                     <span className="text-turf-500" style={{ fontSize: 9 }}>W{ws.week}</span>
                     <span className="font-bold">{ws.points}</span>
