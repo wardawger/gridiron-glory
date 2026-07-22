@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Loader2, Trophy, Users, ChevronRight } from 'lucide-react';
 
 interface Props {
@@ -8,6 +9,7 @@ interface Props {
 }
 
 export function CreateLeaguePage({ displayName, onCreate, hasExistingLeague }: Props) {
+  const navigate = useNavigate();
   const [name, setName]         = useState('');
   const [maxTeams, setMaxTeams] = useState(10);
   const [players, setPlayers]   = useState(4);
@@ -20,7 +22,9 @@ export function CreateLeaguePage({ displayName, onCreate, hasExistingLeague }: P
     setSubmitting(true);
     setError('');
     const result = await onCreate(name.trim(), maxTeams, players);
-    if (result.error) { setError(result.error); setSubmitting(false); }
+    setSubmitting(false);
+    if (result.error) { setError(result.error); return; }
+    navigate('/');
   };
 
   return (
