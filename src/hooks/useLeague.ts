@@ -128,7 +128,10 @@ export function useLeague(user: User | null) {
         filter: `league_id=eq.${league.id}`,
       }, payload => {
         if (payload.eventType === 'INSERT') {
-          setDraftPicks(prev => [...prev, payload.new as DraftPick].sort((a, b) => a.pick_number - b.pick_number));
+          const newPick = payload.new as DraftPick;
+          setDraftPicks(prev => prev.some(p => p.id === newPick.id)
+            ? prev
+            : [...prev, newPick].sort((a, b) => a.pick_number - b.pick_number));
         } else if (payload.eventType === 'DELETE') {
           setDraftPicks(prev => prev.filter(p => p.id !== payload.old.id));
         }
@@ -218,11 +221,15 @@ export function useLeague(user: User | null) {
 
   const startDraft = async (orderedUserIds: string[]) => {
     if (!league) return;
-    await supabase.from('leagues').update({
+    const { data, error } = await supabase.from('leagues').update({
       draft_status: 'active',
       draft_order: orderedUserIds,
       draft_current_pick: 1,
-    }).eq('id', league.id);
+    }).eq('id', league.id).select().single();
+
+    if (!error && data) {
+      setAllLeagues(prev => prev.map(l => l.id === league.id ? data as League : l));
+    }
   };
 
   const makeDraftPick = async (teamId: string, teamName: string, teamLogo: string, teamConf: string) => {
@@ -233,7 +240,7 @@ export function useLeague(user: User | null) {
 
     const round = Math.ceil(pickNum / league.draft_order.length);
 
-    const { error: pickErr } = await supabase.from('draft_picks').insert({
+    const { data: pick, error: pickErr } = await supabase.from('draft_picks').insert({
       league_id:       league.id,
       user_id:         user.id,
       team_id:         teamId,
@@ -242,14 +249,25 @@ export function useLeague(user: User | null) {
       team_conference: teamConf,
       round,
       pick_number: pickNum,
-    });
+    }).select().single();
     if (pickErr) return { error: pickErr.message };
 
+    // Update locally right away rather than waiting on the realtime
+    // round-trip — the realtime handler already de-dupes by id if this
+    // insert's own broadcast arrives afterward.
+    setDraftPicks(prev => prev.some(p => p.id === pick.id)
+      ? prev
+      : [...prev, pick as DraftPick].sort((a, b) => a.pick_number - b.pick_number));
+
     const next = pickNum + 1;
-    await supabase.from('leagues').update({
+    const { data: updatedLeague, error: leagueErr } = await supabase.from('leagues').update({
       draft_current_pick: next,
       draft_status: next > totalPicks ? 'complete' : 'active',
-    }).eq('id', league.id);
+    }).eq('id', league.id).select().single();
+
+    if (!leagueErr && updatedLeague) {
+      setAllLeagues(prev => prev.map(l => l.id === league.id ? updatedLeague as League : l));
+    }
 
     return {};
   };
@@ -270,17 +288,20 @@ export function useLeague(user: User | null) {
 
     if (faDeleteErr) return { error: faDeleteErr.message };
 
-    const { error: updateErr } = await supabase
+    const { data: updatedLeague, error: updateErr } = await supabase
       .from('leagues').update({
         draft_status: 'pending',
         draft_current_pick: 1,
         draft_order: [],
-      }).eq('id', league.id);
+      }).eq('id', league.id).select().single();
 
     if (updateErr) return { error: updateErr.message };
 
     setDraftPicks([]);
     setFreeAgencyMoves([]);
+    if (updatedLeague) {
+      setAllLeagues(prev => prev.map(l => l.id === league.id ? updatedLeague as League : l));
+    }
     return {};
   };
 
