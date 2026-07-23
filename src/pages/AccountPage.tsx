@@ -6,6 +6,7 @@ import { AVATAR_EMOJI_OPTIONS, AVATAR_MAX_FILE_BYTES, AVATAR_MIN_DIMENSION, AVAT
 import { validateAvatarFile, uploadAvatarImage } from '../services/avatarUpload';
 import { Avatar } from '../components/ui/Avatar';
 import { TeamLogo } from '../components/ui/TeamLogo';
+import { PasswordInput } from '../components/ui/PasswordInput';
 
 interface Props {
   auth: ReturnType<typeof useAuth>;
@@ -347,9 +348,8 @@ export function AccountPage({
         <form onSubmit={handleChangePassword} className="space-y-3">
           <div>
             <label className="label">New Password</label>
-            <input
+            <PasswordInput
               className="input"
-              type="password"
               placeholder="••••••••"
               value={password}
               onChange={e => setPassword(e.target.value)}
@@ -359,9 +359,8 @@ export function AccountPage({
           </div>
           <div>
             <label className="label">Confirm Password</label>
-            <input
+            <PasswordInput
               className="input"
-              type="password"
               placeholder="••••••••"
               value={confirm}
               onChange={e => setConfirm(e.target.value)}

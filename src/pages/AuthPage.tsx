@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import type { useAuth } from '../hooks/useAuth';
+import { PasswordInput } from '../components/ui/PasswordInput';
 
 type Mode = 'login' | 'signup' | 'forgot';
 
@@ -108,9 +109,8 @@ export function AuthPage({ auth }: Props) {
           {mode !== 'forgot' && (
             <div>
               <label className="label">Password</label>
-              <input
+              <PasswordInput
                 className="input"
-                type="password"
                 placeholder="••••••••"
                 value={password}
                 onChange={e => setPassword(e.target.value)}

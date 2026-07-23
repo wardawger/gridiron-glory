@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import type { useAuth } from '../hooks/useAuth';
+import { PasswordInput } from '../components/ui/PasswordInput';
 
 interface Props {
   auth: ReturnType<typeof useAuth>;
@@ -43,9 +44,8 @@ export function ResetPasswordPage({ auth }: Props) {
         <form onSubmit={handle} className="space-y-4">
           <div>
             <label className="label">New Password</label>
-            <input
+            <PasswordInput
               className="input"
-              type="password"
               placeholder="••••••••"
               value={password}
               onChange={e => setPassword(e.target.value)}
@@ -56,9 +56,8 @@ export function ResetPasswordPage({ auth }: Props) {
           </div>
           <div>
             <label className="label">Confirm Password</label>
-            <input
+            <PasswordInput
               className="input"
-              type="password"
               placeholder="••••••••"
               value={confirm}
               onChange={e => setConfirm(e.target.value)}
