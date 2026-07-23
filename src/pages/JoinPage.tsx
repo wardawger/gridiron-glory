@@ -41,7 +41,9 @@ export function JoinPage({ user, onJoined }: Props) {
       setLeagueName(name);
 
       if (!user) {
-        sessionStorage.setItem('pending_invite', token);
+        // localStorage (not sessionStorage) so this survives the email-confirmation
+        // link opening in a different tab than the one that started sign-up.
+        localStorage.setItem('pending_invite', token);
         setStatus('needsAuth');
         setMsg(`You've been invited to join "${name}". Sign up or sign in to continue.`);
         return;

@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth }     from './hooks/useAuth';
 import { useLeague }   from './hooks/useLeague';
@@ -22,6 +23,18 @@ export default function App() {
   const auth   = useAuth();
   const league = useLeague(auth.user);
   const cfb    = useCfbData();
+
+  // Resume an invite flow once the user is authenticated, regardless of
+  // whether that happened via the invite's own auth prompt, the general
+  // sign-in page, or an email-confirmation link opened in a new tab.
+  useEffect(() => {
+    if (!auth.user) return;
+    const pending = localStorage.getItem('pending_invite');
+    if (pending && !window.location.pathname.startsWith('/join/')) {
+      localStorage.removeItem('pending_invite');
+      window.location.href = `/join/${pending}`;
+    }
+  }, [auth.user]);
 
   if (auth.loading) {
     return (
