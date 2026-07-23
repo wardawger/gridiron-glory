@@ -177,6 +177,7 @@ export default function App() {
                 members={league.members}
                 draftPicks={league.draftPicks}
                 teams={cfb.teams}
+                gameData={cfb.gameData}
                 userId={auth.user.id}
                 isCommissioner={league.isCommissioner}
                 onStartDraft={league.startDraft}

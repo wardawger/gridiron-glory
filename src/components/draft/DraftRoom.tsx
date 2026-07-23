@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { Search, Clock, CheckCircle2, Zap, ChevronDown, AlertCircle } from 'lucide-react';
-import type { League, LeagueMember, DraftPick, CfbTeam } from '../../types';
+import { Search, Clock, CheckCircle2, Zap, ChevronDown, AlertCircle, X, MapPin, Tv, Loader2 } from 'lucide-react';
+import type { League, LeagueMember, DraftPick, CfbTeam, GameData } from '../../types';
 import { getPickOwner, P4_CONFERENCES, DRAFT_CONF_MIN, DRAFT_CONF_MAX } from '../../services/scoring';
 import { Tooltip } from '../ui/Tooltip';
 import { TeamLogo } from '../ui/TeamLogo';
@@ -9,11 +9,24 @@ import { fireDraftCompleteConfetti } from '../../lib/confetti';
 // Re-export from types so DraftRoom can use them
 import { P4_CONFERENCES as P4_CONF_LIST } from '../../types';
 
+const WEEKS = Array.from({ length: 16 }, (_, i) => i); // weeks 0–15
+
+function formatGameDate(startDate: string | null | undefined): { date: string; time: string } {
+  if (!startDate) return { date: 'TBD', time: 'TBD' };
+  const d = new Date(startDate);
+  const date = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  const time = d.getMinutes() === 0 && d.getHours() === 0
+    ? 'TBD'
+    : d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
+  return { date, time };
+}
+
 interface Props {
   league: League;
   members: LeagueMember[];
   draftPicks: DraftPick[];
   teams: CfbTeam[];
+  gameData: GameData;
   userId: string;
   isCommissioner: boolean;
   onStartDraft: (order: string[]) => void;
@@ -21,7 +34,7 @@ interface Props {
 }
 
 export function DraftRoom({
-  league, members, draftPicks, teams, userId, isCommissioner,
+  league, members, draftPicks, teams, gameData, userId, isCommissioner,
   onStartDraft, onMakePick,
 }: Props) {
   const [search, setSearch]     = useState('');
@@ -29,6 +42,7 @@ export function DraftRoom({
   const [picking, setPicking]   = useState(false);
   const [lastPick, setLastPick] = useState<string | null>(null);
   const [pickError, setPickError] = useState('');
+  const [scheduleModalTeam, setScheduleModalTeam] = useState<CfbTeam | null>(null);
   const [draftOrder, setDraftOrder] = useState<string[]>(
     league.draft_order.length > 0 ? league.draft_order : members.map(m => m.user_id)
   );
@@ -135,7 +149,32 @@ export function DraftRoom({
     return ['ALL', 'P4', 'G5', ...Array.from(set).sort()];
   }, [teams]);
 
+  const byeWeeksByTeam = useMemo(() => {
+    const map = new Map<string, number[]>();
+    teams.forEach(t => {
+      const g = gameData[t.id] ?? {};
+      map.set(t.id, WEEKS.filter(w => !g[w] && w >= 1 && w <= 15));
+    });
+    return map;
+  }, [teams, gameData]);
+
+  // Always land on the top of the page when entering the Draft Room — on
+  // mobile especially, starting scrolled down into the picks list buries
+  // the available-teams grid you actually need to make a selection.
   useEffect(() => {
+    window.scrollTo({ top: 0, left: 0 });
+  }, []);
+
+  // Auto-scroll the picks list to the latest pick, but only for picks made
+  // *after* the page has already loaded — draftPicks.length has no "previous"
+  // value to compare against on first mount, so without this guard the
+  // effect fires on every page load too, not just on a new pick coming in.
+  const isFirstPicksRender = useRef(true);
+  useEffect(() => {
+    if (isFirstPicksRender.current) {
+      isFirstPicksRender.current = false;
+      return;
+    }
     picksRef.current?.lastElementChild?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [draftPicks.length]);
 
@@ -168,8 +207,12 @@ export function DraftRoom({
     setPicking(true);
     setPickError('');
     const result = await onMakePick(team.id, team.name, team.logo, team.conference);
-    if (!result.error) setLastPick(team.id);
-    else setPickError(result.error);
+    if (!result.error) {
+      setLastPick(team.id);
+      setScheduleModalTeam(null);
+    } else {
+      setPickError(result.error);
+    }
     setPicking(false);
   };
 
@@ -274,6 +317,19 @@ export function DraftRoom({
   // ── ACTIVE DRAFT ──────────────────────────────────────────────────────────
   return (
     <div className="space-y-4 animate-fade-in">
+      {scheduleModalTeam && (
+        <DraftTeamModal
+          team={scheduleModalTeam}
+          gameData={gameData}
+          isMyTurn={isMyTurn}
+          picking={picking}
+          pickError={pickError}
+          blockReason={getConfBlock(scheduleModalTeam)}
+          onConfirmPick={() => handlePick(scheduleModalTeam)}
+          onClose={() => setScheduleModalTeam(null)}
+        />
+      )}
+
       {/* On the clock banner */}
       <div className={`card p-4 flex items-center justify-between ${isMyTurn ? 'border-field-500/50 bg-field-950/30' : ''}`}>
         <div className="flex items-center gap-3">
@@ -390,18 +446,18 @@ export function DraftRoom({
             {available.map(team => {
               const block = isMyTurn ? getConfBlock(team) : null;
               const isBlocked = !!block;
+              const byes = byeWeeksByTeam.get(team.id) ?? [];
 
               const card = (
                 <button
                   key={team.id}
-                  onClick={() => handlePick(team)}
-                  disabled={!isMyTurn || picking || isBlocked}
+                  onClick={() => setScheduleModalTeam(team)}
                   className={`card text-left p-3 flex items-center gap-3 transition-all group w-full ${
                     isBlocked
-                      ? 'opacity-40 cursor-not-allowed border-red-900/30'
-                      : isMyTurn && !picking
+                      ? 'opacity-60 border-red-900/30'
+                      : isMyTurn
                       ? 'hover:border-field-500/50 hover:bg-field-950/20 cursor-pointer active:scale-[0.98]'
-                      : 'opacity-60 cursor-not-allowed'
+                      : 'opacity-70'
                   } ${lastPick === team.id ? 'animate-pick-flash' : ''}`}
                 >
                   <TeamLogo src={team.logo} alt={team.name} fallbackName={team.name} size={32} />
@@ -412,13 +468,16 @@ export function DraftRoom({
                       {team.name}
                     </p>
                     <p className="text-xs text-turf-500">{team.conference}</p>
+                    <p className="text-xs text-turf-600">
+                      {byes.length > 0 ? `Bye: ${byes.map(w => `Wk ${w}`).join(', ')}` : 'No bye'}
+                    </p>
                   </div>
                   {isBlocked && (
                     <span className="text-xs text-red-500 flex-shrink-0">Max</span>
                   )}
                   {!isBlocked && isMyTurn && (
                     <span className="text-xs text-field-500 group-hover:text-field-300 transition-colors opacity-0 group-hover:opacity-100">
-                      Pick →
+                      View →
                     </span>
                   )}
                 </button>
@@ -465,6 +524,148 @@ export function DraftRoom({
               );
             })}
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Team schedule + confirm pick modal ──────────────────────────────────────
+
+interface DraftTeamModalProps {
+  team: CfbTeam;
+  gameData: GameData;
+  isMyTurn: boolean;
+  picking: boolean;
+  pickError: string;
+  blockReason: string | null;
+  onConfirmPick: () => void;
+  onClose: () => void;
+}
+
+function DraftTeamModal({ team, gameData, isMyTurn, picking, pickError, blockReason, onConfirmPick, onClose }: DraftTeamModalProps) {
+  const teamGames = gameData[team.id] ?? {};
+  const weeks = WEEKS.filter(w => teamGames[w]);
+  const byes  = WEEKS.filter(w => !teamGames[w] && w >= 1 && w <= 15);
+
+  const reason = !isMyTurn ? 'Not your turn yet' : blockReason;
+  const canPick = isMyTurn && !picking && !blockReason;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ backgroundColor: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)' }}
+      onClick={onClose}
+    >
+      <div
+        className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border border-turf-700 bg-turf-950 shadow-2xl"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header — team info + Confirm Pick action up top */}
+        <div className="sticky top-0 z-10 bg-turf-950 border-b border-turf-800 px-6 py-4 space-y-3">
+          <div className="flex items-center gap-4">
+            <TeamLogo src={team.logo} alt={team.name} fallbackName={team.name} size={48} />
+            <div className="flex-1 min-w-0">
+              <h2 className="font-display text-xl font-bold text-white tracking-wide">{team.name}</h2>
+              <p className="text-sm text-turf-400">{team.conference} · 2026 Schedule</p>
+            </div>
+            <button
+              onClick={onClose}
+              className="rounded-lg border border-turf-700 p-1.5 text-turf-400 hover:border-turf-500 hover:text-white transition-colors flex-shrink-0"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <button
+            onClick={onConfirmPick}
+            disabled={!canPick}
+            className={`w-full btn-lg flex items-center justify-center gap-2 ${
+              canPick ? 'btn-primary' : 'btn-secondary opacity-60 cursor-not-allowed'
+            }`}
+          >
+            {picking ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+            {picking ? 'Drafting…' : canPick ? `Confirm Pick: ${team.name}` : reason ?? 'Not available'}
+          </button>
+          {pickError && (
+            <p className="text-xs text-red-400 text-center">{pickError}</p>
+          )}
+        </div>
+
+        {/* Bye weeks summary */}
+        {byes.length > 0 && (
+          <div className="px-6 pt-4">
+            <p className="text-xs text-turf-500">
+              <span className="text-turf-400 font-medium">Bye weeks: </span>
+              {byes.map(w => `Wk ${w}`).join(', ')}
+            </p>
+          </div>
+        )}
+
+        {/* Games list */}
+        <div className="divide-y divide-turf-800/60 px-2 py-2">
+          {weeks.length === 0 && (
+            <p className="py-8 text-center text-turf-500">No schedule data available yet.</p>
+          )}
+
+          {WEEKS.map(w => {
+            const game = teamGames[w];
+            if (!game) return null;
+
+            const { date, time } = formatGameDate((game as any).start_date);
+            const venue   = (game as any).venue    ?? null;
+            const tv      = (game as any).tv       ?? null;
+            const isHome  = (game as any).is_home  ?? true;
+            const oppLogo = (game as any).opponent_logo ?? null;
+
+            return (
+              <div key={w} className="flex items-start gap-4 rounded-xl px-4 py-4 transition-colors hover:bg-turf-900/40">
+                {/* Week badge */}
+                <div className="flex-shrink-0 w-12 text-center pt-0.5">
+                  <div className="text-xs font-bold uppercase tracking-widest text-turf-500">
+                    {w === 0 ? 'Wk0' : `Wk ${w}`}
+                  </div>
+                </div>
+
+                {/* Opponent logo */}
+                <div className="flex-shrink-0 flex items-center justify-center w-10 h-10 mt-0.5">
+                  <TeamLogo src={oppLogo} alt={game.opponent} fallbackName={game.opponent} size={40} />
+                </div>
+
+                {/* Main game info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs text-turf-500">{isHome ? 'vs' : 'at'}</span>
+                    <span className="font-semibold text-white">
+                      {game.opponent_rank ? (
+                        <span className="text-turf-400 font-normal">#{game.opponent_rank} </span>
+                      ) : null}
+                      {game.opponent}
+                    </span>
+                  </div>
+
+                  <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-turf-500">
+                    <span className="flex items-center gap-1">
+                      <Clock className="h-3 w-3 flex-shrink-0" />
+                      {date}{time !== 'TBD' ? ` · ${time}` : ''}
+                    </span>
+                    {venue && (
+                      <span className="flex items-center gap-1">
+                        <MapPin className="h-3 w-3 flex-shrink-0" />
+                        <span className="truncate max-w-48">{venue}</span>
+                      </span>
+                    )}
+                    {tv && (
+                      <span className="flex items-center gap-1">
+                        <Tv className="h-3 w-3 flex-shrink-0" />
+                        {tv}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
