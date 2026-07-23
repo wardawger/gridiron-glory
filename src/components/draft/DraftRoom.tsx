@@ -232,9 +232,18 @@ export function DraftRoom({
                 </div>
               ))}
             </div>
-            <button onClick={() => onStartDraft(draftOrder)} className="btn-primary w-full btn-lg">
+            <button
+              onClick={() => onStartDraft(draftOrder)}
+              disabled={draftOrder.length < 2}
+              className="btn-primary w-full btn-lg"
+            >
               <Zap className="w-4 h-4" /> Start Draft
             </button>
+            {draftOrder.length < 2 && (
+              <p className="text-xs text-amber-400 text-center -mt-2">
+                Invite at least one more player before starting the draft.
+              </p>
+            )}
           </div>
         )}
 

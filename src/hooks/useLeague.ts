@@ -247,7 +247,7 @@ export function useLeague(user: User | null) {
   };
 
   const startDraft = async (orderedUserIds: string[]) => {
-    if (!league) return;
+    if (!league || orderedUserIds.length < 2) return;
     const { data, error } = await supabase.from('leagues').update({
       draft_status: 'active',
       draft_order: orderedUserIds,
