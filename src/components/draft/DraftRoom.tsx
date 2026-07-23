@@ -34,6 +34,20 @@ export function DraftRoom({
   );
   const picksRef = useRef<HTMLDivElement>(null);
 
+  // draftOrder is only captured once on mount, so anyone who joins the
+  // league after the commissioner opened the Draft Room (but before they
+  // click Start Draft) would otherwise be silently left out of the order
+  // entirely — not just missing from the room, missing from draft_order
+  // itself, which is what actually drives whose turn it is.
+  useEffect(() => {
+    if (league.draft_status !== 'pending') return;
+    setDraftOrder(prev => {
+      const seated = new Set(prev);
+      const missing = members.map(m => m.user_id).filter(id => !seated.has(id));
+      return missing.length === 0 ? prev : [...prev, ...missing];
+    });
+  }, [members, league.draft_status]);
+
   const pickedTeamIds = new Set(draftPicks.map(p => p.team_id));
   const totalPicks    = league.max_teams_per_user * league.draft_order.length;
   const currentPick   = league.draft_current_pick;
