@@ -44,9 +44,13 @@ export function useLeague(user: User | null) {
   draftPicksRef.current   = draftPicks;
   freeAgencyMovesRef.current = freeAgencyMoves;
 
-  const loadAllLeagues = useCallback(async () => {
+  // silent=true skips the loading flag App.tsx uses to show a full-page
+  // blocking spinner — used for background refreshes (e.g. after joining a
+  // league via invite) where forcing every mounted route to unmount and
+  // remount mid-flight would abort whatever it was doing.
+  const loadAllLeagues = useCallback(async (silent = false) => {
     if (!user) { setLoading(false); return; }
-    setLoading(true);
+    if (!silent) setLoading(true);
     setError(null);
 
     try {
@@ -60,7 +64,7 @@ export function useLeague(user: User | null) {
         setAllLeagues([]);
         setAllMemberships({});
         setSelectedLeagueId(null);
-        setLoading(false);
+        if (!silent) setLoading(false);
         return;
       }
 
@@ -77,7 +81,7 @@ export function useLeague(user: User | null) {
     } catch (e: any) {
       setError(e.message ?? 'Failed to load leagues');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [user]);
 
@@ -672,6 +676,6 @@ export function useLeague(user: User | null) {
     setCaptain, addManualBonus, removeManualBonus,
     setSpreadPick, removeSpreadPick, overrideSpreadResult, clearSpreadOverride,
     updateWeek, updateScoring, removeFromRoster, makeFreeAgencyMove, updateDisplayName, updateAvatar,
-    reload: loadAllLeagues,
+    reload: () => loadAllLeagues(true),
   };
 }

@@ -37,14 +37,33 @@ export function JoinPage({ user, onJoined }: Props) {
         setMsg('This invite link is invalid or has expired.');
         return;
       }
+
+      const name = (invite.leagues as any)?.name ?? 'the league';
+      setLeagueName(name);
+
       if (invite.accepted) {
+        // Could genuinely be a stale/reused link, but it could also be this
+        // same user re-processing the invite after a background refresh
+        // remounted this page post-join — check before showing an error.
+        if (user) {
+          const { data: alreadyIn } = await supabase
+            .from('league_members')
+            .select('id')
+            .eq('league_id', invite.league_id)
+            .eq('user_id', user.id)
+            .maybeSingle();
+          if (alreadyIn) {
+            setStatus('success');
+            setMsg(`You're already in "${name}"!`);
+            onJoined?.(invite.league_id);
+            setTimeout(() => navigate('/'), 1000);
+            return;
+          }
+        }
         setStatus('error');
         setMsg('This invite has already been used.');
         return;
       }
-
-      const name = (invite.leagues as any)?.name ?? 'the league';
-      setLeagueName(name);
 
       if (!user) {
         // localStorage (not sessionStorage) so this survives the email-confirmation
