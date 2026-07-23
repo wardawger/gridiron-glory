@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { Search, Clock, CheckCircle2, Zap, ChevronDown, AlertCircle, X, MapPin, Tv, Loader2 } from 'lucide-react';
+import { Search, Clock, CheckCircle2, Zap, ChevronDown, ChevronUp, AlertCircle, X, MapPin, Tv, Loader2 } from 'lucide-react';
 import type { League, LeagueMember, DraftPick, CfbTeam, GameData } from '../../types';
 import { getPickOwner, P4_CONFERENCES, DRAFT_CONF_MIN, DRAFT_CONF_MAX } from '../../services/scoring';
 import { Tooltip } from '../ui/Tooltip';
@@ -40,6 +40,7 @@ export function DraftRoom({
   const [search, setSearch]     = useState('');
   const [confFilter, setConf]   = useState('ALL');
   const [picking, setPicking]   = useState(false);
+  const [showAllPicksMobile, setShowAllPicksMobile] = useState(false);
   const [lastPick, setLastPick] = useState<string | null>(null);
   const [pickError, setPickError] = useState('');
   const [scheduleModalTeam, setScheduleModalTeam] = useState<CfbTeam | null>(null);
@@ -496,36 +497,62 @@ export function DraftRoom({
         {/* Draft board */}
         <div className="space-y-2">
           <p className="text-xs text-turf-500 uppercase tracking-wide font-medium">Draft Board</p>
-          <div ref={picksRef} className="space-y-1 max-h-[660px] overflow-y-auto">
-            {pickSlots.map(slot => {
-              const isNext = slot.pick === currentPick;
-              return (
-                <div
-                  key={slot.pick}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-all ${
-                    slot.draftPick ? 'bg-turf-800/50' :
-                    isNext ? 'bg-field-900/40 border border-field-700/50' :
-                    'opacity-40'
-                  }`}
-                >
-                  <span className="font-mono text-xs text-turf-600 w-5">{slot.pick}</span>
-                  <span className="text-xs text-turf-500 w-20 truncate">{getMemberName(slot.userId)}</span>
-                  {slot.draftPick ? (
-                    <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                      <TeamLogo src={slot.draftPick.team_logo} alt="" fallbackName={slot.draftPick.team_name} size={16} />
-                      <span className="text-white text-xs truncate">{slot.draftPick.team_name}</span>
-                    </div>
-                  ) : isNext ? (
-                    <span className="text-field-400 text-xs animate-pulse">On the clock…</span>
-                  ) : (
-                    <span className="text-turf-700 text-xs">—</span>
-                  )}
-                </div>
-              );
-            })}
+
+          {/* Desktop: unchanged, full scrollable board */}
+          <div ref={picksRef} className="hidden sm:block space-y-1 max-h-[660px] overflow-y-auto">
+            {pickSlots.map(slot => renderPickSlot(slot, currentPick, getMemberName))}
+          </div>
+
+          {/* Mobile: collapsed to the last 10 picks + on-deck by default */}
+          <div className="sm:hidden space-y-1">
+            {(showAllPicksMobile ? pickSlots : pickSlots.slice(Math.max(0, currentPick - 11), currentPick))
+              .map(slot => renderPickSlot(slot, currentPick, getMemberName))}
+            {pickSlots.length > 11 && (
+              <button
+                onClick={() => setShowAllPicksMobile(v => !v)}
+                className="w-full flex items-center justify-center gap-1 text-xs text-field-400 hover:text-field-300 py-2 mt-1 border-t border-turf-800/60 transition-colors"
+              >
+                {showAllPicksMobile ? (
+                  <>Show less <ChevronUp className="w-3.5 h-3.5" /></>
+                ) : (
+                  <>Show all {pickSlots.length} picks <ChevronDown className="w-3.5 h-3.5" /></>
+                )}
+              </button>
+            )}
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function renderPickSlot(
+  slot: { pick: number; userId: string; draftPick: DraftPick | null },
+  currentPick: number,
+  getMemberName: (uid: string) => string,
+) {
+  const isNext = slot.pick === currentPick;
+  return (
+    <div
+      key={slot.pick}
+      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-all ${
+        slot.draftPick ? 'bg-turf-800/50' :
+        isNext ? 'bg-field-900/40 border border-field-700/50' :
+        'opacity-40'
+      }`}
+    >
+      <span className="font-mono text-xs text-turf-600 w-5">{slot.pick}</span>
+      <span className="text-xs text-turf-500 w-20 truncate">{getMemberName(slot.userId)}</span>
+      {slot.draftPick ? (
+        <div className="flex items-center gap-1.5 flex-1 min-w-0">
+          <TeamLogo src={slot.draftPick.team_logo} alt="" fallbackName={slot.draftPick.team_name} size={16} />
+          <span className="text-white text-xs truncate">{slot.draftPick.team_name}</span>
+        </div>
+      ) : isNext ? (
+        <span className="text-field-400 text-xs animate-pulse">On the clock…</span>
+      ) : (
+        <span className="text-turf-700 text-xs">—</span>
+      )}
     </div>
   );
 }
