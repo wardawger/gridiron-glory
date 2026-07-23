@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import type { User } from '@supabase/supabase-js';
@@ -15,9 +15,15 @@ export function JoinPage({ user, onJoined }: Props) {
   const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'needsAuth'>('loading');
   const [msg, setMsg] = useState('');
   const [leagueName, setLeagueName] = useState('');
+  // Supabase's auth listener fires setUser() from more than one source during
+  // session hydration, each with a new User object reference for the same
+  // logged-in user — guard against running the join sequence more than once
+  // per token so a re-fire can't race itself into seeing "already accepted".
+  const joinedTokenRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!token) { setStatus('error'); setMsg('Invalid invite link.'); return; }
+    if (user && joinedTokenRef.current === token) return;
 
     const join = async () => {
       const { data: invite, error: invErr } = await supabase
@@ -48,6 +54,8 @@ export function JoinPage({ user, onJoined }: Props) {
         setMsg(`You've been invited to join "${name}". Sign up or sign in to continue.`);
         return;
       }
+
+      joinedTokenRef.current = token;
 
       // Check already a member
       const { data: existing } = await supabase
@@ -88,7 +96,7 @@ export function JoinPage({ user, onJoined }: Props) {
     };
 
     join();
-  }, [token, user]);
+  }, [token, user?.id]);
 
   return (
     <div className="min-h-dvh flex items-center justify-center p-4">
