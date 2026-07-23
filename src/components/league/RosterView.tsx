@@ -578,8 +578,19 @@ export function RosterView({
                 return (
                   <div
                     key={entry.team_id}
-                    className={`card p-4 transition-all ${isCaptain ? 'border-gold-500/50 bg-amber-950/20' : ''}`}
+                    className={`card relative overflow-hidden p-4 transition-all ${isCaptain ? 'border-gold-500/50 bg-amber-950/20' : ''}`}
                   >
+                    {/* Oversized, faded team logo watermark */}
+                    {entry.team_logo && (
+                      <img
+                        src={entry.team_logo}
+                        alt=""
+                        aria-hidden="true"
+                        className="pointer-events-none select-none absolute top-1/2 -translate-y-1/2 -right-6 w-40 h-40 object-contain opacity-10"
+                      />
+                    )}
+
+                    <div className="relative z-10">
                     {/* Clickable header — opens schedule modal */}
                     <div
                       className="flex items-start gap-3 cursor-pointer hover:opacity-90 transition-opacity"
@@ -763,6 +774,7 @@ export function RosterView({
                         </div>
                       );
                     })()}
+                    </div>
                   </div>
                 );
               })}
