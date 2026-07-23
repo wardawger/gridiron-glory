@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react';
-import { Shield, UserPlus, Copy, Check, Trash2, Plus, Mail, Settings, Gift, RotateCcw, AlertTriangle, TrendingUp, TrendingDown, Loader2 } from 'lucide-react';
+import { Shield, UserPlus, Copy, Check, Trash2, Plus, Mail, Settings, Gift, RotateCcw, AlertTriangle, TrendingUp, TrendingDown, Loader2, ShieldOff } from 'lucide-react';
 import type {
   League, LeagueMember, ManualBonus, DraftPick, SpreadPick, FreeAgencyMove,
-  BonusType, ScoringSettings, StatBonusCategorySettings,
+  BonusType, ScoringSettings, StatBonusCategorySettings, LeagueRole,
 } from '../../types';
 import { BONUS_LABELS, BONUS_DEFAULT_POINTS, normalizeScoring, STAT_BONUS_CATEGORIES, STAT_BONUS_LABELS } from '../../types';
 import { rosterAtWeek } from '../../services/roster';
@@ -26,6 +26,7 @@ interface Props {
   onDeleteLeague: () => Promise<{ error?: string }>;
   onOverrideSpread: (pickId: string, result: 'covered' | 'missed', points: number) => Promise<{ error?: string }>;
   onClearSpreadOverride: (pickId: string) => Promise<{ error?: string }>;
+  onUpdateMemberRole: (userId: string, role: LeagueRole) => Promise<{ error?: string }>;
 }
 
 function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: () => void; disabled?: boolean }) {
@@ -46,7 +47,7 @@ type Tab = 'members' | 'scoring' | 'bonuses';
 export function AdminPanel({
   league, members, draftPicks, manualBonuses, spreadPicks, freeAgencyMoves, isCommissioner,
   onSendInvite, onUpdateWeek, onUpdateScoring, onAddBonus, onRemoveBonus, onResetDraft, onDeleteLeague,
-  onOverrideSpread, onClearSpreadOverride,
+  onOverrideSpread, onClearSpreadOverride, onUpdateMemberRole,
 }: Props) {
   const [tab, setTab]           = useState<Tab>('members');
   const [inviteEmail, setEmail] = useState('');
@@ -59,6 +60,18 @@ export function AdminPanel({
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  const [roleUpdatingId, setRoleUpdatingId] = useState<string | null>(null);
+  const [roleError, setRoleError] = useState('');
+  const commissionerCount = members.filter(m => m.role === 'commissioner').length;
+
+  const handleToggleRole = async (member: LeagueMember) => {
+    const nextRole: LeagueRole = member.role === 'commissioner' ? 'member' : 'commissioner';
+    setRoleUpdatingId(member.user_id);
+    setRoleError('');
+    const result = await onUpdateMemberRole(member.user_id, nextRole);
+    if (result.error) setRoleError(result.error);
+    setRoleUpdatingId(null);
+  };
   const [scoring, setScoring]   = useState<ScoringSettings>(normalizeScoring(league.scoring));
   const [bonusUserId, setBonusUser]       = useState('');
   const [bonusType, setBonusType]         = useState<BonusType>('win_bowl');
@@ -232,19 +245,41 @@ export function AdminPanel({
 
           {/* Member list */}
           <div className="card divide-y divide-turf-800">
-            {members.map(m => (
-              <div key={m.user_id} className="flex items-center gap-4 px-5 py-3">
-                <Avatar displayName={m.display_name} avatarType={m.avatar_type} avatarValue={m.avatar_value} size={32} />
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-white truncate">{m.display_name}</p>
-                  <p className="text-xs text-turf-500">{new Date(m.joined_at).toLocaleDateString()}</p>
+            {members.map(m => {
+              const isLastCommissioner = m.role === 'commissioner' && commissionerCount <= 1;
+              const updating = roleUpdatingId === m.user_id;
+              return (
+                <div key={m.user_id} className="flex items-center gap-4 px-5 py-3">
+                  <Avatar displayName={m.display_name} avatarType={m.avatar_type} avatarValue={m.avatar_value} size={32} />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-white truncate">{m.display_name}</p>
+                    <p className="text-xs text-turf-500">{new Date(m.joined_at).toLocaleDateString()}</p>
+                  </div>
+                  {m.role === 'commissioner' && (
+                    <span className="badge-green text-xs flex-shrink-0">Commissioner</span>
+                  )}
+                  <button
+                    onClick={() => handleToggleRole(m)}
+                    disabled={updating || isLastCommissioner}
+                    title={isLastCommissioner ? 'A league needs at least one commissioner' : undefined}
+                    className="btn-ghost btn-sm flex-shrink-0"
+                  >
+                    {updating ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : m.role === 'commissioner' ? (
+                      <ShieldOff className="w-3.5 h-3.5" />
+                    ) : (
+                      <Shield className="w-3.5 h-3.5" />
+                    )}
+                    {m.role === 'commissioner' ? 'Remove Co-Commissioner' : 'Make Co-Commissioner'}
+                  </button>
                 </div>
-                {m.role === 'commissioner' && (
-                  <span className="badge-green text-xs">Commissioner</span>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
+          {roleError && (
+            <p className="text-xs text-red-400 px-1">{roleError}</p>
+          )}
 
           {/* Current week */}
           <div className="card p-5 flex items-center justify-between">

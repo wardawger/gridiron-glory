@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Trophy, Users, Shield, BarChart3, LogOut, RefreshCw, Zap, ChevronDown, Plus, History, ArrowLeftRight, Award } from 'lucide-react';
+import { Trophy, Users, Shield, BarChart3, LogOut, RefreshCw, Zap, ChevronDown, Plus, History, ArrowLeftRight, Award, Info, ClipboardList } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import type { League, LeagueMember } from '../../types';
 import { Avatar } from '../ui/Avatar';
@@ -21,13 +21,18 @@ export function Header({
 }: Props) {
   const loc = useLocation();
   const [showLeaguePicker, setShowLeaguePicker] = useState(false);
+  const [showLeagueInfo, setShowLeagueInfo] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
+  const infoRef = useRef<HTMLDivElement>(null);
 
-  // Close picker when clicking outside
+  // Close either dropdown when clicking outside its own container
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
         setShowLeaguePicker(false);
+      }
+      if (infoRef.current && !infoRef.current.contains(e.target as Node)) {
+        setShowLeagueInfo(false);
       }
     };
     document.addEventListener('mousedown', handler);
@@ -38,11 +43,6 @@ export function Header({
     { to: '/',          label: 'Standings',  icon: Trophy },
     { to: '/roster',    label: 'My Roster',  icon: Users },
     { to: '/rankings',  label: 'AP Top 25',  icon: BarChart3 },
-    { to: '/draft-recap', label: 'Draft Recap', icon: History },
-    { to: '/stat-bonuses', label: 'Stat Bonuses', icon: Award },
-    ...(league?.scoring.free_agency_enabled
-      ? [{ to: '/free-agency', label: 'Free Agency', icon: ArrowLeftRight }]
-      : []),
     ...(myMembership?.role === 'commissioner'
       ? [{ to: '/admin', label: 'Admin', icon: Shield }]
       : []),
@@ -50,6 +50,18 @@ export function Header({
       ? [{ to: '/draft', label: 'Draft Room', icon: Zap }]
       : []),
   ];
+
+  const leagueInfoItems = [
+    { to: '/draft-recap', label: 'Draft Recap', icon: History, description: 'Every pick, in order' },
+    ...(league?.scoring.stat_bonus_enabled
+      ? [{ to: '/stat-bonuses', label: 'Stat Bonuses', icon: Award, description: "Who's earning bonus points" }]
+      : []),
+    ...(league?.scoring.free_agency_enabled
+      ? [{ to: '/free-agency', label: 'Free Agency', icon: ArrowLeftRight, description: 'Add and drop teams' }]
+      : []),
+    { to: '/league-settings', label: 'League Settings', icon: ClipboardList, description: 'How scoring works' },
+  ];
+  const infoActive = leagueInfoItems.some(i => i.to === loc.pathname);
 
   return (
     <header className="sticky top-0 z-40 bg-turf-950/90 backdrop-blur border-b border-turf-800">
@@ -114,7 +126,67 @@ export function Header({
 
           {/* Nav */}
           <nav className="hidden md:flex items-center gap-1">
-            {nav.map(({ to, label, icon: Icon }) => {
+            {nav.slice(0, 3).map(({ to, label, icon: Icon }) => {
+              const active = loc.pathname === to;
+              return (
+                <Link
+                  key={to}
+                  to={to}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                    active
+                      ? 'bg-field-900/60 text-field-400'
+                      : 'text-turf-400 hover:text-white hover:bg-turf-800'
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  {label}
+                </Link>
+              );
+            })}
+
+            {/* League Info dropdown */}
+            <div className="relative" ref={infoRef}>
+              <button
+                onClick={() => setShowLeagueInfo(v => !v)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  infoActive
+                    ? 'bg-field-900/60 text-field-400'
+                    : 'text-turf-400 hover:text-white hover:bg-turf-800'
+                }`}
+              >
+                <Info className="w-3.5 h-3.5" />
+                League Info
+                <ChevronDown className={`w-3 h-3 transition-transform ${showLeagueInfo ? 'rotate-180' : ''}`} />
+              </button>
+
+              {showLeagueInfo && (
+                <div className="absolute top-full left-0 mt-1 w-60 card shadow-xl shadow-black/40 overflow-hidden animate-slide-up z-50 p-1.5">
+                  {leagueInfoItems.map(({ to, label, icon: Icon, description }) => {
+                    const active = loc.pathname === to;
+                    return (
+                      <Link
+                        key={to}
+                        to={to}
+                        onClick={() => setShowLeagueInfo(false)}
+                        className={`flex items-start gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors ${
+                          active
+                            ? 'bg-field-900/60 text-field-400'
+                            : 'text-turf-300 hover:bg-turf-800 hover:text-white'
+                        }`}
+                      >
+                        <Icon className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                        <div className="min-w-0">
+                          <div className="font-medium">{label}</div>
+                          <div className="text-xs text-turf-500 truncate">{description}</div>
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {nav.slice(3).map(({ to, label, icon: Icon }) => {
               const active = loc.pathname === to;
               return (
                 <Link
@@ -164,9 +236,9 @@ export function Header({
           </div>
         </div>
 
-        {/* Mobile nav */}
+        {/* Mobile nav — League Info items flattened inline, no dropdown */}
         <div className="flex md:hidden gap-1 pb-2 overflow-x-auto">
-          {nav.map(({ to, label, icon: Icon }) => {
+          {[...nav.slice(0, 3), ...leagueInfoItems, ...nav.slice(3)].map(({ to, label, icon: Icon }) => {
             const active = loc.pathname === to;
             return (
               <Link

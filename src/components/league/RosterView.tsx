@@ -1,5 +1,5 @@
-import { useMemo, useState, useEffect } from 'react';
-import { Shield, TrendingUp, TrendingDown, Minus, Star, Calendar, List, X, MapPin, Tv, Clock, Zap, Coins } from 'lucide-react';
+import { useMemo, useState, useEffect, useRef } from 'react';
+import { Shield, TrendingUp, TrendingDown, Minus, Star, Calendar, List, X, MapPin, Tv, Clock, Zap, Coins, ChevronDown } from 'lucide-react';
 import type { RosterEntry, CaptainPick, GameData, ScoringSettings, LeagueMember, WeeklyScore, GameResult, SpreadPick, SpreadData, FreeAgencyMove, DraftPick } from '../../types';
 import { calcWeeklyScore, scoreGame, didCoverSpread } from '../../services/scoring';
 import { rosterAtWeek } from '../../services/roster';
@@ -377,6 +377,8 @@ export function RosterView({
   // without affecting league.current_week (used elsewhere for free agency,
   // standings, and stat bonus lock-in).
   const [selectedWeek, setSelectedWeek] = useState(currentWeek);
+  const [showWeekMenu, setShowWeekMenu] = useState(false);
+  const weekMenuRef = useRef<HTMLDivElement>(null);
   const [modalTeam, setModalTeam] = useState<RosterEntry | null>(null);
   const [spreadError, setSpreadError] = useState<string | null>(null);
   const [spreadsLoading, setSpreadsLoading] = useState(false);
@@ -392,6 +394,17 @@ export function RosterView({
     () => rosterAtWeek(viewUserId, selectedWeek, draftPicks, freeAgencyMoves),
     [viewUserId, selectedWeek, draftPicks, freeAgencyMoves]
   );
+
+  // Close the week menu when clicking outside it
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (weekMenuRef.current && !weekMenuRef.current.contains(e.target as Node)) {
+        setShowWeekMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   // Auto-fetch spreads when feature is on and we don't have data for the selected week
   useEffect(() => {
@@ -503,25 +516,36 @@ export function RosterView({
 
         {/* View toggle */}
         <div className="flex gap-1 bg-turf-900 p-1 rounded-xl border border-turf-800">
-          <div
-            className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg transition-all ${
-              view === 'week' ? 'bg-field-500 text-turf-950' : 'text-turf-400 hover:text-white'
-            }`}
-          >
-            <List className="w-3.5 h-3.5 flex-shrink-0" />
-            <select
-              value={selectedWeek}
-              onChange={e => { setSelectedWeek(Number(e.target.value)); setView('week'); }}
-              className={`bg-transparent border-0 outline-none py-2 text-sm font-medium cursor-pointer text-center ${
-                view === 'week' ? 'text-turf-950' : 'text-turf-400'
+          <div className="relative flex-1" ref={weekMenuRef}>
+            <button
+              onClick={() => { setShowWeekMenu(v => !v); setView('week'); }}
+              className={`w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium transition-all ${
+                view === 'week' ? 'bg-field-500 text-turf-950' : 'text-turf-400 hover:text-white'
               }`}
             >
-              {WEEKS.map(w => (
-                <option key={w} value={w} className="bg-turf-800 text-white">
-                  {w === 0 ? 'Week 0' : `Week ${w}`}
-                </option>
-              ))}
-            </select>
+              <List className="w-3.5 h-3.5 flex-shrink-0" />
+              {selectedWeek === 0 ? 'Week 0' : `Week ${selectedWeek}`}
+              <ChevronDown className={`w-3 h-3 transition-transform ${showWeekMenu ? 'rotate-180' : ''}`} />
+            </button>
+
+            {showWeekMenu && (
+              <div className="absolute top-full left-0 mt-1 w-40 card shadow-xl shadow-black/40 overflow-hidden animate-slide-up z-50 p-1.5 max-h-72 overflow-y-auto">
+                {WEEKS.map(w => (
+                  <button
+                    key={w}
+                    onClick={() => { setSelectedWeek(w); setView('week'); setShowWeekMenu(false); }}
+                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-sm transition-colors ${
+                      w === selectedWeek
+                        ? 'bg-field-900/60 text-field-400'
+                        : 'text-turf-300 hover:bg-turf-800 hover:text-white'
+                    }`}
+                  >
+                    {w === 0 ? 'Week 0' : `Week ${w}`}
+                    {w === currentWeek && <span className="text-xs text-turf-500">now</span>}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           <button
             onClick={() => setView('schedule')}

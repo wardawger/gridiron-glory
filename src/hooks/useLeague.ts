@@ -668,6 +668,31 @@ export function useLeague(user: User | null) {
     return {};
   };
 
+  // Promote a member to co-commissioner or demote one back to member.
+  // Any commissioner can do this to any other member, including themselves —
+  // guarded so a league can never end up with zero commissioners.
+  const updateMemberRole = async (targetUserId: string, role: LeagueRole): Promise<{ error?: string }> => {
+    if (!league || !isCommissioner) return { error: 'Not authorized' };
+
+    if (role === 'member') {
+      const target = members.find(m => m.user_id === targetUserId);
+      const commissionerCount = members.filter(m => m.role === 'commissioner').length;
+      if (target?.role === 'commissioner' && commissionerCount <= 1) {
+        return { error: 'A league needs at least one commissioner.' };
+      }
+    }
+
+    const { error: err } = await supabase
+      .from('league_members')
+      .update({ role })
+      .eq('league_id', league.id)
+      .eq('user_id', targetUserId);
+
+    if (err) return { error: err.message };
+    setMembers(prev => prev.map(m => m.user_id === targetUserId ? { ...m, role } : m));
+    return {};
+  };
+
   return {
     league, allLeagues, allMemberships, selectedLeagueId,
     members, draftPicks, captainPicks, manualBonuses, spreadPicks, freeAgencyMoves,
@@ -676,6 +701,7 @@ export function useLeague(user: User | null) {
     setCaptain, addManualBonus, removeManualBonus,
     setSpreadPick, removeSpreadPick, overrideSpreadResult, clearSpreadOverride,
     updateWeek, updateScoring, removeFromRoster, makeFreeAgencyMove, updateDisplayName, updateAvatar,
+    updateMemberRole,
     reload: () => loadAllLeagues(true),
   };
 }

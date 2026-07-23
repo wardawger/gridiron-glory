@@ -15,6 +15,7 @@ import { DraftRoom }        from './components/draft/DraftRoom';
 import { AdminPanel }       from './components/admin/AdminPanel';
 import { RankingsPage }     from './components/league/RankingsPage';
 import { DraftRecapPage }   from './components/league/DraftRecapPage';
+import { LeagueSettingsPage } from './components/league/LeagueSettingsPage';
 import { FreeAgencyPage }   from './components/league/FreeAgencyPage';
 import { StatBonusPage }    from './components/league/StatBonusPage';
 import { Loader2 }          from 'lucide-react';
@@ -150,6 +151,7 @@ export default function App() {
               />
             } />
             <Route path="/draft-recap" element={<DraftRecapPage league={lg} members={league.members} draftPicks={league.draftPicks} />} />
+            <Route path="/league-settings" element={<LeagueSettingsPage league={lg} members={league.members} />} />
             <Route path="/stat-bonuses" element={
               <StatBonusPage
                 league={lg}
@@ -198,6 +200,7 @@ export default function App() {
                 onRemoveFromRoster={league.removeFromRoster}
                 onResetDraft={league.resetDraft}
                 onDeleteLeague={league.deleteLeague}
+                onUpdateMemberRole={league.updateMemberRole}
                 onOverrideSpread={league.overrideSpreadResult}
                 onClearSpreadOverride={league.clearSpreadOverride}
               />
