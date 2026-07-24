@@ -370,7 +370,7 @@ export interface TeamRatings {
   fpi_rank: number | null;
   offense_rank: number | null;
   defense_rank: number | null;
-  remaining_sos_rank: number | null; // lower = tougher remaining schedule
+  sos_rank: number | null; // lower = tougher season-long schedule
 }
 
 export interface GameResult {

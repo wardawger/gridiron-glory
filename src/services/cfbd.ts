@@ -419,7 +419,7 @@ export async function fetchTeamRatings(teams: CfbTeam[]): Promise<Map<string, Te
         fpi_rank:           fpi?.resumeRanks?.fpi ?? null,
         offense_rank:       sp?.offense?.ranking ?? null,
         defense_rank:       sp?.defense?.ranking ?? null,
-        remaining_sos_rank: fpi?.resumeRanks?.remainingStrengthOfSchedule ?? null,
+        sos_rank:           fpi?.resumeRanks?.strengthOfSchedule ?? null,
       });
     });
   } catch (e) {

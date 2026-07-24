@@ -651,7 +651,7 @@ function DraftTeamModal({ team, gameData, ratings, apRank, isMyTurn, picking, pi
               { label: 'AP Rank',       value: apRank },
               { label: 'Offense',       value: ratings?.offense_rank ?? null },
               { label: 'Defense',       value: ratings?.defense_rank ?? null },
-              { label: 'Remaining SOS', value: ratings?.remaining_sos_rank ?? null },
+              { label: 'Strength of Sched', value: ratings?.sos_rank ?? null },
             ].map(stat => (
               <div
                 key={stat.label}
