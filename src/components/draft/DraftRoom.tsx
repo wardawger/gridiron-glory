@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { Search, Clock, CheckCircle2, Zap, ChevronDown, ChevronUp, AlertCircle, X, MapPin, Tv, Loader2 } from 'lucide-react';
-import type { League, LeagueMember, DraftPick, CfbTeam, GameData } from '../../types';
+import type { League, LeagueMember, DraftPick, CfbTeam, GameData, TeamRatings, APRanking } from '../../types';
 import { getPickOwner, P4_CONFERENCES, DRAFT_CONF_MIN, DRAFT_CONF_MAX } from '../../services/scoring';
 import { Tooltip } from '../ui/Tooltip';
 import { TeamLogo } from '../ui/TeamLogo';
@@ -27,6 +27,8 @@ interface Props {
   draftPicks: DraftPick[];
   teams: CfbTeam[];
   gameData: GameData;
+  teamRatings: Map<string, TeamRatings>;
+  rankings: APRanking[];
   userId: string;
   isCommissioner: boolean;
   onStartDraft: (order: string[]) => void;
@@ -34,7 +36,7 @@ interface Props {
 }
 
 export function DraftRoom({
-  league, members, draftPicks, teams, gameData, userId, isCommissioner,
+  league, members, draftPicks, teams, gameData, teamRatings, rankings, userId, isCommissioner,
   onStartDraft, onMakePick,
 }: Props) {
   const [search, setSearch]     = useState('');
@@ -322,6 +324,8 @@ export function DraftRoom({
         <DraftTeamModal
           team={scheduleModalTeam}
           gameData={gameData}
+          ratings={teamRatings.get(scheduleModalTeam.id) ?? null}
+          apRank={rankings.find(r => r.team_id === scheduleModalTeam.id)?.rank ?? null}
           isMyTurn={isMyTurn}
           picking={picking}
           pickError={pickError}
@@ -448,6 +452,7 @@ export function DraftRoom({
               const block = isMyTurn ? getConfBlock(team) : null;
               const isBlocked = !!block;
               const byes = byeWeeksByTeam.get(team.id) ?? [];
+              const fpiRank = teamRatings.get(team.id)?.fpi_rank ?? null;
 
               const card = (
                 <button
@@ -469,9 +474,16 @@ export function DraftRoom({
                       {team.name}
                     </p>
                     <p className="text-xs text-turf-500">{team.conference}</p>
-                    <p className="text-xs text-turf-600">
-                      {byes.length > 0 ? `Bye: ${byes.map(w => `Wk ${w}`).join(', ')}` : 'No bye'}
-                    </p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      {fpiRank != null && (
+                        <span className="text-xs font-mono text-field-400 bg-field-900/30 border border-field-800/50 px-1.5 rounded flex-shrink-0">
+                          FPI #{fpiRank}
+                        </span>
+                      )}
+                      <p className="text-xs text-turf-600 truncate">
+                        {byes.length > 0 ? `Bye: ${byes.map(w => `Wk ${w}`).join(', ')}` : 'No bye'}
+                      </p>
+                    </div>
                   </div>
                   {isBlocked && (
                     <span className="text-xs text-red-500 flex-shrink-0">Max</span>
@@ -562,6 +574,8 @@ function renderPickSlot(
 interface DraftTeamModalProps {
   team: CfbTeam;
   gameData: GameData;
+  ratings: TeamRatings | null;
+  apRank: number | null;
   isMyTurn: boolean;
   picking: boolean;
   pickError: string;
@@ -570,7 +584,7 @@ interface DraftTeamModalProps {
   onClose: () => void;
 }
 
-function DraftTeamModal({ team, gameData, isMyTurn, picking, pickError, blockReason, onConfirmPick, onClose }: DraftTeamModalProps) {
+function DraftTeamModal({ team, gameData, ratings, apRank, isMyTurn, picking, pickError, blockReason, onConfirmPick, onClose }: DraftTeamModalProps) {
   const teamGames = gameData[team.id] ?? {};
   const weeks = WEEKS.filter(w => teamGames[w]);
   const byes  = WEEKS.filter(w => !teamGames[w] && w >= 1 && w <= 15);
@@ -628,6 +642,29 @@ function DraftTeamModal({ team, gameData, isMyTurn, picking, pickError, blockRea
             </p>
           </div>
         )}
+
+        {/* Team strength */}
+        <div className="px-6 pt-4">
+          <p className="text-xs font-bold uppercase tracking-widest text-turf-500 mb-2">Team Strength</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {[
+              { label: 'AP Rank',       value: apRank },
+              { label: 'Offense',       value: ratings?.offense_rank ?? null },
+              { label: 'Defense',       value: ratings?.defense_rank ?? null },
+              { label: 'Remaining SOS', value: ratings?.remaining_sos_rank ?? null },
+            ].map(stat => (
+              <div
+                key={stat.label}
+                className="rounded-lg border border-field-800/50 bg-field-900/30 px-3 py-2 text-center"
+              >
+                <p className="font-mono text-lg font-bold text-field-400">
+                  {stat.value != null ? `#${stat.value}` : '—'}
+                </p>
+                <p className="text-[10px] uppercase tracking-wide text-turf-500">{stat.label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
 
         {/* Games list */}
         <div className="divide-y divide-turf-800/60 px-2 py-2">

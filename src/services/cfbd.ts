@@ -1,4 +1,4 @@
-import type { CfbTeam, GameData, GameResult, APRanking, TeamSeasonStats, SpreadData } from '../types';
+import type { CfbTeam, GameData, GameResult, APRanking, TeamSeasonStats, SpreadData, TeamRatings } from '../types';
 
 // All CFBD API calls are routed through a Netlify serverless proxy to avoid
 // CORS issues when fetching from the browser. The proxy adds the API key
@@ -369,6 +369,61 @@ export async function fetchSeasonStats(teams: CfbTeam[]): Promise<Map<string, Te
     });
   } catch (e) {
     console.warn('Failed to fetch season stats:', e);
+  }
+
+  return map;
+}
+
+// ── Team Ratings (FPI + SP+) ─────────────────────────────────────────────
+// FPI gives an overall rank plus a remaining-strength-of-schedule rank; SP+
+// gives clean, pre-computed offense/defense ranks. Neither publishes ranks
+// until there's enough of the season played to calibrate, so both endpoints
+// fall back to the prior year via fetchWithFallback when empty.
+
+export async function fetchTeamRatings(teams: CfbTeam[]): Promise<Map<string, TeamRatings>> {
+  const year = getCurrentSeasonYear();
+  const nameToId = new Map(teams.map(t => [t.name.toLowerCase(), t.id]));
+  const map = new Map<string, TeamRatings>();
+
+  const resolveId = (school: string): string | null => {
+    const exact = nameToId.get(school.toLowerCase());
+    if (exact) return exact;
+    for (const [name, id] of nameToId.entries()) {
+      if (name.includes(school.toLowerCase()) || school.toLowerCase().includes(name)) return id;
+    }
+    return null;
+  };
+
+  try {
+    const [fpiRes, spRes] = await Promise.all([
+      fetchWithFallback('/ratings/fpi', year),
+      fetchWithFallback('/ratings/sp', year),
+    ]);
+
+    const fpiByTeam = new Map<string, any>();
+    fpiRes.forEach((r: any) => {
+      const id = resolveId(r.team);
+      if (id) fpiByTeam.set(id, r);
+    });
+    const spByTeam = new Map<string, any>();
+    spRes.forEach((r: any) => {
+      const id = resolveId(r.team);
+      if (id) spByTeam.set(id, r);
+    });
+
+    const allIds = new Set([...fpiByTeam.keys(), ...spByTeam.keys()]);
+    allIds.forEach(id => {
+      const fpi = fpiByTeam.get(id);
+      const sp  = spByTeam.get(id);
+      map.set(id, {
+        fpi_rank:           fpi?.resumeRanks?.fpi ?? null,
+        offense_rank:       sp?.offense?.ranking ?? null,
+        defense_rank:       sp?.defense?.ranking ?? null,
+        remaining_sos_rank: fpi?.resumeRanks?.remainingStrengthOfSchedule ?? null,
+      });
+    });
+  } catch (e) {
+    console.warn('Failed to fetch team ratings:', e);
   }
 
   return map;

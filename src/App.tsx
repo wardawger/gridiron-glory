@@ -178,6 +178,8 @@ export default function App() {
                 draftPicks={league.draftPicks}
                 teams={cfb.teams}
                 gameData={cfb.gameData}
+                teamRatings={cfb.teamRatings}
+                rankings={cfb.rankings}
                 userId={auth.user.id}
                 isCommissioner={league.isCommissioner}
                 onStartDraft={league.startDraft}

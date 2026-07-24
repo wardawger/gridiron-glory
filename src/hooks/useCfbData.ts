@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import type { CfbTeam, GameData, APRanking, TeamSeasonStats, SpreadData } from '../types';
-import { fetchFbsTeams, fetchSeasonData, fetchRankings, fetchTeamRecords, fetchSeasonStats, fetchSpreads } from '../services/cfbd';
+import type { CfbTeam, GameData, APRanking, TeamSeasonStats, SpreadData, TeamRatings } from '../types';
+import { fetchFbsTeams, fetchSeasonData, fetchRankings, fetchTeamRecords, fetchSeasonStats, fetchTeamRatings, fetchSpreads } from '../services/cfbd';
 
 interface CfbState {
   teams: CfbTeam[];
@@ -8,6 +8,7 @@ interface CfbState {
   rankings: APRanking[];
   records: Map<string, { wins: number; losses: number }>;
   seasonStats: Map<string, TeamSeasonStats>;
+  teamRatings: Map<string, TeamRatings>;
   // spreadData[week] = map of teamId → locked spread (null if no line)
   spreadData: Record<number, SpreadData>;
   loading: boolean;
@@ -22,6 +23,7 @@ export function useCfbData(): CfbState {
   const [rankings, setRankings]       = useState<APRanking[]>([]);
   const [records, setRecords]         = useState<Map<string, { wins: number; losses: number }>>(new Map());
   const [seasonStats, setSeasonStats] = useState<Map<string, TeamSeasonStats>>(new Map());
+  const [teamRatings, setTeamRatings] = useState<Map<string, TeamRatings>>(new Map());
   const [spreadData, setSpreadData]   = useState<Record<number, SpreadData>>({});
   const [loading, setLoading]         = useState(true);
   const [error, setError]             = useState<string | null>(null);
@@ -36,17 +38,19 @@ export function useCfbData(): CfbState {
         const t = await fetchFbsTeams();
         if (cancelled) return;
         setTeams(t);
-        const [gd, rk, rec, stats] = await Promise.all([
+        const [gd, rk, rec, stats, ratings] = await Promise.all([
           fetchSeasonData(t),
           fetchRankings(t),
           fetchTeamRecords(),
           fetchSeasonStats(t),
+          fetchTeamRatings(t),
         ]);
         if (cancelled) return;
         setGameData(gd);
         setRankings(rk);
         setRecords(rec);
         setSeasonStats(stats);
+        setTeamRatings(ratings);
       } catch (e: any) {
         if (!cancelled) setError(e.message ?? 'Failed to load CFB data');
       } finally {
@@ -77,7 +81,7 @@ export function useCfbData(): CfbState {
   };
 
   return {
-    teams, gameData, rankings, records, seasonStats, spreadData,
+    teams, gameData, rankings, records, seasonStats, teamRatings, spreadData,
     loading, error,
     refresh: () => setTick(t => t + 1),
     refreshSpreads,

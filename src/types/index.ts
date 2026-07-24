@@ -364,6 +364,15 @@ export interface CfbTeam {
   is_g5: boolean;
 }
 
+// Team strength ratings (FPI + SP+), all as 1-N ranks (1 = best), null if
+// not yet published for the current data year.
+export interface TeamRatings {
+  fpi_rank: number | null;
+  offense_rank: number | null;
+  defense_rank: number | null;
+  remaining_sos_rank: number | null; // lower = tougher remaining schedule
+}
+
 export interface GameResult {
   week: number;
   opponent: string;
