@@ -231,7 +231,7 @@ export function Header({
               />
               <span className="text-sm text-turf-400 group-hover:text-white transition-colors hidden sm:inline">{displayName}</span>
             </Link>
-            <button onClick={onSignOut} className="btn-ghost btn-sm">
+            <button onClick={onSignOut} className="btn-ghost btn-sm" title="Sign out" aria-label="Sign out">
               <LogOut className="w-4 h-4" />
             </button>
           </div>

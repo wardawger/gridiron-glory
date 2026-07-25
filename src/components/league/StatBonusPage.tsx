@@ -55,7 +55,7 @@ export function StatBonusPage({ league, members, rosters, seasonStats }: Props) 
         <div className="card p-12 text-center text-turf-500">
           <Award className="w-8 h-8 mx-auto mb-3 text-turf-700" />
           <p>No season stats available yet.</p>
-          <p className="text-xs text-turf-600 mt-1">Check back once the season is underway.</p>
+          <p className="text-xs text-turf-500 mt-1">Check back once the season is underway.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -72,9 +72,9 @@ export function StatBonusPage({ league, members, rosters, seasonStats }: Props) 
                     <TrendingUp className="w-3 h-3" /> Top{topOn ? ` ${catSettings.top_count}` : ''}
                   </p>
                   {!topOn ? (
-                    <p className="text-xs text-turf-600 py-1">Not enabled</p>
+                    <p className="text-xs text-turf-500 py-1">Not enabled</p>
                   ) : category.top.length === 0 ? (
-                    <p className="text-xs text-turf-600 py-1">No data yet</p>
+                    <p className="text-xs text-turf-500 py-1">No data yet</p>
                   ) : (
                     <div className="space-y-1">
                       {category.top.map(e => (
@@ -100,9 +100,9 @@ export function StatBonusPage({ league, members, rosters, seasonStats }: Props) 
                     <TrendingDown className="w-3 h-3" /> Bottom{botOn ? ` ${catSettings.bottom_count}` : ''}
                   </p>
                   {!botOn ? (
-                    <p className="text-xs text-turf-600 py-1">Not enabled</p>
+                    <p className="text-xs text-turf-500 py-1">Not enabled</p>
                   ) : category.bottom.length === 0 ? (
-                    <p className="text-xs text-turf-600 py-1">No data yet</p>
+                    <p className="text-xs text-turf-500 py-1">No data yet</p>
                   ) : (
                     <div className="space-y-1">
                       {category.bottom.map(e => (

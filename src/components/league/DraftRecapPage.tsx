@@ -197,7 +197,7 @@ export function DraftRecapPage({ league, members, draftPicks }: Props) {
                     <span className="text-xs text-turf-500 ml-auto">{picks.length} pick{picks.length !== 1 ? 's' : ''}</span>
                   </div>
                   {picks.length === 0 ? (
-                    <p className="text-sm text-turf-600 py-2">No picks yet</p>
+                    <p className="text-sm text-turf-500 py-2">No picks yet</p>
                   ) : (
                     <div className="space-y-1.5">
                       {picks.map(pick => (

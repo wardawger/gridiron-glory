@@ -98,7 +98,7 @@ function AnalyticsRow({ label, tooltip, values }: AnalyticsRowProps) {
         >
           <span
             className="cursor-default"
-            style={{ color: v.display === '—' ? '#495057' : undefined }}
+            style={{ color: v.display === '—' ? '#adb5bd' : undefined }}
           >
             {v.display}
           </span>
@@ -481,7 +481,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                   <div className="flex flex-wrap gap-2">
                     {undrafted.map(t => (
                       <span key={t.team_name} className="badge-gray text-xs cursor-default select-none">
-                        {t.team_name} <span className="text-turf-500">(#{t.rank})</span>
+                        {t.team_name} <span className="text-turf-400">(#{t.rank})</span>
                       </span>
                     ))}
                   </div>
@@ -495,7 +495,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
             <div className="p-5">
               <p className="text-xs text-turf-500 mb-4">Points scored per week by each player</p>
               {weeklyData.length === 0 ? (
-                <p className="text-turf-600 text-sm text-center py-8">No weekly data yet — check back once games are played</p>
+                <p className="text-turf-500 text-sm text-center py-8">No weekly data yet — check back once games are played</p>
               ) : (
                 <div className="h-72">
                   <ResponsiveContainer width="100%" height="100%">
@@ -543,7 +543,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                 <h3 className="font-display text-lg tracking-wide text-white">Roster profile</h3>
                 <p className="text-xs text-turf-500 mt-0.5 mb-4">Normalized roster quality across 5 dimensions (higher = better)</p>
                 {radarData.length === 0 ? (
-                  <p className="text-turf-600 text-sm text-center py-8">No ranking data yet</p>
+                  <p className="text-turf-500 text-sm text-center py-8">No ranking data yet</p>
                 ) : (
                   <div className="h-72">
                     <ResponsiveContainer width="100%" height="100%">
@@ -587,7 +587,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                 <h3 className="font-display text-lg tracking-wide text-white">Season trend</h3>
                 <p className="text-xs text-turf-500 mt-0.5 mb-4">Cumulative points across the season</p>
                 {trendData.length === 0 ? (
-                  <p className="text-turf-600 text-sm text-center py-8">No weekly data yet — check back once games are played</p>
+                  <p className="text-turf-500 text-sm text-center py-8">No weekly data yet — check back once games are played</p>
                 ) : (
                   <div className="h-72">
                     <ResponsiveContainer width="100%" height="100%">
@@ -631,7 +631,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                 <h3 className="font-display text-lg tracking-wide text-white">Draft value</h3>
                 <p className="text-xs text-turf-500 mt-0.5 mb-4">Draft pick number vs. AP rank — points below the diagonal were drafted later than their rank suggests</p>
                 {scatterByManager.length === 0 ? (
-                  <p className="text-turf-600 text-sm text-center py-8">No ranking data yet</p>
+                  <p className="text-turf-500 text-sm text-center py-8">No ranking data yet</p>
                 ) : (
                   <div className="h-72">
                     <ResponsiveContainer width="100%" height="100%">

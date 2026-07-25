@@ -120,7 +120,7 @@ export function FreeAgencyPage({ league, members, draftPicks, freeAgencyMoves, t
       <div className="card p-12 text-center text-turf-500">
         <ArrowLeftRight className="w-8 h-8 mx-auto mb-3 text-turf-700" />
         <p>Free agency is not enabled for this league.</p>
-        <p className="text-xs text-turf-600 mt-1">Ask your commissioner to turn it on in Admin → Scoring.</p>
+        <p className="text-xs text-turf-500 mt-1">Ask your commissioner to turn it on in Admin → Scoring.</p>
       </div>
     );
   }
@@ -269,7 +269,7 @@ export function FreeAgencyPage({ league, members, draftPicks, freeAgencyMoves, t
               {dropTeam.team_name}
             </span>
           ) : (
-            <span className="text-turf-600">No team selected to drop</span>
+            <span className="text-turf-500">No team selected to drop</span>
           )}
           <ArrowRight className="w-4 h-4 text-turf-600 flex-shrink-0" />
           {addId ? (() => {
@@ -281,7 +281,7 @@ export function FreeAgencyPage({ league, members, draftPicks, freeAgencyMoves, t
               </span>
             );
           })() : (
-            <span className="text-turf-600">No team selected to add</span>
+            <span className="text-turf-500">No team selected to add</span>
           )}
         </div>
         <button onClick={handleConfirm} disabled={!canSubmit} className="btn-primary flex-shrink-0">
@@ -313,7 +313,7 @@ export function FreeAgencyPage({ league, members, draftPicks, freeAgencyMoves, t
                 {m.penalty_points !== 0 && (
                   <span className="text-xs font-mono text-red-400 flex-shrink-0">{m.penalty_points} pts</span>
                 )}
-                <span className="text-xs text-turf-600 font-mono flex-shrink-0">{formatMoveTime(m.created_at)}</span>
+                <span className="text-xs text-turf-500 font-mono flex-shrink-0">{formatMoveTime(m.created_at)}</span>
               </div>
             ))}
           </div>

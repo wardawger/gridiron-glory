@@ -129,6 +129,7 @@ function GameScoreModal({ game, teamName, teamLogo, week, isCaptain, scoring, on
           </div>
           <button
             onClick={onClose}
+            aria-label="Close"
             className="ml-2 rounded-lg border border-turf-700 p-1.5 text-turf-400 hover:border-turf-500 hover:text-white transition-colors flex-shrink-0"
           >
             <X className="h-3.5 w-3.5" />
@@ -166,7 +167,7 @@ function GameScoreModal({ game, teamName, teamLogo, week, isCaptain, scoring, on
           <p className="text-xs text-turf-500 uppercase tracking-wide font-medium mb-3">Scoring Breakdown</p>
 
           {lines.length === 0 && (
-            <p className="text-xs text-turf-600 text-center py-2">No points — game not completed</p>
+            <p className="text-xs text-turf-500 text-center py-2">No points — game not completed</p>
           )}
 
           {lines.map(line => (
@@ -256,6 +257,7 @@ function ScheduleModal({ team, gameData, captainPicks, userId, currentWeek, onCl
           </div>
           <button
             onClick={onClose}
+            aria-label="Close"
             className="rounded-lg border border-turf-700 p-1.5 text-turf-400 hover:border-turf-500 hover:text-white transition-colors"
           >
             <X className="h-4 w-4" />
@@ -351,7 +353,7 @@ function ScheduleModal({ team, gameData, captainPicks, userId, currentWeek, onCl
           {/* Bye weeks summary */}
           {byes.length > 0 && (
             <div className="px-4 py-3">
-              <p className="text-xs text-turf-600">
+              <p className="text-xs text-turf-500">
                 <span className="text-turf-500 font-medium">Bye weeks: </span>
                 {byes.map(w => `Wk ${w}`).join(', ')}
               </p>
@@ -497,7 +499,7 @@ export function RosterView({
                         ? 'bg-turf-800 text-turf-300'
                         : ws.points < 0
                         ? 'bg-red-900/30 text-red-400'
-                        : 'bg-turf-900 text-turf-600'
+                        : 'bg-turf-900 text-turf-500'
                     }`}
                     title={
                       ws.fa_points !== 0
@@ -663,7 +665,7 @@ export function RosterView({
                         </div>
                       </div>
                     ) : (
-                      <p className="mt-2 text-xs text-turf-600">No game this week</p>
+                      <p className="mt-2 text-xs text-turf-500">No game this week</p>
                     )}
 
                     {isOwner && onSetCaptain && game && (
@@ -672,7 +674,7 @@ export function RosterView({
                           <span className={`text-xs font-medium flex items-center gap-1 ${isCaptain ? 'text-gold-400' : 'text-turf-300'}`}>
                             <Star className="w-3 h-3 flex-shrink-0" /> {isCaptain ? 'Captain ×2' : 'Captain'}
                           </span>
-                          <p className="text-xs text-turf-600">
+                          <p className="text-xs text-turf-500">
                             {captainKickedOff
                               ? (isCaptain ? 'Game started — locked' : 'Game started')
                               : isCaptain
@@ -687,6 +689,7 @@ export function RosterView({
                           onClick={() => onSetCaptain(selectedWeek, entry.team_id)}
                           disabled={captainKickedOff || (!canBeCaptain && !isCaptain)}
                           aria-label={isCaptain ? 'Remove captain' : 'Set captain'}
+                          aria-pressed={isCaptain}
                           className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${
                             isCaptain ? 'bg-gold-500' : canBeCaptain ? 'bg-turf-700' : 'bg-turf-800 opacity-50 cursor-not-allowed'
                           }`}
@@ -760,13 +763,14 @@ export function RosterView({
                             <span className={`text-xs font-medium flex items-center gap-1 ${labelColor}`}>
                               <Coins className="w-3 h-3 flex-shrink-0" /> Spread
                             </span>
-                            <p className="text-xs text-turf-600 truncate">{subtext}</p>
+                            <p className="text-xs text-turf-500 truncate">{subtext}</p>
                           </div>
                           <button
                             type="button"
                             onClick={handleToggle}
                             disabled={toggleDisabled}
                             aria-label={isOn ? 'Remove spread pick' : 'Pick spread'}
+                            aria-pressed={isOn}
                             className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${trackColor} ${toggleDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                           >
                             <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${isOn ? 'left-5' : 'left-0.5'}`} />
@@ -849,7 +853,7 @@ export function RosterView({
                             </span>
                           </button>
                           </Tooltip>
-                          <div className="text-turf-600 mt-0.5 pl-8">
+                          <div className="text-turf-500 mt-0.5 pl-8">
                             {captainUses}/2 captain uses
                           </div>
                         </td>
@@ -909,7 +913,7 @@ export function RosterView({
                                   </Tooltip>
 
                                   {/* Home/Away indicator + rank */}
-                                  <span className="text-turf-600 text-xs leading-none">
+                                  <span className="text-turf-500 text-xs leading-none">
                                     {isHome ? 'vs' : '@'}
                                     {game.opponent_rank ? ` #${game.opponent_rank}` : ''}
                                   </span>
@@ -919,7 +923,7 @@ export function RosterView({
 
                                   {/* Score */}
                                   {game.home_score != null && game.away_score != null && (
-                                    <div className="text-turf-600 font-mono text-xs">
+                                    <div className="text-turf-500 font-mono text-xs">
                                       {game.home_score}–{game.away_score}
                                     </div>
                                   )}
@@ -943,7 +947,7 @@ export function RosterView({
                                   {canSetCap && !isCap && (
                                     <button
                                       onClick={e => { e.stopPropagation(); onSetCaptain!(w, entry.team_id); }}
-                                      className="text-turf-600 hover:text-gold-400 transition-colors text-xs border border-turf-700 hover:border-gold-600 rounded px-1 py-0.5 w-full"
+                                      className="text-turf-500 hover:text-gold-400 transition-colors text-xs border border-turf-700 hover:border-gold-600 rounded px-1 py-0.5 w-full"
                                     >
                                       + Cap
                                     </button>
@@ -1033,10 +1037,10 @@ export function RosterView({
               <span className="flex items-center gap-1"><span className="text-red-400 font-bold">L</span> Loss</span>
               <span className="flex items-center gap-1"><span className="text-amber-400">★</span> Captain</span>
               <span className="flex items-center gap-1"><span className="text-turf-400">—</span> Bye / no game</span>
-              <span className="flex items-center gap-1 text-turf-600">
+              <span className="flex items-center gap-1 text-turf-500">
                 Click a team name for full schedule details
               </span>
-              <span className="text-turf-600 ml-auto">Scroll right →</span>
+              <span className="text-turf-500 ml-auto">Scroll right →</span>
             </div>
           </div>
         )}

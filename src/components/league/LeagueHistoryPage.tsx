@@ -87,7 +87,7 @@ export function LeagueHistoryPage({ league, seasonHistory }: Props) {
         <div className="card p-12 text-center">
           <Archive className="w-10 h-10 mx-auto mb-3 text-turf-700" />
           <p className="text-turf-400 font-medium">No past seasons yet</p>
-          <p className="text-turf-600 text-sm mt-1">
+          <p className="text-turf-500 text-sm mt-1">
             Once your commissioner ends a season (after the national championship game), it'll show up here.
           </p>
         </div>

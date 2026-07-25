@@ -35,12 +35,14 @@ interface Props {
   onUpdateMemberRole: (userId: string, role: LeagueRole) => Promise<{ error?: string }>;
 }
 
-function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: () => void; disabled?: boolean }) {
+function Toggle({ checked, onChange, disabled, label }: { checked: boolean; onChange: () => void; disabled?: boolean; label: string }) {
   return (
     <button
       type="button"
       onClick={onChange}
       disabled={disabled}
+      aria-label={label}
+      aria-pressed={checked}
       className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${checked ? 'bg-field-500' : 'bg-turf-700'} ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
     >
       <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${checked ? 'left-5' : 'left-0.5'}`} />
@@ -310,6 +312,7 @@ export function AdminPanel({
                         checked={m.role === 'commissioner'}
                         onChange={() => handleToggleRole(m)}
                         disabled={isLastCommissioner}
+                        label={`${m.role === 'commissioner' ? 'Remove' : 'Make'} ${m.display_name} co-commissioner`}
                       />
                     )}
                   </div>
@@ -610,6 +613,7 @@ export function AdminPanel({
               <Toggle
                 checked={scoring.stat_bonus_enabled}
                 onChange={() => setScoring(prev => ({ ...prev, stat_bonus_enabled: !prev.stat_bonus_enabled }))}
+                label={`${scoring.stat_bonus_enabled ? 'Disable' : 'Enable'} statistical ranking bonuses`}
               />
             </div>
 
@@ -636,7 +640,11 @@ export function AdminPanel({
                             <span className="text-xs text-turf-400 flex items-center gap-1">
                               <TrendingUp className="w-3 h-3 text-field-400" /> Top Bonus
                             </span>
-                            <Toggle checked={c.top_enabled} onChange={() => updateCat({ top_enabled: !c.top_enabled })} />
+                            <Toggle
+                              checked={c.top_enabled}
+                              onChange={() => updateCat({ top_enabled: !c.top_enabled })}
+                              label={`${c.top_enabled ? 'Disable' : 'Enable'} ${STAT_BONUS_LABELS[cat]} top bonus`}
+                            />
                           </div>
                           {c.top_enabled && (
                             <div className="grid grid-cols-2 gap-2">
@@ -670,7 +678,11 @@ export function AdminPanel({
                             <span className="text-xs text-turf-400 flex items-center gap-1">
                               <TrendingDown className="w-3 h-3 text-red-400" /> Bottom Bonus
                             </span>
-                            <Toggle checked={c.bottom_enabled} onChange={() => updateCat({ bottom_enabled: !c.bottom_enabled })} />
+                            <Toggle
+                              checked={c.bottom_enabled}
+                              onChange={() => updateCat({ bottom_enabled: !c.bottom_enabled })}
+                              label={`${c.bottom_enabled ? 'Disable' : 'Enable'} ${STAT_BONUS_LABELS[cat]} bottom bonus`}
+                            />
                           </div>
                           {c.bottom_enabled && (
                             <div className="grid grid-cols-2 gap-2">
@@ -693,7 +705,7 @@ export function AdminPanel({
                                   value={c.bottom_points}
                                   onChange={e => updateCat({ bottom_points: parseFloat(e.target.value) || 0 })}
                                 />
-                                <p className="text-[10px] text-turf-600 mt-0.5">Negative values subtract points</p>
+                                <p className="text-[10px] text-turf-500 mt-0.5">Negative values subtract points</p>
                               </div>
                             </div>
                           )}
@@ -763,7 +775,7 @@ export function AdminPanel({
                       value={scoring.spread_points}
                       onChange={e => setScoring(prev => ({ ...prev, spread_points: parseFloat(e.target.value) || 0 }))}
                     />
-                    <p className="text-xs text-turf-600 mt-0.5">
+                    <p className="text-xs text-turf-500 mt-0.5">
                       Penalty for missing: {scoring.spread_is_multiplier ? `×${scoring.spread_points}` : `-${scoring.spread_points} pts`}
                     </p>
                   </div>
@@ -805,7 +817,7 @@ export function AdminPanel({
                         {scoring.spread_allow_captain_stack ? 'Allowed' : 'Not allowed'}
                       </span>
                     </label>
-                    <p className="text-xs text-turf-600 mt-0.5">Pick spread on captain's team</p>
+                    <p className="text-xs text-turf-500 mt-0.5">Pick spread on captain's team</p>
                   </div>
                 </div>
               </div>
@@ -858,7 +870,7 @@ export function AdminPanel({
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-white">Point Penalty</p>
-                    <p className="text-xs text-turf-600 mt-0.5">Subtract points the week a swap is made</p>
+                    <p className="text-xs text-turf-500 mt-0.5">Subtract points the week a swap is made</p>
                   </div>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <span className="text-xs text-turf-400">{scoring.fa_penalty_enabled ? 'Enabled' : 'Disabled'}</span>
@@ -882,7 +894,7 @@ export function AdminPanel({
                       value={scoring.fa_penalty_points}
                       onChange={e => setScoring(prev => ({ ...prev, fa_penalty_points: parseFloat(e.target.value) || 0 }))}
                     />
-                    <p className="text-xs text-turf-600 mt-0.5">
+                    <p className="text-xs text-turf-500 mt-0.5">
                       −{scoring.fa_penalty_points} pts applied the week of each add/drop
                     </p>
                   </div>
@@ -949,10 +961,10 @@ export function AdminPanel({
                       ))}
                     </select>
                   ) : (
-                    <div className="input text-turf-600 cursor-default">No teams drafted yet</div>
+                    <div className="input text-turf-500 cursor-default">No teams drafted yet</div>
                   )
                 ) : (
-                  <div className="input text-turf-600 cursor-default">Select a player first</div>
+                  <div className="input text-turf-500 cursor-default">Select a player first</div>
                 )}
               </div>
 
@@ -1040,7 +1052,7 @@ export function AdminPanel({
                                   {pick.result === 'covered' ? '✓ Covered' : '✗ Missed'}
                                   {pick.points !== null ? ` · ${pick.points > 0 ? '+' : ''}${pick.points} pts` : ''}
                                 </span>
-                              : <span className="text-turf-600">Pending</span>
+                              : <span className="text-turf-500">Pending</span>
                             }
                           </div>
                         </div>

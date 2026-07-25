@@ -262,6 +262,7 @@ export function DraftRoom({
                         setDraftOrder(o);
                       }}
                       disabled={i === 0}
+                      aria-label={`Move ${getMemberName(uid)} up`}
                       className="btn-ghost btn-sm px-2 py-0.5 disabled:opacity-20"
                     >↑</button>
                     <button
@@ -272,6 +273,7 @@ export function DraftRoom({
                         setDraftOrder(o);
                       }}
                       disabled={i === draftOrder.length - 1}
+                      aria-label={`Move ${getMemberName(uid)} down`}
                       className="btn-ghost btn-sm px-2 py-0.5 disabled:opacity-20"
                     >↓</button>
                   </div>
@@ -480,7 +482,7 @@ export function DraftRoom({
                           FPI #{fpiRank}
                         </span>
                       )}
-                      <p className="text-xs text-turf-600 truncate">
+                      <p className="text-xs text-turf-500 truncate">
                         {byes.length > 0 ? `Bye: ${byes.map(w => `Wk ${w}`).join(', ')}` : 'No bye'}
                       </p>
                     </div>
@@ -553,7 +555,7 @@ function renderPickSlot(
         'opacity-40'
       }`}
     >
-      <span className="font-mono text-xs text-turf-600 w-5">{slot.pick}</span>
+      <span className="font-mono text-xs text-turf-500 w-5">{slot.pick}</span>
       <span className="text-xs text-turf-500 w-20 truncate">{getMemberName(slot.userId)}</span>
       {slot.draftPick ? (
         <div className="flex items-center gap-1.5 flex-1 min-w-0">
@@ -612,6 +614,7 @@ function DraftTeamModal({ team, gameData, ratings, apRank, isMyTurn, picking, pi
             </div>
             <button
               onClick={onClose}
+              aria-label="Close"
               className="rounded-lg border border-turf-700 p-1.5 text-turf-400 hover:border-turf-500 hover:text-white transition-colors flex-shrink-0"
             >
               <X className="h-4 w-4" />

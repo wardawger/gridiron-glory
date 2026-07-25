@@ -102,7 +102,7 @@ export function LeagueSettingsPage({ league, members }: Props) {
             <div className="card-inner px-3 py-2 flex items-center justify-between"><span className="text-turf-300">Max picks / week</span><span className="font-mono font-medium text-white">{scoring.spread_max_per_week}</span></div>
             <div className="card-inner px-3 py-2 flex items-center justify-between"><span className="text-turf-300">Max picks / team / season</span><span className="font-mono font-medium text-white">{scoring.spread_max_per_team}</span></div>
           </div>
-          <p className="text-xs text-turf-600">
+          <p className="text-xs text-turf-500">
             {scoring.spread_allow_captain_stack
               ? 'You can pick the spread on your Captain\'s team the same week.'
               : 'You cannot pick the spread on your Captain\'s team the same week — pick a different team.'}
@@ -126,7 +126,7 @@ export function LeagueSettingsPage({ league, members }: Props) {
             <div className="card-inner px-3 py-2 flex items-center justify-between"><span className="text-turf-300">Max moves / week</span><span className="font-mono font-medium text-white">{scoring.fa_max_moves_per_week}</span></div>
             <div className="card-inner px-3 py-2 flex items-center justify-between"><span className="text-turf-300">Max moves / season</span><span className="font-mono font-medium text-white">{scoring.fa_max_moves_per_season}</span></div>
           </div>
-          <p className="text-xs text-turf-600">
+          <p className="text-xs text-turf-500">
             {scoring.fa_penalty_enabled
               ? `Each swap costs ${pts(-Math.abs(scoring.fa_penalty_points))} points that week.`
               : 'No point penalty for making a swap.'}
