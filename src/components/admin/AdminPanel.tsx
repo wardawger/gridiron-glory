@@ -77,7 +77,7 @@ export function AdminPanel({
   const [bonusType, setBonusType]         = useState<BonusType>('win_bowl');
   const [bonusTeamId, setBonusTeamId]     = useState('');
   const [bonusTeamName, setBonusTeamName] = useState('');
-  const [bonusPoints, setBonusPoints]     = useState<number>(5);
+  const [bonusPoints, setBonusPoints]     = useState<string>('5');
   const [bonusNote, setBonusNote]         = useState('');
 
   // Teams currently rostered by the selected user (draft + free agency swaps)
@@ -139,7 +139,7 @@ export function AdminPanel({
       type:      bonusType,
       team_id:   bonusTeamId,
       team_name: bonusTeamName,
-      points:    bonusPoints,
+      points:    parseInt(bonusPoints) || 0,
       note:      bonusNote,
     });
     setBonusTeamId('');
@@ -788,7 +788,7 @@ export function AdminPanel({
                   onChange={e => {
                     const t = e.target.value as BonusType;
                     setBonusType(t);
-                    setBonusPoints(BONUS_DEFAULT_POINTS[t]);
+                    setBonusPoints(String(BONUS_DEFAULT_POINTS[t]));
                   }}
                 >
                   {(Object.entries(BONUS_LABELS) as [BonusType, string][]).map(([k, v]) => (
@@ -826,7 +826,7 @@ export function AdminPanel({
               <div>
                 <label className="label">Points</label>
                 <input className="input font-mono" type="number" value={bonusPoints}
-                  onChange={e => setBonusPoints(parseInt(e.target.value) || 0)} />
+                  onChange={e => setBonusPoints(e.target.value)} />
               </div>
 
               {/* Note */}
