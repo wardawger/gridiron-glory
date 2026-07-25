@@ -38,12 +38,13 @@ export function useCfbData(): CfbState {
         const t = await fetchFbsTeams();
         if (cancelled) return;
         setTeams(t);
-        const [gd, rk, rec, stats, ratings] = await Promise.all([
-          fetchSeasonData(t),
+        const gd = await fetchSeasonData(t);
+        if (cancelled) return;
+        const [rk, rec, stats, ratings] = await Promise.all([
           fetchRankings(t),
           fetchTeamRecords(),
           fetchSeasonStats(t),
-          fetchTeamRatings(t),
+          fetchTeamRatings(t, gd),
         ]);
         if (cancelled) return;
         setGameData(gd);

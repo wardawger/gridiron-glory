@@ -375,12 +375,14 @@ export async function fetchSeasonStats(teams: CfbTeam[]): Promise<Map<string, Te
 }
 
 // ── Team Ratings (FPI + SP+) ─────────────────────────────────────────────
-// FPI gives an overall rank plus a remaining-strength-of-schedule rank; SP+
-// gives clean, pre-computed offense/defense ranks. Neither publishes ranks
-// until there's enough of the season played to calibrate, so both endpoints
-// fall back to the prior year via fetchWithFallback when empty.
+// FPI gives an overall rank plus a strength-of-schedule rank; SP+ gives
+// clean, pre-computed offense/defense ranks. Neither publishes ranks until
+// there's enough of the season played to calibrate, so both endpoints fall
+// back to the prior year via fetchWithFallback when empty. Strength of
+// schedule is further refined below using each team's real current-season
+// schedule (see oppAvgFpi).
 
-export async function fetchTeamRatings(teams: CfbTeam[]): Promise<Map<string, TeamRatings>> {
+export async function fetchTeamRatings(teams: CfbTeam[], gameData: GameData): Promise<Map<string, TeamRatings>> {
   const year = getCurrentSeasonYear();
   const nameToId = new Map(teams.map(t => [t.name.toLowerCase(), t.id]));
   const map = new Map<string, TeamRatings>();
@@ -411,6 +413,33 @@ export async function fetchTeamRatings(teams: CfbTeam[]): Promise<Map<string, Te
       if (id) spByTeam.set(id, r);
     });
 
+    // CFBD doesn't publish current-season SOS until enough of the season is
+    // played to calibrate it. In the meantime, estimate schedule strength
+    // ourselves from data we already have: each team's real schedule for
+    // this season (gameData) combined with each opponent's most recent FPI
+    // rating. This auto-updates every year with no hardcoded teams, and is
+    // more accurate than reusing a team's own SOS rank from last season
+    // (which reflects last year's opponents, not this year's).
+    const oppAvgFpi = new Map<string, number>();
+    teams.forEach(team => {
+      const games = gameData[team.id] ?? {};
+      const oppFpiValues: number[] = [];
+      Object.values(games).forEach(g => {
+        const oppFpi = fpiByTeam.get(g.opponent_id)?.fpi;
+        if (typeof oppFpi === 'number') oppFpiValues.push(oppFpi);
+      });
+      if (oppFpiValues.length > 0) {
+        oppAvgFpi.set(team.id, oppFpiValues.reduce((a, b) => a + b, 0) / oppFpiValues.length);
+      }
+    });
+
+    // Higher average opponent FPI = tougher schedule = rank 1, matching
+    // CFBD's own "lower rank = tougher" convention for strength of schedule.
+    const preseasonSosRank = new Map<string, number>();
+    [...oppAvgFpi.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .forEach(([teamId], i) => preseasonSosRank.set(teamId, i + 1));
+
     const allIds = new Set([...fpiByTeam.keys(), ...spByTeam.keys()]);
     allIds.forEach(id => {
       const fpi = fpiByTeam.get(id);
@@ -419,7 +448,7 @@ export async function fetchTeamRatings(teams: CfbTeam[]): Promise<Map<string, Te
         fpi_rank:           fpi?.resumeRanks?.fpi ?? null,
         offense_rank:       sp?.offense?.ranking ?? null,
         defense_rank:       sp?.defense?.ranking ?? null,
-        sos_rank:           fpi?.resumeRanks?.strengthOfSchedule ?? null,
+        sos_rank:           preseasonSosRank.get(id) ?? fpi?.resumeRanks?.strengthOfSchedule ?? null,
       });
     });
   } catch (e) {

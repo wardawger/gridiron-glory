@@ -370,7 +370,7 @@ export interface TeamRatings {
   fpi_rank: number | null;
   offense_rank: number | null;
   defense_rank: number | null;
-  sos_rank: number | null; // lower = tougher season-long schedule
+  sos_rank: number | null; // lower = tougher schedule; preseason estimate until CFBD publishes current-season SOS
 }
 
 export interface GameResult {
