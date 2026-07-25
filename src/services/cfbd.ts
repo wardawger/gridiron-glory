@@ -92,17 +92,33 @@ export async function fetchSeasonData(teams: CfbTeam[]): Promise<GameData> {
   teams.forEach(t => { gameData[t.id] = {}; });
 
   let rankHistory: any[] = [];
+  let rankHistoryIsCurrentYear = true;
   try {
     const rRes = await cfbdFetch('/rankings', { year, seasonType: 'regular' });
     rankHistory = rRes.ok ? await rRes.json() : [];
     if (!Array.isArray(rankHistory) || !rankHistory.length) {
       const rRes2 = await cfbdFetch('/rankings', { year: year - 1, seasonType: 'regular' });
       rankHistory = rRes2.ok ? await rRes2.json() : [];
+      rankHistoryIsCurrentYear = false;
     }
   } catch { /* rankings optional */ }
 
+  // When the current season has no polls published yet, we fall back to
+  // last season's history above — but matching a past week's poll against
+  // this year's game-week number is meaningless (that week's opponent
+  // ranking has no connection to this year's schedule). In that case, use
+  // last season's single latest/final poll for every game instead, so it
+  // matches the "most recent known rank" shown elsewhere (e.g. the AP Top
+  // 25 page). Once this season's own polls exist, real per-week history
+  // is used again.
+  const fallbackLatestWeek = !rankHistoryIsCurrentYear && rankHistory.length
+    ? rankHistory.reduce((max: any, c: any) => c.week > max.week ? c : max, rankHistory[0])
+    : null;
+
   const getRankAtWeek = (school: string, week: number): number | null => {
-    const weekData = rankHistory.find((w: any) => w.week === week);
+    const weekData = rankHistoryIsCurrentYear
+      ? rankHistory.find((w: any) => w.week === week)
+      : fallbackLatestWeek;
     if (!weekData) return null;
     const poll = weekData.polls?.find((p: any) =>
       p.poll === 'Playoff Committee Rankings' || p.poll === 'AP Top 25'
