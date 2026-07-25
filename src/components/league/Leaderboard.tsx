@@ -217,7 +217,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
             <BarChart data={chartData} layout="vertical" margin={{ top: 0, right: 32, left: 0, bottom: 0 }}>
               <XAxis type="number" hide />
               <YAxis
-                type="category" dataKey="name" width={80}
+                type="category" dataKey="name" width={90}
                 tick={{ fill: '#6c757d', fontSize: 12, fontFamily: 'DM Sans' }}
                 axisLine={false} tickLine={false}
               />
@@ -225,7 +225,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                 content={<CustomTooltip />}
                 cursor={{ fill: 'rgba(255,255,255,0.03)' }}
               />
-              <Bar dataKey="points" radius={[0, 4, 4, 0]} maxBarSize={28} label={{ position: 'right', fill: '#6c757d', fontSize: 11 }}>
+              <Bar dataKey="points" radius={[0, 4, 4, 0]} maxBarSize={28}>
                 {chartData.map((_, i) => (
                   <Cell key={i} fill={PLAYER_COLORS[i] ?? '#22c55e'} fillOpacity={i === 0 ? 1 : 0.75} />
                 ))}
