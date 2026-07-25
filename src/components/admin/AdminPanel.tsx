@@ -1,20 +1,25 @@
 import { useState, useMemo } from 'react';
-import { Shield, UserPlus, Copy, Check, Trash2, Plus, Mail, Settings, Gift, RotateCcw, AlertTriangle, TrendingUp, TrendingDown, Loader2 } from 'lucide-react';
+import { Shield, UserPlus, Copy, Check, Trash2, Plus, Mail, Settings, Gift, RotateCcw, AlertTriangle, TrendingUp, TrendingDown, Loader2, Archive } from 'lucide-react';
 import type {
   League, LeagueMember, ManualBonus, DraftPick, SpreadPick, FreeAgencyMove,
   BonusType, ScoringSettings, StatBonusCategorySettings, LeagueRole,
+  CaptainPick, GameData, TeamSeasonStats, SeasonHistoryEntry,
 } from '../../types';
 import { BONUS_LABELS, BONUS_DEFAULT_POINTS, normalizeScoring, STAT_BONUS_CATEGORIES, STAT_BONUS_LABELS } from '../../types';
 import { rosterAtWeek } from '../../services/roster';
+import { buildLeaderboard } from '../../services/scoring';
 import { Avatar } from '../ui/Avatar';
 
 interface Props {
   league: League;
   members: LeagueMember[];
   draftPicks: DraftPick[];
+  captainPicks: CaptainPick[];
   manualBonuses: ManualBonus[];
   spreadPicks: SpreadPick[];
   freeAgencyMoves: FreeAgencyMove[];
+  gameData: GameData;
+  seasonStats: Map<string, TeamSeasonStats>;
   isCommissioner: boolean;
   onSendInvite: (email: string) => Promise<{ token?: string; error?: string }>;
   onUpdateWeek: (week: number) => void;
@@ -24,6 +29,7 @@ interface Props {
   onRemoveFromRoster: (userId: string, teamId: string) => void;
   onResetDraft: () => Promise<{ error?: string }>;
   onDeleteLeague: () => Promise<{ error?: string }>;
+  onEndSeason: (seasonLabel: string, standings: SeasonHistoryEntry[]) => Promise<{ error?: string }>;
   onOverrideSpread: (pickId: string, result: 'covered' | 'missed', points: number) => Promise<{ error?: string }>;
   onClearSpreadOverride: (pickId: string) => Promise<{ error?: string }>;
   onUpdateMemberRole: (userId: string, role: LeagueRole) => Promise<{ error?: string }>;
@@ -45,9 +51,10 @@ function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: (
 type Tab = 'members' | 'scoring' | 'bonuses';
 
 export function AdminPanel({
-  league, members, draftPicks, manualBonuses, spreadPicks, freeAgencyMoves, isCommissioner,
+  league, members, draftPicks, captainPicks, manualBonuses, spreadPicks, freeAgencyMoves,
+  gameData, seasonStats, isCommissioner,
   onSendInvite, onUpdateWeek, onUpdateScoring, onAddBonus, onRemoveBonus, onResetDraft, onDeleteLeague,
-  onOverrideSpread, onClearSpreadOverride, onUpdateMemberRole,
+  onEndSeason, onOverrideSpread, onClearSpreadOverride, onUpdateMemberRole,
 }: Props) {
   const [tab, setTab]           = useState<Tab>('members');
   const [inviteEmail, setEmail] = useState('');
@@ -63,6 +70,39 @@ export function AdminPanel({
   const [roleUpdatingId, setRoleUpdatingId] = useState<string | null>(null);
   const [roleError, setRoleError] = useState('');
   const commissionerCount = members.filter(m => m.role === 'commissioner').length;
+
+  // Default season label: the year the season started (games run Aug of one
+  // calendar year through the natty in January of the next).
+  const defaultSeasonLabel = useMemo(() => {
+    const now = new Date();
+    return String(now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear());
+  }, []);
+  const [showEndSeasonModal, setShowEndSeasonModal] = useState(false);
+  const [seasonLabel, setSeasonLabel] = useState(defaultSeasonLabel);
+  const [endingSeason, setEndingSeason] = useState(false);
+  const [endSeasonError, setEndSeasonError] = useState('');
+
+  const finalStandings = useMemo((): SeasonHistoryEntry[] => {
+    const board = buildLeaderboard(
+      members, draftPicks, captainPicks, gameData,
+      league.scoring, manualBonuses, seasonStats, true, spreadPicks,
+      freeAgencyMoves, league.current_week
+    );
+    return board.map((e, i) => ({
+      user_id: e.user_id, display_name: e.display_name,
+      avatar_type: e.avatar_type, avatar_value: e.avatar_value,
+      total_points: e.total_points, rank: i + 1,
+    }));
+  }, [members, draftPicks, captainPicks, gameData, league.scoring, manualBonuses, seasonStats, spreadPicks, freeAgencyMoves, league.current_week]);
+
+  const handleEndSeason = async () => {
+    setEndingSeason(true);
+    setEndSeasonError('');
+    const result = await onEndSeason(seasonLabel, finalStandings);
+    setEndingSeason(false);
+    if (result.error) { setEndSeasonError(result.error); return; }
+    setShowEndSeasonModal(false);
+  };
 
   const handleToggleRole = async (member: LeagueMember) => {
     const nextRole: LeagueRole = member.role === 'commissioner' ? 'member' : 'commissioner';
@@ -266,19 +306,11 @@ export function AdminPanel({
                     {updating ? (
                       <Loader2 className="w-4 h-4 animate-spin text-turf-500" />
                     ) : (
-                      <button
-                        onClick={() => handleToggleRole(m)}
+                      <Toggle
+                        checked={m.role === 'commissioner'}
+                        onChange={() => handleToggleRole(m)}
                         disabled={isLastCommissioner}
-                        className={`relative w-10 h-5 rounded-full transition-colors ${
-                          m.role === 'commissioner' ? 'bg-field-500' : 'bg-turf-700'
-                        } ${isLastCommissioner ? 'opacity-50 cursor-not-allowed' : ''}`}
-                      >
-                        <span
-                          className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${
-                            m.role === 'commissioner' ? 'left-5' : 'left-0.5'
-                          }`}
-                        />
-                      </button>
+                      />
                     )}
                   </div>
                 </div>
@@ -299,6 +331,30 @@ export function AdminPanel({
               <button onClick={() => onUpdateWeek(Math.max(0, league.current_week - 1))} className="btn-secondary btn-sm px-3">−</button>
               <span className="font-mono text-xl text-white w-8 text-center">{league.current_week}</span>
               <button onClick={() => onUpdateWeek(Math.min(18, league.current_week + 1))} className="btn-secondary btn-sm px-3">+</button>
+            </div>
+          </div>
+
+          {/* End Season */}
+          <div className="card p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <Archive className="w-5 h-5 text-gold-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-medium text-white">End Season</p>
+                  <p className="text-xs text-turf-500 mt-0.5">
+                    Once the national championship game is final, archive this season's standings
+                    to League History and reset the league — draft, free agency, captain picks,
+                    bonuses, and spread picks — so it's ready for a new draft. This cannot be undone.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => { setEndSeasonError(''); setSeasonLabel(defaultSeasonLabel); setShowEndSeasonModal(true); }}
+                disabled={finalStandings.length === 0}
+                className="btn-gold flex-shrink-0"
+              >
+                <Archive className="w-4 h-4" /> End Season
+              </button>
             </div>
           </div>
 
@@ -343,6 +399,76 @@ export function AdminPanel({
                 className="btn-danger flex-shrink-0"
               >
                 <Trash2 className="w-4 h-4" /> Delete League
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* End Season confirmation modal */}
+      {showEndSeasonModal && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4"
+          style={{ backgroundColor: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)' }}
+          onClick={() => !endingSeason && setShowEndSeasonModal(false)}
+        >
+          <div
+            className="relative w-full max-w-sm rounded-2xl border border-gold-600/40 bg-turf-950 shadow-2xl p-6 space-y-4"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-gold-600/20 flex items-center justify-center flex-shrink-0">
+                <Archive className="w-5 h-5 text-gold-400" />
+              </div>
+              <h3 className="font-display text-xl text-white tracking-wide">End Season?</h3>
+            </div>
+
+            <div>
+              <label className="label">Season Label</label>
+              <input
+                className="input"
+                value={seasonLabel}
+                onChange={e => setSeasonLabel(e.target.value)}
+                placeholder="e.g. 2026"
+              />
+            </div>
+
+            {finalStandings.length > 0 && (
+              <div className="space-y-1.5">
+                <p className="text-xs text-turf-500 uppercase tracking-wide font-medium">Final Standings Preview</p>
+                {finalStandings.slice(0, 3).map(e => (
+                  <div key={e.user_id} className="flex items-center justify-between text-sm">
+                    <span className="text-turf-300">{e.rank}. {e.display_name}</span>
+                    <span className="font-mono text-white">{e.total_points}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <p className="text-sm text-turf-300">
+              This archives the standings above to <span className="text-white font-medium">League History</span> and
+              resets <span className="text-white font-medium">{league.name}</span> — draft picks, free agency, captain
+              picks, bonuses, and spread picks — for a new season.{' '}
+              <span className="text-red-400 font-medium">There is no way to recover the current data afterward.</span>
+            </p>
+            {endSeasonError && (
+              <p className="text-xs text-red-400">{endSeasonError}</p>
+            )}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowEndSeasonModal(false)}
+                disabled={endingSeason}
+                className="btn-secondary flex-1"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleEndSeason}
+                disabled={endingSeason || !seasonLabel.trim()}
+                className="btn-gold flex-1"
+              >
+                {endingSeason && <Loader2 className="w-4 h-4 animate-spin" />}
+                {endingSeason ? 'Archiving…' : 'Yes, End Season'}
               </button>
             </div>
           </div>

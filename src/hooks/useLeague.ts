@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import type {
   League, LeagueMember, DraftPick, CaptainPick,
   ManualBonus, SpreadPick, FreeAgencyMove, LeagueRole, AvatarType,
+  SeasonHistory, SeasonHistoryEntry,
 } from '../types';
 import { P4_CONFERENCES, DRAFT_CONF_MAX, DEFAULT_SCORING } from '../types';
 import { rosterAtWeek, currentRosters } from '../services/roster';
@@ -18,6 +19,7 @@ export function useLeague(user: User | null) {
   const [manualBonuses, setManualBonuses] = useState<ManualBonus[]>([]);
   const [spreadPicks, setSpreadPicks]   = useState<SpreadPick[]>([]);
   const [freeAgencyMoves, setFreeAgencyMoves] = useState<FreeAgencyMove[]>([]);
+  const [seasonHistory, setSeasonHistory] = useState<SeasonHistory[]>([]);
   const [loading, setLoading]           = useState(true);
   const [error, setError]               = useState<string | null>(null);
 
@@ -86,13 +88,14 @@ export function useLeague(user: User | null) {
   }, [user]);
 
   const loadLeagueData = useCallback(async (leagueId: string) => {
-    const [membersRes, picksRes, captainRes, bonusRes, spreadRes, faRes] = await Promise.all([
+    const [membersRes, picksRes, captainRes, bonusRes, spreadRes, faRes, historyRes] = await Promise.all([
       supabase.from('league_members').select('*').eq('league_id', leagueId),
       supabase.from('draft_picks').select('*').eq('league_id', leagueId).order('pick_number'),
       supabase.from('captain_picks').select('*').eq('league_id', leagueId),
       supabase.from('manual_bonuses').select('*').eq('league_id', leagueId),
       supabase.from('spread_picks').select('*').eq('league_id', leagueId),
       supabase.from('free_agency_moves').select('*').eq('league_id', leagueId),
+      supabase.from('season_history').select('*').eq('league_id', leagueId).order('archived_at', { ascending: false }),
     ]);
 
     if (membersRes.data)  setMembers(membersRes.data);
@@ -101,6 +104,7 @@ export function useLeague(user: User | null) {
     if (bonusRes.data)    setManualBonuses(bonusRes.data);
     if (spreadRes.data)   setSpreadPicks(spreadRes.data);
     if (faRes.data)       setFreeAgencyMoves(faRes.data);
+    if (historyRes.data)  setSeasonHistory(historyRes.data);
   }, []);
 
   useEffect(() => { loadAllLeagues(); }, [loadAllLeagues]);
@@ -120,6 +124,7 @@ export function useLeague(user: User | null) {
     setManualBonuses([]);
     setSpreadPicks([]);
     setFreeAgencyMoves([]);
+    setSeasonHistory([]);
   };
 
   // Real-time subscriptions
@@ -326,6 +331,62 @@ export function useLeague(user: User | null) {
 
     setDraftPicks([]);
     setFreeAgencyMoves([]);
+    if (updatedLeague) {
+      setAllLeagues(prev => prev.map(l => l.id === league.id ? updatedLeague as League : l));
+    }
+    return {};
+  };
+
+  // Archives the given final standings as a completed season, then fully
+  // resets the league for a new one — everything Reset Draft clears, plus
+  // captain picks, manual bonuses, and spread picks (which Reset Draft
+  // deliberately leaves alone for mid-season redos).
+  const endSeason = async (
+    seasonLabel: string,
+    standings: SeasonHistoryEntry[]
+  ): Promise<{ error?: string }> => {
+    if (!league || !user || !isCommissioner) return { error: 'Not authorized' };
+    if (!seasonLabel.trim()) return { error: 'Season label is required' };
+    if (standings.length === 0) return { error: 'No standings to archive' };
+
+    const { data: historyRow, error: historyErr } = await supabase
+      .from('season_history').insert({
+        league_id:    league.id,
+        season_label: seasonLabel.trim(),
+        standings,
+        archived_by:  user.id,
+      }).select().single();
+
+    if (historyErr) return { error: historyErr.message };
+
+    const deletes = await Promise.all([
+      supabase.from('draft_picks').delete().eq('league_id', league.id),
+      supabase.from('free_agency_moves').delete().eq('league_id', league.id),
+      supabase.from('captain_picks').delete().eq('league_id', league.id),
+      supabase.from('manual_bonuses').delete().eq('league_id', league.id),
+      supabase.from('spread_picks').delete().eq('league_id', league.id),
+    ]);
+    const deleteErr = deletes.find(d => d.error)?.error;
+    if (deleteErr) return { error: deleteErr.message };
+
+    const { data: updatedLeague, error: updateErr } = await supabase
+      .from('leagues').update({
+        draft_status: 'pending',
+        draft_current_pick: 1,
+        draft_order: [],
+        current_week: 0,
+      }).eq('id', league.id).select().single();
+
+    if (updateErr) return { error: updateErr.message };
+
+    setDraftPicks([]);
+    setFreeAgencyMoves([]);
+    setCaptainPicks([]);
+    setManualBonuses([]);
+    setSpreadPicks([]);
+    if (historyRow) {
+      setSeasonHistory(prev => [historyRow as SeasonHistory, ...prev]);
+    }
     if (updatedLeague) {
       setAllLeagues(prev => prev.map(l => l.id === league.id ? updatedLeague as League : l));
     }
@@ -695,9 +756,9 @@ export function useLeague(user: User | null) {
 
   return {
     league, allLeagues, allMemberships, selectedLeagueId,
-    members, draftPicks, captainPicks, manualBonuses, spreadPicks, freeAgencyMoves,
+    members, draftPicks, captainPicks, manualBonuses, spreadPicks, freeAgencyMoves, seasonHistory,
     rosters, myMembership, isCommissioner, loading, error,
-    switchLeague, createLeague, sendInvite, startDraft, makeDraftPick, resetDraft, deleteLeague,
+    switchLeague, createLeague, sendInvite, startDraft, makeDraftPick, resetDraft, deleteLeague, endSeason,
     setCaptain, addManualBonus, removeManualBonus,
     setSpreadPick, removeSpreadPick, overrideSpreadResult, clearSpreadOverride,
     updateWeek, updateScoring, removeFromRoster, makeFreeAgencyMove, updateDisplayName, updateAvatar,

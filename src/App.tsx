@@ -16,6 +16,7 @@ import { AdminPanel }       from './components/admin/AdminPanel';
 import { RankingsPage }     from './components/league/RankingsPage';
 import { DraftRecapPage }   from './components/league/DraftRecapPage';
 import { LeagueSettingsPage } from './components/league/LeagueSettingsPage';
+import { LeagueHistoryPage } from './components/league/LeagueHistoryPage';
 import { FreeAgencyPage }   from './components/league/FreeAgencyPage';
 import { StatBonusPage }    from './components/league/StatBonusPage';
 import { Loader2 }          from 'lucide-react';
@@ -152,6 +153,7 @@ export default function App() {
             } />
             <Route path="/draft-recap" element={<DraftRecapPage league={lg} members={league.members} draftPicks={league.draftPicks} />} />
             <Route path="/league-settings" element={<LeagueSettingsPage league={lg} members={league.members} />} />
+            <Route path="/league-history" element={<LeagueHistoryPage league={lg} seasonHistory={league.seasonHistory} />} />
             <Route path="/stat-bonuses" element={
               <StatBonusPage
                 league={lg}
@@ -191,9 +193,12 @@ export default function App() {
                 league={lg}
                 members={league.members}
                 draftPicks={league.draftPicks}
+                captainPicks={league.captainPicks}
                 manualBonuses={league.manualBonuses}
                 spreadPicks={league.spreadPicks}
                 freeAgencyMoves={league.freeAgencyMoves}
+                gameData={cfb.gameData}
+                seasonStats={cfb.seasonStats}
                 isCommissioner={league.isCommissioner}
                 onSendInvite={league.sendInvite}
                 onUpdateWeek={league.updateWeek}
@@ -203,6 +208,7 @@ export default function App() {
                 onRemoveFromRoster={league.removeFromRoster}
                 onResetDraft={league.resetDraft}
                 onDeleteLeague={league.deleteLeague}
+                onEndSeason={league.endSeason}
                 onUpdateMemberRole={league.updateMemberRole}
                 onOverrideSpread={league.overrideSpreadResult}
                 onClearSpreadOverride={league.clearSpreadOverride}

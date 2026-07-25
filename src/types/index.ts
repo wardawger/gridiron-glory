@@ -476,6 +476,28 @@ export interface LeaderboardEntry {
   roster: RosterEntry[];
 }
 
+// ─── Season History ────────────────────────────────────────────────────────
+// A frozen snapshot of a league's final standings, captured by a
+// commissioner via "End Season" (after the real-world national championship
+// game) before the league resets for a new season.
+
+export interface SeasonHistoryEntry {
+  user_id: string;
+  display_name: string;
+  avatar_type: AvatarType;
+  avatar_value: string;
+  total_points: number;
+  rank: number;
+}
+
+export interface SeasonHistory {
+  id: string;
+  league_id: string;
+  season_label: string;
+  standings: SeasonHistoryEntry[];
+  archived_at: string;
+}
+
 // ─── Invites ───────────────────────────────────────────────────────────────
 
 export interface Invite {

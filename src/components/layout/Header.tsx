@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Trophy, Users, Shield, BarChart3, LogOut, RefreshCw, Zap, ChevronDown, Plus, History, ArrowLeftRight, Award, Info, ClipboardList } from 'lucide-react';
+import { Trophy, Users, Shield, BarChart3, LogOut, RefreshCw, Zap, ChevronDown, Plus, History, ArrowLeftRight, Award, Info, ClipboardList, Archive } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import type { League, LeagueMember } from '../../types';
 import { Avatar } from '../ui/Avatar';
@@ -60,6 +60,7 @@ export function Header({
       ? [{ to: '/free-agency', label: 'Free Agency', icon: ArrowLeftRight, description: 'Add and drop teams' }]
       : []),
     { to: '/league-settings', label: 'League Settings', icon: ClipboardList, description: 'How scoring works' },
+    { to: '/league-history', label: 'League History', icon: Archive, description: 'Past seasons and champions' },
   ];
   const infoActive = leagueInfoItems.some(i => i.to === loc.pathname);
 
