@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Shield, UserPlus, Copy, Check, Trash2, Plus, Mail, Settings, Gift, RotateCcw, AlertTriangle, TrendingUp, TrendingDown, Loader2, ShieldOff } from 'lucide-react';
+import { Shield, UserPlus, Copy, Check, Trash2, Plus, Mail, Settings, Gift, RotateCcw, AlertTriangle, TrendingUp, TrendingDown, Loader2 } from 'lucide-react';
 import type {
   League, LeagueMember, ManualBonus, DraftPick, SpreadPick, FreeAgencyMove,
   BonusType, ScoringSettings, StatBonusCategorySettings, LeagueRole,
@@ -258,21 +258,29 @@ export function AdminPanel({
                   {m.role === 'commissioner' && (
                     <span className="badge-green text-xs flex-shrink-0">Commissioner</span>
                   )}
-                  <button
-                    onClick={() => handleToggleRole(m)}
-                    disabled={updating || isLastCommissioner}
+                  <div
+                    className="flex items-center gap-2 flex-shrink-0"
                     title={isLastCommissioner ? 'A league needs at least one commissioner' : undefined}
-                    className="btn-ghost btn-sm flex-shrink-0"
                   >
+                    <span className="text-xs text-turf-500">Co-Commissioner</span>
                     {updating ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : m.role === 'commissioner' ? (
-                      <ShieldOff className="w-3.5 h-3.5" />
+                      <Loader2 className="w-4 h-4 animate-spin text-turf-500" />
                     ) : (
-                      <Shield className="w-3.5 h-3.5" />
+                      <button
+                        onClick={() => handleToggleRole(m)}
+                        disabled={isLastCommissioner}
+                        className={`relative w-10 h-5 rounded-full transition-colors ${
+                          m.role === 'commissioner' ? 'bg-field-500' : 'bg-turf-700'
+                        } ${isLastCommissioner ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        <span
+                          className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${
+                            m.role === 'commissioner' ? 'left-5' : 'left-0.5'
+                          }`}
+                        />
+                      </button>
                     )}
-                    {m.role === 'commissioner' ? 'Remove Co-Commissioner' : 'Make Co-Commissioner'}
-                  </button>
+                  </div>
                 </div>
               );
             })}
