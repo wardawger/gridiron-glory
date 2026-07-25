@@ -143,13 +143,13 @@ export function FreeAgencyPage({ league, members, draftPicks, freeAgencyMoves, t
 
         <div className="mt-5 grid grid-cols-2 sm:grid-cols-3 gap-3">
           <div className="card-inner p-3 text-center">
-            <p className={`font-mono text-xl font-bold ${weekRemaining > 0 ? 'text-white' : 'text-red-400'}`}>
+            <p className={`font-mono text-xl font-bold ${weekRemaining > 0 ? 'text-white' : 'text-red-300'}`}>
               {Math.max(0, weekRemaining)}/{scoring.fa_max_moves_per_week}
             </p>
             <p className="text-xs text-turf-500 mt-0.5">Moves left this week</p>
           </div>
           <div className="card-inner p-3 text-center">
-            <p className={`font-mono text-xl font-bold ${seasonRemaining > 0 ? 'text-white' : 'text-red-400'}`}>
+            <p className={`font-mono text-xl font-bold ${seasonRemaining > 0 ? 'text-white' : 'text-red-300'}`}>
               {Math.max(0, seasonRemaining)}/{scoring.fa_max_moves_per_season}
             </p>
             <p className="text-xs text-turf-500 mt-0.5">Moves left this season</p>
@@ -311,7 +311,7 @@ export function FreeAgencyPage({ league, members, draftPicks, freeAgencyMoves, t
                   <span className="truncate max-w-28 text-turf-300">{m.added_team_name}</span>
                 </div>
                 {m.penalty_points !== 0 && (
-                  <span className="text-xs font-mono text-red-400 flex-shrink-0">{m.penalty_points} pts</span>
+                  <span className="text-xs font-mono text-red-300 flex-shrink-0">{m.penalty_points} pts</span>
                 )}
                 <span className="text-xs text-turf-500 font-mono flex-shrink-0">{formatMoveTime(m.created_at)}</span>
               </div>

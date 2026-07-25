@@ -93,8 +93,8 @@ function GameScoreModal({ game, teamName, teamLogo, week, isCaptain, scoring, on
       lines.push({ label: 'Win vs Top 15',          pts: scoring.win_top15,  active: (game.opponent_rank ?? 99) <= 15, color: 'text-field-400' });
       lines.push({ label: 'Win vs Top 5',           pts: scoring.win_top5,   active: (game.opponent_rank ?? 99) <= 5,  color: 'text-field-400' });
     } else {
-      lines.push({ label: 'Loss',                   pts: scoring.loss,      active: true,                              color: 'text-red-400' });
-      lines.push({ label: 'Loss to G5',             pts: scoring.loss_g5,   active: game.is_g5_opponent,               color: 'text-red-400' });
+      lines.push({ label: 'Loss',                   pts: scoring.loss,      active: true,                              color: 'text-red-300' });
+      lines.push({ label: 'Loss to G5',             pts: scoring.loss_g5,   active: game.is_g5_opponent,               color: 'text-red-300' });
     }
   }
 
@@ -144,7 +144,7 @@ function GameScoreModal({ game, teamName, teamLogo, week, isCaptain, scoring, on
             <div className="flex items-center gap-2">
               {isWin
                 ? <TrendingUp className="w-4 h-4 text-field-400" />
-                : <TrendingDown className="w-4 h-4 text-red-400" />
+                : <TrendingDown className="w-4 h-4 text-red-300" />
               }
               <span className={`font-bold text-sm ${isWin ? 'text-field-300' : 'text-red-300'}`}>
                 {game.result === 'W' ? 'WIN' : 'LOSS'}
@@ -185,7 +185,7 @@ function GameScoreModal({ game, teamName, teamLogo, week, isCaptain, scoring, on
               </div>
               <span className={`font-mono font-medium ${
                 line.active
-                  ? line.pts >= 0 ? 'text-field-400' : 'text-red-400'
+                  ? line.pts >= 0 ? 'text-field-400' : 'text-red-300'
                   : 'text-turf-700'
               }`}>
                 {line.pts > 0 ? '+' : ''}{line.pts}
@@ -210,7 +210,7 @@ function GameScoreModal({ game, teamName, teamLogo, week, isCaptain, scoring, on
           <div className="mt-3 pt-3 border-t border-turf-700 flex items-center justify-between">
             <span className="font-semibold text-white text-sm">Total Points</span>
             <span className={`font-mono font-bold text-lg ${
-              totalPoints > 0 ? 'text-field-400' : totalPoints < 0 ? 'text-red-400' : 'text-turf-500'
+              totalPoints > 0 ? 'text-field-400' : totalPoints < 0 ? 'text-red-300' : 'text-turf-500'
             }`}>
               {totalPoints > 0 ? '+' : ''}{totalPoints}
             </span>
@@ -317,7 +317,7 @@ function ScheduleModal({ team, gameData, captainPicks, userId, currentWeek, onCl
                     </span>
                     {game.result && (
                       <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${
-                        game.result === 'W' ? 'bg-field-900/40 text-field-400' : 'bg-red-900/40 text-red-400'
+                        game.result === 'W' ? 'bg-field-900/40 text-field-400' : 'bg-red-900/40 text-red-300'
                       }`}>
                         {game.result}
                         {game.home_score != null && game.away_score != null
@@ -498,7 +498,7 @@ export function RosterView({
                         : ws.points > 0
                         ? 'bg-turf-800 text-turf-300'
                         : ws.points < 0
-                        ? 'bg-red-900/30 text-red-400'
+                        ? 'bg-red-900/30 text-red-300'
                         : 'bg-turf-900 text-turf-500'
                     }`}
                     title={
@@ -611,7 +611,7 @@ export function RosterView({
                         <span className="text-xs text-turf-500">{entry.team_conference}</span>
                       </div>
                       {weekBreak && weekBreak.points !== 0 && (
-                        <div className={`font-mono font-bold text-sm flex-shrink-0 ${weekBreak.points > 0 ? 'text-field-400' : 'text-red-400'}`}>
+                        <div className={`font-mono font-bold text-sm flex-shrink-0 ${weekBreak.points > 0 ? 'text-field-400' : 'text-red-300'}`}>
                           {weekBreak.points > 0 ? '+' : ''}{weekBreak.points}
                         </div>
                       )}
@@ -639,7 +639,7 @@ export function RosterView({
                                 <span className="flex items-center gap-1">
                                   {game.result === 'W'
                                     ? <TrendingUp className="w-3 h-3 text-field-400 flex-shrink-0" />
-                                    : <TrendingDown className="w-3 h-3 text-red-400 flex-shrink-0" />
+                                    : <TrendingDown className="w-3 h-3 text-red-300 flex-shrink-0" />
                                   }
                                   <span className={game.result === 'W' ? 'text-field-300' : 'text-red-300'}>
                                     {game.result} {isHome ? 'vs' : 'at'} {game.opponent}
@@ -753,7 +753,7 @@ export function RosterView({
                         : isOn ? 'bg-blue-600'
                         : 'bg-turf-700';
                       const labelColor = spreadResult === 'covered' ? 'text-field-400'
-                        : spreadResult === 'missed' ? 'text-red-400'
+                        : spreadResult === 'missed' ? 'text-red-300'
                         : isOn ? 'text-blue-300'
                         : 'text-turf-300';
 
@@ -876,7 +876,7 @@ export function RosterView({
                           if (game?.result === 'W') {
                             resultBadge = <span className="text-field-400 font-bold text-xs">W</span>;
                           } else if (game?.result === 'L') {
-                            resultBadge = <span className="text-red-400 font-bold text-xs">L</span>;
+                            resultBadge = <span className="text-red-300 font-bold text-xs">L</span>;
                           }
 
                           return (
@@ -935,7 +935,7 @@ export function RosterView({
                                     return canRemove ? (
                                       <button
                                         onClick={e => { e.stopPropagation(); onSetCaptain!(w, entry.team_id); }}
-                                        className="text-amber-400 font-bold text-xs hover:text-red-400 transition-colors border border-amber-900/40 hover:border-red-800 rounded px-1"
+                                        className="text-amber-400 font-bold text-xs hover:text-red-300 transition-colors border border-amber-900/40 hover:border-red-800 rounded px-1"
                                         title="Remove captain"
                                       >
                                         ★ ✕
@@ -977,7 +977,7 @@ export function RosterView({
                                     if (sp) return (
                                       <div className={`text-xs font-mono mt-0.5 flex items-center gap-0.5 ${
                                         sp.result === 'covered' ? 'text-field-400' :
-                                        sp.result === 'missed'  ? 'text-red-400' : 'text-blue-400'
+                                        sp.result === 'missed'  ? 'text-red-300' : 'text-blue-400'
                                       }`}>
                                         {canRemoveSpread ? (
                                           <button
@@ -987,7 +987,7 @@ export function RosterView({
                                                 if (r.error) setSpreadError(r.error);
                                               });
                                             }}
-                                            className="hover:text-red-400 transition-colors border border-current/20 hover:border-red-800 rounded px-0.5 flex items-center gap-0.5"
+                                            className="hover:text-red-300 transition-colors border border-current/20 hover:border-red-800 rounded px-0.5 flex items-center gap-0.5"
                                             title="Remove spread pick"
                                           >
                                             <Coins className="w-2.5 h-2.5" />{formatSpread(sp.locked_spread)}
@@ -1034,7 +1034,7 @@ export function RosterView({
             {/* Legend */}
             <div className="border-t border-turf-800 px-4 py-3 flex items-center gap-4 text-xs text-turf-500 flex-wrap">
               <span className="flex items-center gap-1"><span className="text-field-400 font-bold">W</span> Win</span>
-              <span className="flex items-center gap-1"><span className="text-red-400 font-bold">L</span> Loss</span>
+              <span className="flex items-center gap-1"><span className="text-red-300 font-bold">L</span> Loss</span>
               <span className="flex items-center gap-1"><span className="text-amber-400">★</span> Captain</span>
               <span className="flex items-center gap-1"><span className="text-turf-400">—</span> Bye / no game</span>
               <span className="flex items-center gap-1 text-turf-500">

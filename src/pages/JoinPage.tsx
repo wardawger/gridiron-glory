@@ -134,7 +134,7 @@ export function JoinPage({ user, onJoined }: Props) {
         )}
         {status === 'error' && (
           <>
-            <XCircle className="w-10 h-10 text-red-400 mx-auto" />
+            <XCircle className="w-10 h-10 text-red-300 mx-auto" />
             <p className="text-red-300">{msg}</p>
             <button onClick={() => navigate('/')} className="btn-secondary w-full">
               Go Home

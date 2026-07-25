@@ -275,7 +275,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                     <span className="text-amber-500">{entry.bonus_points > 0 ? '+' : ''}{entry.bonus_points} bonus</span>
                   )}
                   {statPts !== 0 && (
-                    <span className={statPts > 0 ? 'text-blue-400' : 'text-red-400'}>
+                    <span className={statPts > 0 ? 'text-blue-400' : 'text-red-300'}>
                       {statPts > 0 ? '+' : ''}{statPts} stats{!confChampComplete ? ' ◎' : ''}
                     </span>
                   )}

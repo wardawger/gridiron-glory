@@ -96,7 +96,7 @@ export function StatBonusPage({ league, members, rosters, seasonStats }: Props) 
                 </div>
 
                 <div>
-                  <p className="text-xs text-red-400 uppercase tracking-wide font-medium mb-1.5 flex items-center gap-1">
+                  <p className="text-xs text-red-300 uppercase tracking-wide font-medium mb-1.5 flex items-center gap-1">
                     <TrendingDown className="w-3 h-3" /> Bottom{botOn ? ` ${catSettings.bottom_count}` : ''}
                   </p>
                   {!botOn ? (
@@ -107,7 +107,7 @@ export function StatBonusPage({ league, members, rosters, seasonStats }: Props) 
                     <div className="space-y-1">
                       {category.bottom.map(e => (
                         <div key={e.team_id} className="card-inner flex items-center gap-2.5 px-3 py-2">
-                          <span className="font-mono text-xs text-red-400 w-5 flex-shrink-0">#{e.rank}</span>
+                          <span className="font-mono text-xs text-red-300 w-5 flex-shrink-0">#{e.rank}</span>
                           <TeamLogo src={e.team_logo} alt={e.team_name} fallbackName={e.team_name} size={24} />
                           <div className="flex-1 min-w-0">
                             <p className="text-xs font-medium text-white truncate">{e.team_name}</p>
@@ -115,7 +115,7 @@ export function StatBonusPage({ league, members, rosters, seasonStats }: Props) 
                           </div>
                           <div className="text-right flex-shrink-0">
                             <p className="font-mono text-xs text-turf-300">{e.value.toFixed(1)}</p>
-                            <p className="font-mono text-xs text-red-400">{e.points}</p>
+                            <p className="font-mono text-xs text-red-300">{e.points}</p>
                           </div>
                         </div>
                       ))}

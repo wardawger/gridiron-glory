@@ -321,7 +321,7 @@ export function AdminPanel({
             })}
           </div>
           {roleError && (
-            <p className="text-xs text-red-400 px-1">{roleError}</p>
+            <p className="text-xs text-red-300 px-1">{roleError}</p>
           )}
 
           {/* Current week */}
@@ -365,7 +365,7 @@ export function AdminPanel({
           <div className="card p-5 border-red-900/40">
             <div className="flex items-start justify-between gap-4">
               <div className="flex items-start gap-3">
-                <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                <AlertTriangle className="w-5 h-5 text-red-300 flex-shrink-0 mt-0.5" />
                 <div>
                   <p className="font-medium text-white">Reset Draft</p>
                   <p className="text-xs text-turf-500 mt-0.5">
@@ -388,7 +388,7 @@ export function AdminPanel({
           <div className="card p-5 border-red-900/40">
             <div className="flex items-start justify-between gap-4">
               <div className="flex items-start gap-3">
-                <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                <AlertTriangle className="w-5 h-5 text-red-300 flex-shrink-0 mt-0.5" />
                 <div>
                   <p className="font-medium text-white">Delete League</p>
                   <p className="text-xs text-turf-500 mt-0.5">
@@ -452,10 +452,10 @@ export function AdminPanel({
               This archives the standings above to <span className="text-white font-medium">League History</span> and
               resets <span className="text-white font-medium">{league.name}</span> — draft picks, free agency, captain
               picks, bonuses, and spread picks — for a new season.{' '}
-              <span className="text-red-400 font-medium">There is no way to recover the current data afterward.</span>
+              <span className="text-red-300 font-medium">There is no way to recover the current data afterward.</span>
             </p>
             {endSeasonError && (
-              <p className="text-xs text-red-400">{endSeasonError}</p>
+              <p className="text-xs text-red-300">{endSeasonError}</p>
             )}
             <div className="flex gap-2">
               <button
@@ -491,17 +491,17 @@ export function AdminPanel({
           >
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-red-900/40 flex items-center justify-center flex-shrink-0">
-                <AlertTriangle className="w-5 h-5 text-red-400" />
+                <AlertTriangle className="w-5 h-5 text-red-300" />
               </div>
               <h3 className="font-display text-xl text-white tracking-wide">Reset Draft?</h3>
             </div>
             <p className="text-sm text-turf-300">
               This permanently deletes every draft pick and free agency swap in <span className="text-white font-medium">{league.name}</span> and
               returns the league to pre-draft status. Captain picks and bonuses are not affected.{' '}
-              <span className="text-red-400 font-medium">There is no way to recover them.</span>
+              <span className="text-red-300 font-medium">There is no way to recover them.</span>
             </p>
             {resetError && (
-              <p className="text-xs text-red-400">{resetError}</p>
+              <p className="text-xs text-red-300">{resetError}</p>
             )}
             <div className="flex gap-2">
               <button
@@ -537,17 +537,17 @@ export function AdminPanel({
           >
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-red-900/40 flex items-center justify-center flex-shrink-0">
-                <AlertTriangle className="w-5 h-5 text-red-400" />
+                <AlertTriangle className="w-5 h-5 text-red-300" />
               </div>
               <h3 className="font-display text-xl text-white tracking-wide">Delete League?</h3>
             </div>
             <p className="text-sm text-turf-300">
               This permanently deletes <span className="text-white font-medium">{league.name}</span> —
               every member, draft pick, score, and setting.{' '}
-              <span className="text-red-400 font-medium">There is no way to recover it.</span>
+              <span className="text-red-300 font-medium">There is no way to recover it.</span>
             </p>
             {deleteError && (
-              <p className="text-xs text-red-400">{deleteError}</p>
+              <p className="text-xs text-red-300">{deleteError}</p>
             )}
             <div className="flex gap-2">
               <button
@@ -676,7 +676,7 @@ export function AdminPanel({
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
                             <span className="text-xs text-turf-400 flex items-center gap-1">
-                              <TrendingDown className="w-3 h-3 text-red-400" /> Bottom Bonus
+                              <TrendingDown className="w-3 h-3 text-red-300" /> Bottom Bonus
                             </span>
                             <Toggle
                               checked={c.bottom_enabled}
@@ -1007,7 +1007,7 @@ export function AdminPanel({
                       <p className="text-xs text-turf-500">{b.team_name} · {b.note}</p>
                     </div>
                     <span className="font-mono font-bold text-gold-400">+{b.points}</span>
-                    <button onClick={() => onRemoveBonus(b.id)} className="btn-ghost btn-sm text-red-400 hover:text-red-300">
+                    <button onClick={() => onRemoveBonus(b.id)} className="btn-ghost btn-sm text-red-300 hover:text-red-200">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
@@ -1048,7 +1048,7 @@ export function AdminPanel({
                           </div>
                           <div className="text-xs text-turf-500 mt-0.5">
                             {pick.result
-                              ? <span className={pick.result === 'covered' ? 'text-field-400' : 'text-red-400'}>
+                              ? <span className={pick.result === 'covered' ? 'text-field-400' : 'text-red-300'}>
                                   {pick.result === 'covered' ? '✓ Covered' : '✗ Missed'}
                                   {pick.points !== null ? ` · ${pick.points > 0 ? '+' : ''}${pick.points} pts` : ''}
                                 </span>
@@ -1065,7 +1065,7 @@ export function AdminPanel({
                           </button>
                           <button
                             onClick={() => onOverrideSpread(pick.id, 'missed', -league.scoring.spread_points)}
-                            className="text-xs border border-red-800 text-red-400 hover:bg-red-900/20 rounded px-2 py-1 transition-colors"
+                            className="text-xs border border-red-800 text-red-300 hover:bg-red-900/20 rounded px-2 py-1 transition-colors"
                           >
                             ✗ Missed
                           </button>

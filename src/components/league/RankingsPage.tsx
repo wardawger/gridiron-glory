@@ -62,7 +62,7 @@ export function RankingsPage({ rankings, teams, records }: Props) {
                   <td className="px-4 py-3 text-center">
                     <span className="inline-flex items-center justify-center">
                       {r.trend === 'up'   && <ArrowUp   className="w-4 h-4 text-field-400" />}
-                      {r.trend === 'down' && <ArrowDown  className="w-4 h-4 text-red-400" />}
+                      {r.trend === 'down' && <ArrowDown  className="w-4 h-4 text-red-300" />}
                       {r.trend === 'same' && <Minus       className="w-4 h-4 text-turf-600" />}
                       {r.trend === 'new'  && <span className="text-xs text-amber-400 font-medium">NEW</span>}
                     </span>

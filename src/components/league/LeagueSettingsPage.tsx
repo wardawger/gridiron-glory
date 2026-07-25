@@ -69,8 +69,8 @@ export function LeagueSettingsPage({ league, members }: Props) {
           <div className="card-inner px-3 py-2 flex items-center justify-between"><span className="text-turf-300">Beat a ranked team</span><span className="font-mono font-medium text-field-400">{pts(scoring.win_ranked)}</span></div>
           <div className="card-inner px-3 py-2 flex items-center justify-between"><span className="text-turf-300">Beat Top 15</span><span className="font-mono font-medium text-field-400">{pts(scoring.win_top15)}</span></div>
           <div className="card-inner px-3 py-2 flex items-center justify-between"><span className="text-turf-300">Beat Top 5</span><span className="font-mono font-medium text-field-400">{pts(scoring.win_top5)}</span></div>
-          <div className="card-inner px-3 py-2 flex items-center justify-between"><span className="text-turf-300">Loss</span><span className="font-mono font-medium text-red-400">{pts(scoring.loss)}</span></div>
-          <div className="card-inner px-3 py-2 flex items-center justify-between"><span className="text-turf-300">Loss to a G5 team</span><span className="font-mono font-medium text-red-400">{pts(scoring.loss_g5)}</span></div>
+          <div className="card-inner px-3 py-2 flex items-center justify-between"><span className="text-turf-300">Loss</span><span className="font-mono font-medium text-red-300">{pts(scoring.loss)}</span></div>
+          <div className="card-inner px-3 py-2 flex items-center justify-between"><span className="text-turf-300">Loss to a G5 team</span><span className="font-mono font-medium text-red-300">{pts(scoring.loss_g5)}</span></div>
         </div>
       </div>
 
@@ -95,7 +95,7 @@ export function LeagueSettingsPage({ league, members }: Props) {
             </div>
             <div className="card-inner px-3 py-2 flex items-center justify-between">
               <span className="text-turf-300">Missing the spread</span>
-              <span className="font-mono font-medium text-red-400">
+              <span className="font-mono font-medium text-red-300">
                 {scoring.spread_is_multiplier ? `×${scoring.spread_points}` : `-${scoring.spread_points}`}
               </span>
             </div>
@@ -160,7 +160,7 @@ export function LeagueSettingsPage({ league, members }: Props) {
                       </span>
                     )}
                     {c.bottom_enabled && (
-                      <span className="text-red-400 flex items-center gap-1">
+                      <span className="text-red-300 flex items-center gap-1">
                         <TrendingDown className="w-3 h-3" /> Bottom {c.bottom_count}: {pts(c.bottom_points)}
                       </span>
                     )}
@@ -190,7 +190,7 @@ export function LeagueSettingsPage({ league, members }: Props) {
                 {group.types.map(type => (
                   <div key={type} className="px-3 py-1.5 flex items-center justify-between text-xs">
                     <span className="text-turf-300">{BONUS_LABELS[type]}</span>
-                    <span className={`font-mono font-medium ${BONUS_DEFAULT_POINTS[type] >= 0 ? 'text-field-400' : 'text-red-400'}`}>
+                    <span className={`font-mono font-medium ${BONUS_DEFAULT_POINTS[type] >= 0 ? 'text-field-400' : 'text-red-300'}`}>
                       {pts(BONUS_DEFAULT_POINTS[type])}
                     </span>
                   </div>

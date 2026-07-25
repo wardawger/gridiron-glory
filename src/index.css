@@ -87,7 +87,7 @@
   }
   .badge-green  { @apply badge bg-field-900/60 text-field-400 border border-field-800; }
   .badge-gold   { @apply badge bg-amber-900/60 text-amber-400 border border-amber-800; }
-  .badge-red    { @apply badge bg-red-900/60 text-red-400 border border-red-800; }
+  .badge-red    { @apply badge bg-red-900/60 text-red-300 border border-red-800; }
   .badge-blue   { @apply badge bg-blue-900/60 text-blue-400 border border-blue-800; }
   .badge-purple { @apply badge bg-purple-900/60 text-purple-400 border border-purple-800; }
   .badge-gray   { @apply badge bg-turf-700 text-turf-400 border border-turf-600; }

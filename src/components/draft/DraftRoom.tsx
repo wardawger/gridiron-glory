@@ -391,7 +391,7 @@ export function DraftRoom({
                 }`}>
                   <p className="text-xs text-turf-400 truncate">{conf}</p>
                   <p className={`font-mono font-bold text-lg ${
-                    atMax ? 'text-red-400' : atMin ? 'text-field-400' : 'text-white'
+                    atMax ? 'text-red-300' : atMin ? 'text-field-400' : 'text-white'
                   }`}>{count}/{DRAFT_CONF_MAX}</p>
                   <p className="text-xs text-turf-500">min {DRAFT_CONF_MIN}</p>
                 </div>
@@ -632,7 +632,7 @@ function DraftTeamModal({ team, gameData, ratings, apRank, isMyTurn, picking, pi
             {picking ? 'Drafting…' : canPick ? `Confirm Pick: ${team.name}` : reason ?? 'Not available'}
           </button>
           {pickError && (
-            <p className="text-xs text-red-400 text-center">{pickError}</p>
+            <p className="text-xs text-red-300 text-center">{pickError}</p>
           )}
         </div>
 
