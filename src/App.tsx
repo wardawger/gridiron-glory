@@ -132,6 +132,7 @@ export default function App() {
                 gameData={cfb.gameData}
                 seasonStats={cfb.seasonStats}
                 rankings={cfb.rankings}
+                teams={cfb.teams}
                 userId={auth.user.id}
                 cfbLoading={cfb.loading}
               />

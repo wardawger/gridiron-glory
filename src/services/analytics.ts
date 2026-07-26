@@ -7,10 +7,10 @@ export interface RosterAnalytics {
   avg_rank: number;
   top25_avg: number;
   bot25_avg: number;
-  best_pick: { team_name: string; points: number } | null;
-  worst_pick: { team_name: string; points: number } | null;
-  best_team: { team_name: string; rank: number } | null;
-  worst_team: { team_name: string; rank: number } | null;
+  best_pick: { team_name: string; team_logo: string; points: number } | null;
+  worst_pick: { team_name: string; team_logo: string; points: number } | null;
+  best_team: { team_name: string; team_logo: string; rank: number } | null;
+  worst_team: { team_name: string; team_logo: string; rank: number } | null;
   over_under_pts: number;
   over_under_avg: number;
   draft_pick_numbers: number[];
@@ -22,6 +22,7 @@ export interface RosterAnalytics {
 }
 
 export interface UndraftedTeam {
+  team_id: string;
   team_name: string;
   rank: number;
 }
@@ -79,7 +80,7 @@ export function computeAnalytics(
       const rank = rankMap.get(t.team_id)
         ?? rankByName.get(t.team_name.toLowerCase())
         ?? 999;
-      return { team_id: t.team_id, team_name: t.team_name, rank };
+      return { team_id: t.team_id, team_name: t.team_name, team_logo: t.team_logo, rank };
     }).sort((a, b) => a.rank - b.rank);
 
     const n = teamRanks.length;
@@ -96,6 +97,7 @@ export function computeAnalytics(
     // Best/worst picks by total season points
     const teamPtsArr = roster.map(t => ({
       team_name: t.team_name,
+      team_logo: t.team_logo,
       points: tmap.get(t.team_id) ?? 0,
     })).filter(t => t.points !== 0).sort((a, b) => b.points - a.points);
 
@@ -163,7 +165,7 @@ export function computeAnalytics(
   const undrafted: UndraftedTeam[] = apRankings
     .filter(r => r.team_id && !draftedTeamIds.has(r.team_id))
     .slice(0, 10)
-    .map(r => ({ team_name: r.team_name, rank: r.rank }));
+    .map(r => ({ team_id: r.team_id!, team_name: r.team_name, rank: r.rank }));
 
   return { analytics, undrafted, scatterPoints };
 }

@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
-import { Loader2, Coins } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Loader2, Coins, Trophy } from 'lucide-react';
 import { Leaderboard } from '../components/league/Leaderboard';
-import type { League, LeagueMember, CaptainPick, GameData, ManualBonus, DraftPick, TeamSeasonStats, APRanking, SpreadPick, FreeAgencyMove } from '../types';
+import type { League, LeagueMember, CaptainPick, GameData, ManualBonus, DraftPick, TeamSeasonStats, APRanking, SpreadPick, FreeAgencyMove, CfbTeam } from '../types';
 import { buildLeaderboard } from '../services/scoring';
 
 interface Props {
@@ -15,13 +16,14 @@ interface Props {
   gameData: GameData;
   seasonStats: Map<string, TeamSeasonStats>;
   rankings: APRanking[];
+  teams: CfbTeam[];
   userId: string;
   cfbLoading: boolean;
 }
 
 export function HomePage({
   league, members, draftPicks, captainPicks, manualBonuses, spreadPicks, freeAgencyMoves,
-  gameData, seasonStats, rankings, userId, cfbLoading,
+  gameData, seasonStats, rankings, teams, userId, cfbLoading,
 }: Props) {
   const confChampComplete = league.current_week >= 15;
 
@@ -58,14 +60,26 @@ export function HomePage({
           </span>
         </div>
       )}
-      <Leaderboard
-        entries={leaderboard}
-        currentWeek={league.current_week}
-        userId={userId}
-        confChampComplete={confChampComplete}
-        draftPicks={draftPicks}
-        rankings={rankings}
-      />
+      {league.draft_status === 'pending' ? (
+        <div className="card p-12 text-center">
+          <Trophy className="w-10 h-10 mx-auto mb-3 text-turf-700" />
+          <p className="text-turf-300 font-medium">Standings will show up here once the draft starts</p>
+          <p className="text-turf-500 text-sm mt-1 max-w-sm mx-auto">
+            Each manager's total points, weekly trends, and roster analytics appear as soon as teams are drafted.
+          </p>
+          <Link to="/draft" className="btn-primary mt-4 inline-flex">Go to Draft Room</Link>
+        </div>
+      ) : (
+        <Leaderboard
+          entries={leaderboard}
+          currentWeek={league.current_week}
+          userId={userId}
+          confChampComplete={confChampComplete}
+          draftPicks={draftPicks}
+          rankings={rankings}
+          teams={teams}
+        />
+      )}
     </div>
   );
 }
