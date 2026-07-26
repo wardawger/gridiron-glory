@@ -291,19 +291,21 @@ export function AdminPanel({
               const isLastCommissioner = m.role === 'commissioner' && commissionerCount <= 1;
               const updating = roleUpdatingId === m.user_id;
               return (
-                <div key={m.user_id} className="flex items-center gap-4 px-5 py-3">
-                  <Avatar displayName={m.display_name} avatarType={m.avatar_type} avatarValue={m.avatar_value} size={32} />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-white truncate">{m.display_name}</p>
-                    <p className="text-xs text-turf-500">{new Date(m.joined_at).toLocaleDateString()}</p>
+                <div key={m.user_id} className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 px-5 py-3">
+                  <div className="flex items-center gap-4 flex-1 min-w-0">
+                    <Avatar displayName={m.display_name} avatarType={m.avatar_type} avatarValue={m.avatar_value} size={32} />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-white truncate">{m.display_name}</p>
+                      <p className="text-xs text-turf-500">{new Date(m.joined_at).toLocaleDateString()}</p>
+                    </div>
                   </div>
-                  {m.role === 'commissioner' && (
-                    <span className="badge-green text-xs flex-shrink-0">Commissioner</span>
-                  )}
                   <div
-                    className="flex items-center gap-2 flex-shrink-0"
+                    className="flex items-center gap-2 pl-12 sm:pl-0 flex-shrink-0"
                     title={isLastCommissioner ? 'A league needs at least one commissioner' : undefined}
                   >
+                    {m.role === 'commissioner' && (
+                      <span className="badge-green text-xs flex-shrink-0">Commissioner</span>
+                    )}
                     <span className="text-xs text-turf-500">Co-Commissioner</span>
                     {updating ? (
                       <Loader2 className="w-4 h-4 animate-spin text-turf-500" />
@@ -339,7 +341,7 @@ export function AdminPanel({
 
           {/* End Season */}
           <div className="card p-5">
-            <div className="flex items-start justify-between gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
               <div className="flex items-start gap-3">
                 <Archive className="w-5 h-5 text-gold-400 flex-shrink-0 mt-0.5" />
                 <div>
@@ -354,7 +356,7 @@ export function AdminPanel({
               <button
                 onClick={() => { setEndSeasonError(''); setSeasonLabel(defaultSeasonLabel); setShowEndSeasonModal(true); }}
                 disabled={finalStandings.length === 0}
-                className="btn-gold flex-shrink-0"
+                className="btn-gold w-full sm:w-auto flex-shrink-0"
               >
                 <Archive className="w-4 h-4" /> End Season
               </button>
@@ -363,7 +365,7 @@ export function AdminPanel({
 
           {/* Reset Draft */}
           <div className="card p-5 border-red-900/40">
-            <div className="flex items-start justify-between gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
               <div className="flex items-start gap-3">
                 <AlertTriangle className="w-5 h-5 text-red-300 flex-shrink-0 mt-0.5" />
                 <div>
@@ -377,7 +379,7 @@ export function AdminPanel({
               </div>
               <button
                 onClick={() => { setResetError(''); setShowResetModal(true); }}
-                className="btn-danger flex-shrink-0"
+                className="btn-danger w-full sm:w-auto flex-shrink-0"
               >
                 <RotateCcw className="w-4 h-4" /> Reset Draft
               </button>
@@ -386,7 +388,7 @@ export function AdminPanel({
 
           {/* Delete League */}
           <div className="card p-5 border-red-900/40">
-            <div className="flex items-start justify-between gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
               <div className="flex items-start gap-3">
                 <AlertTriangle className="w-5 h-5 text-red-300 flex-shrink-0 mt-0.5" />
                 <div>
@@ -399,7 +401,7 @@ export function AdminPanel({
               </div>
               <button
                 onClick={() => { setDeleteError(''); setShowDeleteModal(true); }}
-                className="btn-danger flex-shrink-0"
+                className="btn-danger w-full sm:w-auto flex-shrink-0"
               >
                 <Trash2 className="w-4 h-4" /> Delete League
               </button>
