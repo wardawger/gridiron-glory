@@ -152,7 +152,7 @@ export function LeagueSettingsPage({ league, members }: Props) {
               if (!c.top_enabled && !c.bottom_enabled) return null;
               return (
                 <div key={cat} className="card-inner px-3 py-2 flex items-center justify-between text-sm flex-wrap gap-1">
-                  <span className="text-turf-300">{STAT_BONUS_LABELS[cat]}</span>
+                  <span className="text-turf-300">{cat === 'qbr' ? 'QBR' : STAT_BONUS_LABELS[cat]}</span>
                   <div className="flex items-center gap-3 text-xs font-mono">
                     {c.top_enabled && (
                       <span className="text-field-400 flex items-center gap-1">
