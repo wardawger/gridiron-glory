@@ -216,9 +216,9 @@ export function AdminPanel({
   };
 
   const tabs: { id: Tab; label: string; icon: any }[] = [
-    { id: 'members',  label: 'Members & Invites',  icon: UserPlus },
-    { id: 'scoring',  label: 'Scoring',             icon: Settings },
-    { id: 'bonuses',  label: 'Postseason Bonuses',  icon: Gift },
+    { id: 'members',  label: 'Members',  icon: UserPlus },
+    { id: 'scoring',  label: 'Scoring',  icon: Settings },
+    { id: 'bonuses',  label: 'Bonuses',  icon: Gift },
   ];
 
   return (
@@ -234,13 +234,13 @@ export function AdminPanel({
           <button
             key={id}
             onClick={() => setTab(id)}
-            className={`flex items-center gap-1.5 flex-1 justify-center py-2 rounded-lg text-sm font-medium transition-all ${
+            className={`flex items-center gap-1.5 flex-1 justify-center px-2 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${
               tab === id
                 ? 'bg-field-500 text-turf-950'
                 : 'text-turf-400 hover:text-white'
             }`}
           >
-            <Icon className="w-3.5 h-3.5" /> {label}
+            <Icon className="w-3.5 h-3.5 flex-shrink-0" /> {label}
           </button>
         ))}
       </div>
@@ -304,7 +304,13 @@ export function AdminPanel({
                     title={isLastCommissioner ? 'A league needs at least one commissioner' : undefined}
                   >
                     {m.role === 'commissioner' && (
-                      <span className="badge-green text-xs flex-shrink-0">Commissioner</span>
+                      <Shield
+                        className="w-4 h-4 text-field-400 flex-shrink-0"
+                        role="img"
+                        aria-label="Commissioner"
+                      >
+                        <title>Commissioner</title>
+                      </Shield>
                     )}
                     <span className="text-xs text-turf-500">Co-Commissioner</span>
                     {updating ? (
@@ -1008,7 +1014,9 @@ export function AdminPanel({
                       </div>
                       <p className="text-xs text-turf-500">{b.team_name} · {b.note}</p>
                     </div>
-                    <span className="font-mono font-bold text-gold-400">+{b.points}</span>
+                    <span className={`font-mono font-bold ${b.points >= 0 ? 'text-gold-400' : 'text-red-300'}`}>
+                      {b.points >= 0 ? '+' : '-'}{Math.abs(b.points)}
+                    </span>
                     <button onClick={() => onRemoveBonus(b.id)} className="btn-ghost btn-sm text-red-300 hover:text-red-200">
                       <Trash2 className="w-4 h-4" />
                     </button>
