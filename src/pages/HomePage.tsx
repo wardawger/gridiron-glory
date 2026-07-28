@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Loader2, Coins, Trophy } from 'lucide-react';
+import { Loader2, Coins, Trophy, BarChart3 } from 'lucide-react';
 import { Leaderboard } from '../components/league/Leaderboard';
 import type { League, LeagueMember, CaptainPick, GameData, ManualBonus, DraftPick, TeamSeasonStats, APRanking, SpreadPick, FreeAgencyMove, CfbTeam } from '../types';
 import { buildLeaderboard } from '../services/scoring';
@@ -46,7 +46,7 @@ export function HomePage({
       )}
       {!cfbLoading && seasonStats.size > 0 && !confChampComplete && (
         <div className="card p-4 flex items-center gap-3 text-sm border-amber-800/40 bg-amber-950/20">
-          <span className="text-amber-400">📊</span>
+          <BarChart3 className="w-4 h-4 text-amber-400 flex-shrink-0" />
           <span className="text-amber-300">
             Statistical ranking bonuses are shown as a live preview (◎). Points lock in after conference championship week.
           </span>

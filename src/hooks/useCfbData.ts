@@ -1,6 +1,11 @@
 import { useState, useEffect } from 'react';
 import type { CfbTeam, GameData, APRanking, TeamSeasonStats, SpreadData, TeamRatings } from '../types';
 import { fetchFbsTeams, fetchSeasonData, fetchRankings, fetchTeamRecords, fetchSeasonStats, fetchTeamRatings, fetchSpreads } from '../services/cfbd';
+import { buildMockSeasonData, buildMockSeasonStats, MOCK_TEAMS } from '../services/mockSeasonData';
+
+// Dev-only preview flag — never set in Netlify, so production always takes
+// the real CFBD path. See src/services/mockSeasonData.ts.
+const USE_MOCK_SEASON_DATA = import.meta.env.VITE_MOCK_SEASON_DATA === 'true';
 
 interface CfbState {
   teams: CfbTeam[];
@@ -35,6 +40,24 @@ export function useCfbData(): CfbState {
       setLoading(true);
       setError(null);
       try {
+        if (USE_MOCK_SEASON_DATA) {
+          // Skip fetchFbsTeams() entirely — it depends on the Netlify
+          // Function proxy, which doesn't exist under plain `vite dev`, so
+          // it would just return an empty list locally. Use a bundled real
+          // team roster instead so mock games/ratings have something to
+          // attach to.
+          const t = MOCK_TEAMS;
+          if (cancelled) return;
+          setTeams(t);
+          const mock = buildMockSeasonData(t);
+          setGameData(mock.gameData);
+          setRankings(mock.rankings);
+          setRecords(mock.records);
+          setSeasonStats(buildMockSeasonStats(t));
+          setTeamRatings(new Map());
+          return;
+        }
+
         const t = await fetchFbsTeams();
         if (cancelled) return;
         setTeams(t);
