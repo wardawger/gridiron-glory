@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
 import { Shield, TrendingUp, TrendingDown, Minus, Star, Calendar, List, X, MapPin, Tv, Clock, Zap, Coins, ChevronDown } from 'lucide-react';
 import type { RosterEntry, CaptainPick, GameData, ScoringSettings, LeagueMember, WeeklyScore, GameResult, SpreadPick, SpreadData, FreeAgencyMove, DraftPick } from '../../types';
-import { calcWeeklyScore, scoreGame, didCoverSpread } from '../../services/scoring';
+import { calcWeeklyScore, scoreGame, didCoverSpread, scoreSpread } from '../../services/scoring';
 import { rosterAtWeek } from '../../services/roster';
 import { Tooltip } from '../ui/Tooltip';
 import { TeamLogo } from '../ui/TeamLogo';
@@ -73,15 +73,18 @@ interface GameScoreModalProps {
   week: number;
   isCaptain: boolean;
   scoring: ScoringSettings;
+  spreadPick: SpreadPick | null;
   onClose: () => void;
 }
 
-function GameScoreModal({ game, teamName, teamLogo, week, isCaptain, scoring, onClose }: GameScoreModalProps) {
+function GameScoreModal({ game, teamName, teamLogo, week, isCaptain, scoring, spreadPick, onClose }: GameScoreModalProps) {
   const isWin      = game.result === 'W';
   const isLoss     = game.result === 'L';
   const isComplete = game.completed;
   const isHome     = (game as any).is_home ?? true;
   const oppLogo    = (game as any).opponent_logo ?? null;
+  const myScore    = isHome ? game.home_score : game.away_score;
+  const oppScore   = isHome ? game.away_score : game.home_score;
 
   // Build individual scoring line items
   const lines: { label: string; pts: number; active: boolean; color: string }[] = [];
@@ -98,9 +101,25 @@ function GameScoreModal({ game, teamName, teamLogo, week, isCaptain, scoring, on
     }
   }
 
-  const basePoints  = scoreGame(game, scoring, false);
-  const totalPoints = scoreGame(game, scoring, isCaptain);
-  const captainBonus = totalPoints - basePoints;
+  // Spread points — only relevant if the owner actually picked this team's
+  // spread that week. Reuses the same scoring functions the real weekly
+  // total is computed with, so this always agrees with the rest of the app.
+  let spreadPts = 0;
+  let spreadCovered: boolean | null = null;
+  if (spreadPick && isComplete) {
+    if (spreadPick.points !== null && spreadPick.result !== null) {
+      spreadPts = spreadPick.points;
+      spreadCovered = spreadPick.result === 'covered';
+    } else {
+      const baseGamePts = scoreGame(game, scoring, false);
+      spreadCovered = didCoverSpread(game, spreadPick.locked_spread, isHome);
+      spreadPts = scoreSpread(game, scoring, spreadPick.locked_spread, isHome, baseGamePts);
+    }
+  }
+
+  const basePoints    = scoreGame(game, scoring, false);
+  const captainBonus  = scoreGame(game, scoring, isCaptain) - basePoints;
+  const totalPoints   = scoreGame(game, scoring, isCaptain) + spreadPts;
 
   return (
     <div
@@ -112,49 +131,61 @@ function GameScoreModal({ game, teamName, teamLogo, week, isCaptain, scoring, on
         className="relative w-full max-w-sm rounded-2xl border border-turf-700 bg-turf-950 shadow-2xl"
         onClick={e => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="flex items-center gap-3 border-b border-turf-800 px-5 py-4">
-          {/* My team */}
-          <TeamLogo src={teamLogo} alt={teamName} fallbackName={teamName} size={36} />
-          <div className="flex-1 min-w-0 text-center">
-            <div className="text-xs text-turf-500 mb-0.5">Week {week}</div>
-            <div className="text-xs text-turf-400">{isHome ? 'vs' : 'at'}</div>
-          </div>
-          {/* Opponent */}
-          <div className="flex flex-col items-center gap-1">
-            <TeamLogo src={oppLogo} alt={game.opponent} fallbackName={game.opponent} size={36} />
-            <span className="text-xs text-turf-400 text-center leading-tight max-w-20 truncate">
-              {game.opponent_rank ? `#${game.opponent_rank} ` : ''}{game.opponent}
-            </span>
-          </div>
+        {/* Header — scoreboard: logo + score per side */}
+        <div className="relative border-b border-turf-800 px-5 py-5">
           <button
             onClick={onClose}
             aria-label="Close"
-            className="ml-2 rounded-lg border border-turf-700 p-1.5 text-turf-400 hover:border-turf-500 hover:text-white transition-colors flex-shrink-0"
+            className="absolute top-3 right-3 rounded-lg border border-turf-700 p-1.5 text-turf-400 hover:border-turf-500 hover:text-white transition-colors"
           >
             <X className="h-3.5 w-3.5" />
           </button>
+          <div className="flex items-center justify-center gap-4">
+            {/* My team */}
+            <div className="flex flex-1 flex-col items-center gap-2 min-w-0">
+              <TeamLogo src={teamLogo} alt={teamName} fallbackName={teamName} size={44} />
+              <span className={`font-mono text-3xl font-bold ${
+                !isComplete ? 'text-turf-600' : isWin ? 'text-white' : 'text-turf-500'
+              }`}>
+                {myScore ?? '–'}
+              </span>
+              <span className="text-xs text-turf-400 text-center leading-tight max-w-24 truncate">{teamName}</span>
+            </div>
+
+            <div className="flex flex-shrink-0 flex-col items-center gap-1 px-1">
+              <span className="text-xs text-turf-500">Week {week}</span>
+              <span className="text-[10px] uppercase tracking-wide text-turf-600">
+                {isComplete ? 'Final' : (isHome ? 'vs' : 'at')}
+              </span>
+            </div>
+
+            {/* Opponent */}
+            <div className="flex flex-1 flex-col items-center gap-2 min-w-0">
+              <TeamLogo src={oppLogo} alt={game.opponent} fallbackName={game.opponent} size={44} />
+              <span className={`font-mono text-3xl font-bold ${
+                !isComplete ? 'text-turf-600' : isLoss ? 'text-white' : 'text-turf-500'
+              }`}>
+                {oppScore ?? '–'}
+              </span>
+              <span className="text-xs text-turf-400 text-center leading-tight max-w-24 truncate">
+                {game.opponent_rank ? `#${game.opponent_rank} ` : ''}{game.opponent}
+              </span>
+            </div>
+          </div>
         </div>
 
         {/* Result badge */}
         {isComplete && game.result ? (
-          <div className={`mx-5 mt-4 rounded-lg px-4 py-2 flex items-center justify-between ${
+          <div className={`mx-5 mt-4 rounded-lg px-4 py-2 flex items-center justify-center gap-2 ${
             isWin ? 'bg-field-900/40 border border-field-800/50' : 'bg-red-900/30 border border-red-800/50'
           }`}>
-            <div className="flex items-center gap-2">
-              {isWin
-                ? <TrendingUp className="w-4 h-4 text-field-400" />
-                : <TrendingDown className="w-4 h-4 text-red-300" />
-              }
-              <span className={`font-bold text-sm ${isWin ? 'text-field-300' : 'text-red-300'}`}>
-                {game.result === 'W' ? 'WIN' : 'LOSS'}
-              </span>
-            </div>
-            {game.home_score != null && game.away_score != null && (
-              <span className="font-mono text-sm text-white">
-                {game.home_score}–{game.away_score}
-              </span>
-            )}
+            {isWin
+              ? <TrendingUp className="w-4 h-4 text-field-400" />
+              : <TrendingDown className="w-4 h-4 text-red-300" />
+            }
+            <span className={`font-bold text-sm ${isWin ? 'text-field-300' : 'text-red-300'}`}>
+              {game.result === 'W' ? 'WIN' : 'LOSS'}
+            </span>
           </div>
         ) : (
           <div className="mx-5 mt-4 rounded-lg px-4 py-2 bg-turf-800/50 border border-turf-700">
@@ -192,6 +223,21 @@ function GameScoreModal({ game, teamName, teamLogo, week, isCaptain, scoring, on
               </span>
             </div>
           ))}
+
+          {/* Spread pick */}
+          {spreadPick && isComplete && spreadCovered !== null && (
+            <div className="mt-3 pt-3 border-t border-turf-800 flex items-center justify-between text-sm">
+              <div className="flex items-center gap-2">
+                <Coins className={`w-3.5 h-3.5 flex-shrink-0 ${spreadCovered ? 'text-field-400' : 'text-red-300'}`} />
+                <span className={spreadCovered ? 'text-field-300' : 'text-red-300'}>
+                  Spread {spreadCovered ? 'Covered' : 'Missed'} ({formatSpread(spreadPick.locked_spread)})
+                </span>
+              </div>
+              <span className={`font-mono font-medium ${spreadPts >= 0 ? 'text-field-400' : 'text-red-300'}`}>
+                {spreadPts > 0 ? '+' : ''}{spreadPts}
+              </span>
+            </div>
+          )}
 
           {/* Captain multiplier */}
           {isCaptain && isComplete && game.result && (
@@ -385,7 +431,7 @@ export function RosterView({
   const [spreadError, setSpreadError] = useState<string | null>(null);
   const [spreadsLoading, setSpreadsLoading] = useState(false);
   const [gameScoreModal, setGameScoreModal] = useState<{
-    game: GameResult; teamName: string; teamLogo: string;
+    game: GameResult; teamId: string; teamName: string; teamLogo: string;
     week: number; isCaptain: boolean;
   } | null>(null);
 
@@ -439,6 +485,9 @@ export function RosterView({
           week={gameScoreModal.week}
           isCaptain={gameScoreModal.isCaptain}
           scoring={scoring}
+          spreadPick={spreadPicks.find(
+            p => p.team_id === gameScoreModal.teamId && p.week === gameScoreModal.week
+          ) ?? null}
           onClose={() => setGameScoreModal(null)}
         />
       )}
@@ -624,12 +673,13 @@ export function RosterView({
                         className="mt-3 w-full text-left group/game cursor-pointer"
                         onClick={() => setGameScoreModal({
                           game,
+                          teamId: entry.team_id,
                           teamName: entry.team_name,
                           teamLogo: entry.team_logo,
                           week: selectedWeek,
                           isCaptain,
                         })}
-                        onKeyDown={e => { if (e.key === 'Enter') setGameScoreModal({ game, teamName: entry.team_name, teamLogo: entry.team_logo, week: selectedWeek, isCaptain }); }}
+                        onKeyDown={e => { if (e.key === 'Enter') setGameScoreModal({ game, teamId: entry.team_id, teamName: entry.team_name, teamLogo: entry.team_logo, week: selectedWeek, isCaptain }); }}
                       >
                         <div className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-turf-800/60 transition-colors">
                           <div className="flex items-center gap-2 min-w-0">
@@ -901,6 +951,7 @@ export function RosterView({
                                       const isCaptainThisWeek = getCaptainForWeek(w) === entry.team_id;
                                       setGameScoreModal({
                                         game,
+                                        teamId: entry.team_id,
                                         teamName: entry.team_name,
                                         teamLogo: entry.team_logo,
                                         week: w,
