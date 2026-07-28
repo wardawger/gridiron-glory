@@ -83,16 +83,19 @@ export function computeAnalytics(
       return { team_id: t.team_id, team_name: t.team_name, team_logo: t.team_logo, rank };
     }).sort((a, b) => a.rank - b.rank);
 
-    const n = teamRanks.length;
-    const top25n  = Math.max(1, Math.ceil(n * 0.25));
-    const bot25n  = Math.max(1, Math.ceil(n * 0.25));
+    // Unranked teams carry the 999 sentinel — exclude them before slicing
+    // into quartiles, or they sort into the "bottom 25%" and drag averages
+    // toward 999 (e.g. a "999.0" Bottom 25% Rank for a lightly-ranked roster).
+    const rankedTeams = teamRanks.filter(t => t.rank < 999);
+    const rn = rankedTeams.length;
+    const top25n = Math.max(1, Math.ceil(rn * 0.25));
+    const bot25n = Math.max(1, Math.ceil(rn * 0.25));
 
     const avg = (arr: number[]) => arr.length ? +(arr.reduce((s, v) => s + v, 0) / arr.length).toFixed(1) : 0;
 
-    const top25Ranks  = teamRanks.slice(0, top25n).map(t => t.rank);
-    const bot25Ranks  = teamRanks.slice(n - bot25n).map(t => t.rank);
-    const allRanks    = teamRanks.map(t => t.rank).filter(r => r < 999);
-    const rankedTeams = teamRanks.filter(t => t.rank < 999);
+    const top25Ranks = rankedTeams.slice(0, top25n).map(t => t.rank);
+    const bot25Ranks = rankedTeams.slice(rn - bot25n).map(t => t.rank);
+    const allRanks    = rankedTeams.map(t => t.rank);
 
     // Best/worst picks by total season points
     const teamPtsArr = roster.map(t => ({

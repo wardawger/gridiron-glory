@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  Cell, RadarChart, Radar, PolarGrid, PolarAngleAxis, Legend,
+  Cell, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Legend,
   LineChart, Line, ScatterChart, Scatter, ReferenceLine,
 } from 'recharts';
 import { Crown, TrendingUp, TrendingDown, Star } from 'lucide-react';
@@ -23,6 +23,16 @@ interface Props {
 
 const PLAYER_COLORS = ['#f59e0b', '#60a5fa', '#a78bfa', '#34d399', '#f87171', '#fb923c'];
 
+// Short display label for charts — first name plus a last-initial, so two
+// managers who share a first word (e.g. "Mr. Wilson" / "Mr. Anderson") still
+// read as distinct on axes/legends. Never used as a data key — user_id is,
+// since even this can theoretically collide.
+function chartLabel(displayName: string): string {
+  const parts = displayName.trim().split(/\s+/);
+  if (parts.length <= 1) return parts[0] ?? '';
+  return `${parts[0]} ${parts[1][0]}`;
+}
+
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
   return (
@@ -39,7 +49,7 @@ const ScatterTooltip = ({ active, payload }: any) => {
   return (
     <div className="bg-turf-900 border border-turf-700 rounded-lg px-3 py-2 text-sm shadow-xl shadow-black/40">
       <p className="font-medium text-white mb-1">{p.team_name}</p>
-      <p className="text-turf-400 text-xs">{p.display_name.split(' ')[0]}</p>
+      <p className="text-turf-400 text-xs">{chartLabel(p.display_name)}</p>
       <p className="text-turf-300 font-mono text-xs mt-1">Pick #{p.pick_number} · AP #{p.rank}</p>
     </div>
   );
@@ -137,7 +147,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
   );
 
   const chartData = entries.map(e => ({
-    name: e.display_name.split(' ')[0],
+    name: chartLabel(e.display_name),
     points: e.total_points,
   }));
   const chartDomain: [number, number] = [
@@ -151,36 +161,39 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
     return weeks.map(w => {
       const row: Record<string, any> = { week: `Wk ${w}` };
       entries.forEach(e => {
-        row[e.display_name.split(' ')[0]] = e.weekly_scores.find(ws => ws.week === w)?.points ?? 0;
+        row[e.user_id] = e.weekly_scores.find(ws => ws.week === w)?.points ?? 0;
       });
       return row;
-    }).filter(row => entries.some(e => (row[e.display_name.split(' ')[0]] ?? 0) !== 0));
+    }).filter(row => entries.some(e => (row[e.user_id] ?? 0) !== 0));
   }, [entries, currentWeek]);
 
-  // Radar data
+  // Radar data — normalized against a fixed, real-world domain per metric
+  // (roughly what "worst" and "best" actually look like for that stat),
+  // not the group's own min/max. Min-max normalization always pins someone
+  // to 0 and someone to 100 no matter how close the real numbers are — with
+  // only 2-3 managers that made every axis a meaningless full swing. Domain
+  // is [worst, best] in raw units; values outside it just clamp to the edge.
   const radarData = useMemo(() => {
     if (analytics.length === 0) return [];
-    const metrics = [
-      { key: 'avg_rank',   label: 'Avg Rank',    higherIsBetter: false },
-      { key: 'top25_avg',  label: 'Top 25%',     higherIsBetter: false },
-      { key: 'best_pick',  label: 'Best Pick',   higherIsBetter: true  },
-      { key: 'worst_pick', label: 'Worst Pick',  higherIsBetter: true  },
-      { key: 'over_under', label: 'Draft Value', higherIsBetter: false },
+    const metrics: { key: string; label: string; domain: [number, number] }[] = [
+      { key: 'avg_rank',   label: 'Avg Rank',    domain: [25, 1] },   // AP Top 25 range
+      { key: 'top25_avg',  label: 'Top 25%',     domain: [25, 1] },
+      { key: 'best_pick',  label: 'Best Pick',   domain: [-20, 35] }, // typical single-team season point range
+      { key: 'worst_pick', label: 'Worst Pick',  domain: [-20, 35] },
+      { key: 'over_under', label: 'Draft Value', domain: [30, -30] }, // pick# − AP rank, lower is better
     ];
     return metrics.map(m => {
       const row: Record<string, any> = { metric: m.label };
-      const values = analytics.map(a => {
-        if (m.key === 'best_pick')  return a.best_pick?.points ?? 0;
-        if (m.key === 'worst_pick') return a.worst_pick?.points ?? 0;
-        if (m.key === 'over_under') return a.over_under_pts;
-        return (a as any)[m.key] ?? 0;
-      });
-      const min = Math.min(...values);
-      const max = Math.max(...values);
-      analytics.forEach((a, i) => {
-        const raw = values[i];
-        const norm = max === min ? 50 : ((raw - min) / (max - min)) * 100;
-        row[a.display_name.split(' ')[0]] = m.higherIsBetter ? norm : 100 - norm;
+      const [worst, best] = m.domain;
+      analytics.forEach(a => {
+        let raw: number;
+        if (m.key === 'best_pick')       raw = a.best_pick?.points ?? 0;
+        else if (m.key === 'worst_pick') raw = a.worst_pick?.points ?? 0;
+        else if (m.key === 'over_under') raw = a.over_under_pts;
+        else                              raw = (a as any)[m.key] ?? 0;
+
+        const pct = ((raw - worst) / (best - worst)) * 100;
+        row[a.user_id] = Math.max(0, Math.min(100, pct));
       });
       return row;
     });
@@ -190,13 +203,12 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
   const trendData = useMemo(() => {
     const weeks = Array.from({ length: currentWeek + 1 }, (_, i) => i);
     const running: Record<string, number> = {};
-    entries.forEach(e => { running[e.display_name.split(' ')[0]] = 0; });
+    entries.forEach(e => { running[e.user_id] = 0; });
     return weeks.map(w => {
       const row: Record<string, any> = { week: `Wk ${w}` };
       entries.forEach(e => {
-        const name = e.display_name.split(' ')[0];
-        running[name] += e.weekly_scores.find(ws => ws.week === w)?.points ?? 0;
-        row[name] = running[name];
+        running[e.user_id] += e.weekly_scores.find(ws => ws.week === w)?.points ?? 0;
+        row[e.user_id] = running[e.user_id];
       });
       return row;
     });
@@ -205,7 +217,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
   // Draft value scatter — one series per manager so each gets its own color/legend entry
   const scatterByManager = useMemo(() => {
     return entries.map((e, i) => ({
-      name: e.display_name.split(' ')[0],
+      name: chartLabel(e.display_name),
       color: PLAYER_COLORS[i] ?? '#22c55e',
       data: scatterPoints.filter(p => p.user_id === e.user_id),
     })).filter(m => m.data.length > 0);
@@ -376,7 +388,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                             style={{ backgroundColor: PLAYER_COLORS[i] }}
                           />
                           <span className="font-sans font-bold text-sm text-white truncate">
-                            {a.display_name.split(' ')[0]}
+                            {chartLabel(a.display_name)}
                           </span>
                         </span>
                       </th>
@@ -575,7 +587,8 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                       {entries.map((e, i) => (
                         <Bar
                           key={e.user_id}
-                          dataKey={e.display_name.split(' ')[0]}
+                          name={chartLabel(e.display_name)}
+                          dataKey={e.user_id}
                           fill={PLAYER_COLORS[i] ?? '#22c55e'}
                           fillOpacity={0.85}
                           radius={[3, 3, 0, 0]}
@@ -599,11 +612,12 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                 {radarData.length === 0 ? (
                   <p className="text-turf-500 text-sm text-center py-8">No ranking data yet</p>
                 ) : (
-                  <div className="h-72">
+                  <div className="h-72 animate-radar-in" style={{ transformOrigin: 'center' }}>
                     <ResponsiveContainer width="100%" height="100%">
                       <RadarChart data={radarData} margin={{ top: 8, right: 24, left: 24, bottom: 8 }}>
                         <PolarGrid stroke="#30363d" />
                         <PolarAngleAxis dataKey="metric" tick={{ fill: '#6c757d', fontSize: 11 }} />
+                        <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
                         <Tooltip
                           contentStyle={{
                             background: '#21262d',
@@ -614,6 +628,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                           }}
                           labelStyle={{ color: '#fff', fontWeight: 600 }}
                           itemStyle={{ color: '#adb5bd' }}
+                          formatter={(value: number) => value.toFixed(1)}
                         />
                         <Legend
                           wrapperStyle={{ fontSize: 12, paddingTop: 8 }}
@@ -622,12 +637,13 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                         {entries.map((e, i) => (
                           <Radar
                             key={e.user_id}
-                            name={e.display_name.split(' ')[0]}
-                            dataKey={e.display_name.split(' ')[0]}
+                            name={chartLabel(e.display_name)}
+                            dataKey={e.user_id}
                             stroke={PLAYER_COLORS[i] ?? '#22c55e'}
                             fill={PLAYER_COLORS[i] ?? '#22c55e'}
                             fillOpacity={0.12}
                             strokeWidth={2}
+                            isAnimationActive={false}
                           />
                         ))}
                       </RadarChart>
@@ -667,7 +683,8 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                           <Line
                             key={e.user_id}
                             type="monotone"
-                            dataKey={e.display_name.split(' ')[0]}
+                            name={chartLabel(e.display_name)}
+                            dataKey={e.user_id}
                             stroke={PLAYER_COLORS[i] ?? '#22c55e'}
                             strokeWidth={2}
                             dot={{ r: 2 }}

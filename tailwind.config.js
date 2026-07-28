@@ -47,6 +47,7 @@ export default {
         'slide-up': 'slideUp 0.3s ease-out',
         'fade-in': 'fadeIn 0.4s ease-out',
         'pick-flash': 'pickFlash 0.6s ease-out',
+        'radar-in': 'radarIn 0.4s ease-out',
       },
       keyframes: {
         shimmer: {
@@ -64,6 +65,10 @@ export default {
         pickFlash: {
           '0%': { backgroundColor: '#bbf7d0' },
           '100%': { backgroundColor: 'transparent' },
+        },
+        radarIn: {
+          '0%':   { transform: 'scale(0.8)', opacity: '0' },
+          '100%': { transform: 'scale(1)',   opacity: '1' },
         },
       },
     },
