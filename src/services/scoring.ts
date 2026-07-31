@@ -7,7 +7,19 @@ import type {
 import { STAT_BONUS_CATEGORIES, normalizeScoring } from '../types';
 import { rosterAtWeek, currentRosters } from './roster';
 
-export { P4_CONFERENCES, DRAFT_CONF_MIN, DRAFT_CONF_MAX } from '../types';
+export { P4_CONFERENCES } from '../types';
+import { P4_CONFERENCES as P4_CONF_LIST } from '../types';
+
+export function isP4Conference(conference: string): boolean {
+  return (P4_CONF_LIST as readonly string[]).includes(conference);
+}
+
+// Every non-P4 conference shares one combined G5 limit rather than each
+// having its own — this collapses any non-P4 conference name to the 'G5'
+// bucket so callers can track counts/minimums per category uniformly.
+export function confCategory(conference: string): string {
+  return isP4Conference(conference) ? conference : 'G5';
+}
 
 export function scoreGame(
   game: GameResult,

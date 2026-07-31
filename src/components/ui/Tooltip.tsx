@@ -5,6 +5,7 @@ interface TooltipProps {
   children: React.ReactNode;
   position?: 'top' | 'bottom' | 'left' | 'right';
   width?: string; // e.g. 'w-48', 'w-64'
+  fullWidth?: boolean; // stretch to fill the parent instead of shrinking to content width — for wrapping a w-full row in a block/list layout
 }
 
 /**
@@ -16,7 +17,7 @@ interface TooltipProps {
  *     <span>Hover me</span>
  *   </Tooltip>
  */
-export function Tooltip({ content, children, position = 'bottom', width = 'w-56' }: TooltipProps) {
+export function Tooltip({ content, children, position = 'bottom', width = 'w-56', fullWidth = false }: TooltipProps) {
   const [show, setShow] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -49,7 +50,7 @@ export function Tooltip({ content, children, position = 'bottom', width = 'w-56'
   return (
     <div
       ref={ref}
-      className="relative inline-flex"
+      className={`relative ${fullWidth ? 'flex w-full' : 'inline-flex'}`}
       onMouseEnter={() => setShow(true)}
       onMouseLeave={() => setShow(false)}
     >

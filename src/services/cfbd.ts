@@ -1,4 +1,5 @@
 import type { CfbTeam, GameData, GameResult, APRanking, TeamSeasonStats, SpreadData, TeamRatings } from '../types';
+import { P4_CONFERENCES as P4_CONF_LIST } from '../types';
 
 // All CFBD API calls are routed through a Netlify serverless proxy to avoid
 // CORS issues when fetching from the browser. The proxy adds the API key
@@ -17,7 +18,11 @@ async function cfbdFetch(path: string, params: Record<string, string | number> =
   return fetch(proxyUrl(path, params));
 }
 
-const P4_CONFERENCES = new Set(['SEC', 'Big Ten', 'Big 12', 'ACC', 'FBS Independents', 'Pac-12']);
+// Canonical P4 list (types/index.ts) — previously diverged here (also
+// treated FBS Independents/Pac-12 as P4), which meant losses to teams like
+// Notre Dame never triggered the loss_g5 scoring penalty. Consolidated so
+// P4/G5 classification agrees everywhere in the app.
+const P4_CONFERENCES = new Set(P4_CONF_LIST as readonly string[]);
 
 // CFB seasons run Aug–Jan. We want to show the UPCOMING season's schedule
 // as soon as it exists (~spring before the season). The CFBD API has 2026

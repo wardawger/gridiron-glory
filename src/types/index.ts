@@ -97,6 +97,16 @@ export interface ScoringSettings {
   // Statistical ranking bonus settings (top-N / bottom-N per category, among all drafted teams)
   stat_bonus_enabled: boolean; // master toggle for the whole feature
   stat_bonus_categories: Record<StatBonusCategory, StatBonusCategorySettings>;
+  // Roster conference limits — enforced during the draft and free agency/waivers
+  p4_conf_min: number;   // min teams required per P4 conference (SEC/Big Ten/Big 12/ACC), each
+  p4_conf_max: number;   // max teams allowed per P4 conference, each
+  g5_conf_min: number;   // min teams required from the combined G5/non-P4 pool (0 = no minimum)
+  g5_conf_max: number;   // max teams allowed from the combined G5/non-P4 pool (99 = effectively unlimited)
+  // Waiver wire settings — when disabled, free agency stays instant (first-come-first-served)
+  waiver_enabled: boolean;
+  waiver_priority_metric: 'worst_record' | 'fewest_points';
+  waiver_process_day: number;  // 0=Sun..6=Sat, evaluated in waiver_timezone
+  waiver_timezone: string;     // IANA zone, e.g. 'America/New_York'
 }
 
 export const DEFAULT_SCORING: ScoringSettings = {
@@ -127,6 +137,14 @@ export const DEFAULT_SCORING: ScoringSettings = {
     def_ints:      { top_enabled: true, top_count: 3, top_points: 3, bottom_enabled: true, bottom_count: 3, bottom_points: -3 },
     sacks:         { top_enabled: true, top_count: 3, top_points: 3, bottom_enabled: true, bottom_count: 3, bottom_points: -3 },
   },
+  p4_conf_min: 2,
+  p4_conf_max: 3,
+  g5_conf_min: 0,
+  g5_conf_max: 99,
+  waiver_enabled: false,
+  waiver_priority_metric: 'worst_record',
+  waiver_process_day: 3, // Wednesday
+  waiver_timezone: 'America/New_York',
 };
 
 // Fills in any missing/legacy-shaped scoring fields with defaults — handles
@@ -155,13 +173,10 @@ export function normalizeScoring(raw: Partial<ScoringSettings> | null | undefine
 
 // ─── Draft ─────────────────────────────────────────────────────────────────
 
-// P4 conferences for draft enforcement
+// P4 conferences for draft/free-agency enforcement — the one canonical list;
+// min/max team counts per category live on ScoringSettings (p4_conf_*/g5_conf_*).
 export const P4_CONFERENCES = ['SEC', 'Big Ten', 'Big 12', 'ACC'] as const;
 export type P4Conference = typeof P4_CONFERENCES[number];
-
-// Draft rules: min 2 and max 3 from each P4 conference
-export const DRAFT_CONF_MIN = 2;
-export const DRAFT_CONF_MAX = 3;
 
 export interface DraftPick {
   id: string;
@@ -193,6 +208,32 @@ export interface FreeAgencyMove {
   added_team_conference: string;
   penalty_points: number; // <= 0, captured at time of the move
   created_at: string;
+}
+
+// A pending free-agency swap awaiting waiver-wire resolution. Only exists
+// while scoring.waiver_enabled is on — resolution is performed exclusively
+// by the process-waivers scheduled function (netlify/functions), never by a
+// client, since it must be able to cancel a claim that isn't its own.
+export type WaiverClaimStatus = 'pending' | 'processed' | 'cancelled';
+
+export interface WaiverClaim {
+  id: string;
+  league_id: string;
+  user_id: string;
+  week: number;
+  dropped_team_id: string;
+  dropped_team_name: string;
+  dropped_team_logo: string;
+  dropped_team_conference: string;
+  added_team_id: string;
+  added_team_name: string;
+  added_team_logo: string;
+  added_team_conference: string;
+  status: WaiverClaimStatus;
+  priority_snapshot: number | null; // metric value used at resolution time, for audit
+  submitted_at: string;
+  processed_at: string | null;
+  resulting_move_id: string | null; // set on the free_agency_moves row created if this claim wins
 }
 
 // ─── Roster / Captain ──────────────────────────────────────────────────────

@@ -4,10 +4,46 @@ import { supabase } from '../lib/supabase';
 import type {
   League, LeagueMember, DraftPick, CaptainPick,
   ManualBonus, SpreadPick, FreeAgencyMove, LeagueRole, AvatarType,
-  SeasonHistory, SeasonHistoryEntry,
+  SeasonHistory, SeasonHistoryEntry, RosterEntry, ScoringSettings, WaiverClaim,
 } from '../types';
-import { P4_CONFERENCES, DRAFT_CONF_MAX, DEFAULT_SCORING } from '../types';
+import { DEFAULT_SCORING, normalizeScoring } from '../types';
 import { rosterAtWeek, currentRosters } from '../services/roster';
+import { isP4Conference, confCategory } from '../services/scoring';
+
+// Shared by makeFreeAgencyMove and submitWaiverClaim — both are a drop+add
+// swap with identical conference-limit rules (P4 per-conference, G5
+// combined), they just differ in whether the swap executes immediately or
+// queues as a waiver claim pending priority resolution.
+function checkConferenceLimits(
+  myRoster: RosterEntry[], droppedTeamId: string, addedTeamConference: string, settings: ScoringSettings,
+): { error?: string } {
+  const droppedTeam = myRoster.find(t => t.team_id === droppedTeamId);
+  const addCategory = confCategory(addedTeamConference);
+  const addMax = addCategory === 'G5' ? settings.g5_conf_max : settings.p4_conf_max;
+  const addCurrentCount = addCategory === 'G5'
+    ? myRoster.filter(t => !isP4Conference(t.team_conference)).length
+    : myRoster.filter(t => t.team_conference === addedTeamConference).length;
+  const droppingSameCategory = droppedTeam ? confCategory(droppedTeam.team_conference) === addCategory : false;
+  const newCount = addCurrentCount - (droppingSameCategory ? 1 : 0) + 1;
+  if (newCount > addMax) {
+    return { error: `Max ${addMax} ${addCategory === 'G5' ? 'G5/non-P4' : addCategory} teams` };
+  }
+
+  if (droppedTeam) {
+    const dropCategory = confCategory(droppedTeam.team_conference);
+    const dropMin = dropCategory === 'G5' ? settings.g5_conf_min : settings.p4_conf_min;
+    if (dropMin > 0 && !droppingSameCategory) {
+      const dropCurrentCount = dropCategory === 'G5'
+        ? myRoster.filter(t => !isP4Conference(t.team_conference)).length
+        : myRoster.filter(t => t.team_conference === droppedTeam.team_conference).length;
+      if (dropCurrentCount - 1 < dropMin) {
+        const label = dropCategory === 'G5' ? 'G5/non-P4' : dropCategory;
+        return { error: `Dropping ${droppedTeam.team_name} would leave you below the ${dropMin}-team ${label} minimum` };
+      }
+    }
+  }
+  return {};
+}
 
 export function useLeague(user: User | null) {
   const [allLeagues, setAllLeagues]     = useState<League[]>([]);
@@ -19,6 +55,7 @@ export function useLeague(user: User | null) {
   const [manualBonuses, setManualBonuses] = useState<ManualBonus[]>([]);
   const [spreadPicks, setSpreadPicks]   = useState<SpreadPick[]>([]);
   const [freeAgencyMoves, setFreeAgencyMoves] = useState<FreeAgencyMove[]>([]);
+  const [waiverClaims, setWaiverClaims] = useState<WaiverClaim[]>([]);
   const [seasonHistory, setSeasonHistory] = useState<SeasonHistory[]>([]);
   const [loading, setLoading]           = useState(true);
   const [error, setError]               = useState<string | null>(null);
@@ -38,6 +75,7 @@ export function useLeague(user: User | null) {
   const membersRef      = useRef(members);
   const draftPicksRef   = useRef(draftPicks);
   const freeAgencyMovesRef = useRef(freeAgencyMoves);
+  const waiverClaimsRef = useRef(waiverClaims);
   leagueRef.current       = league;
   userRef.current         = user;
   captainPicksRef.current = captainPicks;
@@ -45,6 +83,7 @@ export function useLeague(user: User | null) {
   membersRef.current      = members;
   draftPicksRef.current   = draftPicks;
   freeAgencyMovesRef.current = freeAgencyMoves;
+  waiverClaimsRef.current = waiverClaims;
 
   // silent=true skips the loading flag App.tsx uses to show a full-page
   // blocking spinner — used for background refreshes (e.g. after joining a
@@ -88,13 +127,14 @@ export function useLeague(user: User | null) {
   }, [user]);
 
   const loadLeagueData = useCallback(async (leagueId: string) => {
-    const [membersRes, picksRes, captainRes, bonusRes, spreadRes, faRes, historyRes] = await Promise.all([
+    const [membersRes, picksRes, captainRes, bonusRes, spreadRes, faRes, waiverRes, historyRes] = await Promise.all([
       supabase.from('league_members').select('*').eq('league_id', leagueId),
       supabase.from('draft_picks').select('*').eq('league_id', leagueId).order('pick_number'),
       supabase.from('captain_picks').select('*').eq('league_id', leagueId),
       supabase.from('manual_bonuses').select('*').eq('league_id', leagueId),
       supabase.from('spread_picks').select('*').eq('league_id', leagueId),
       supabase.from('free_agency_moves').select('*').eq('league_id', leagueId),
+      supabase.from('waiver_claims').select('*').eq('league_id', leagueId),
       supabase.from('season_history').select('*').eq('league_id', leagueId).order('archived_at', { ascending: false }),
     ]);
 
@@ -104,6 +144,7 @@ export function useLeague(user: User | null) {
     if (bonusRes.data)    setManualBonuses(bonusRes.data);
     if (spreadRes.data)   setSpreadPicks(spreadRes.data);
     if (faRes.data)       setFreeAgencyMoves(faRes.data);
+    if (waiverRes.data)   setWaiverClaims(waiverRes.data);
     if (historyRes.data)  setSeasonHistory(historyRes.data);
   }, []);
 
@@ -124,6 +165,7 @@ export function useLeague(user: User | null) {
     setManualBonuses([]);
     setSpreadPicks([]);
     setFreeAgencyMoves([]);
+    setWaiverClaims([]);
     setSeasonHistory([]);
   };
 
@@ -174,6 +216,17 @@ export function useLeague(user: User | null) {
             ? prev
             : [...prev, payload.new as FreeAgencyMove]
         );
+      })
+      .on('postgres_changes', {
+        // '*' (not just INSERT) — status transitions (pending → processed/
+        // cancelled) are written by the process-waivers scheduled function,
+        // not by this client, so a full refetch is the simplest way to stay
+        // in sync (mirrors the captain_picks/spread_picks pattern above).
+        event: '*', schema: 'public', table: 'waiver_claims',
+        filter: `league_id=eq.${league.id}`,
+      }, () => {
+        supabase.from('waiver_claims').select('*').eq('league_id', league.id)
+          .then(({ data }) => { if (data) setWaiverClaims(data); });
       })
       .subscribe();
 
@@ -320,6 +373,10 @@ export function useLeague(user: User | null) {
 
     if (faDeleteErr) return { error: faDeleteErr.message };
 
+    // Best-effort — waiver_claims may not exist yet for leagues that
+    // predate the migration, and that must never block a reset.
+    await supabase.from('waiver_claims').delete().eq('league_id', league.id);
+
     const { data: updatedLeague, error: updateErr } = await supabase
       .from('leagues').update({
         draft_status: 'pending',
@@ -331,6 +388,7 @@ export function useLeague(user: User | null) {
 
     setDraftPicks([]);
     setFreeAgencyMoves([]);
+    setWaiverClaims([]);
     if (updatedLeague) {
       setAllLeagues(prev => prev.map(l => l.id === league.id ? updatedLeague as League : l));
     }
@@ -369,6 +427,10 @@ export function useLeague(user: User | null) {
     const deleteErr = deletes.find(d => d.error)?.error;
     if (deleteErr) return { error: deleteErr.message };
 
+    // Best-effort — waiver_claims may not exist yet for leagues that
+    // predate the migration, and that must never block ending a season.
+    await supabase.from('waiver_claims').delete().eq('league_id', league.id);
+
     const { data: updatedLeague, error: updateErr } = await supabase
       .from('leagues').update({
         draft_status: 'pending',
@@ -381,6 +443,7 @@ export function useLeague(user: User | null) {
 
     setDraftPicks([]);
     setFreeAgencyMoves([]);
+    setWaiverClaims([]);
     setCaptainPicks([]);
     setManualBonuses([]);
     setSpreadPicks([]);
@@ -400,6 +463,7 @@ export function useLeague(user: User | null) {
     // harmless no-op for any that already do.
     await supabase.from('spread_picks').delete().eq('league_id', league.id);
     await supabase.from('free_agency_moves').delete().eq('league_id', league.id);
+    await supabase.from('waiver_claims').delete().eq('league_id', league.id);
 
     const { error: err } = await supabase.from('leagues').delete().eq('id', league.id);
     if (err) return { error: err.message };
@@ -601,8 +665,9 @@ export function useLeague(user: User | null) {
     const moves   = freeAgencyMovesRef.current;
     if (!league || !user) return { error: 'Not ready' };
 
-    const settings = league.scoring;
+    const settings = normalizeScoring(league.scoring);
     if (!settings.free_agency_enabled) return { error: 'Free agency is not enabled for this league' };
+    if (settings.waiver_enabled) return { error: 'Waivers are enabled for this league — submit a claim instead' };
 
     const week = league.current_week;
     const myMoves = moves.filter(m => m.user_id === user.id);
@@ -623,17 +688,8 @@ export function useLeague(user: User | null) {
     const isTaken = Array.from(allRosters.values()).some(r => r.some(t => t.team_id === addedTeamId));
     if (isTaken) return { error: 'That team is already owned by another manager' };
 
-    const isP4 = (P4_CONFERENCES as readonly string[]).includes(addedTeamConference);
-    if (isP4) {
-      const droppedTeam = myRoster.find(t => t.team_id === droppedTeamId);
-      const currentConfCount = myRoster.filter(t => t.team_conference === addedTeamConference).length;
-      const newConfCount = currentConfCount
-        - (droppedTeam?.team_conference === addedTeamConference ? 1 : 0)
-        + 1;
-      if (newConfCount > DRAFT_CONF_MAX) {
-        return { error: `Max ${DRAFT_CONF_MAX} teams from ${addedTeamConference}` };
-      }
-    }
+    const confCheck = checkConferenceLimits(myRoster, droppedTeamId, addedTeamConference, settings);
+    if (confCheck.error) return confCheck;
 
     const droppedTeam = myRoster.find(t => t.team_id === droppedTeamId)!;
     const penaltyPoints = settings.fa_penalty_enabled ? -Math.abs(settings.fa_penalty_points) : 0;
@@ -655,6 +711,67 @@ export function useLeague(user: User | null) {
 
     if (err) return { error: err.message };
     if (data) setFreeAgencyMoves(prev => [...prev, data as FreeAgencyMove]);
+    return {};
+  }, []);
+
+  const submitWaiverClaim = useCallback(async (
+    droppedTeamId: string, droppedTeamName: string,
+    addedTeamId: string, addedTeamName: string, addedTeamLogo: string, addedTeamConference: string,
+  ): Promise<{ error?: string }> => {
+    const league  = leagueRef.current;
+    const user    = userRef.current;
+    const draftPicks = draftPicksRef.current;
+    const moves   = freeAgencyMovesRef.current;
+    const claims  = waiverClaimsRef.current;
+    if (!league || !user) return { error: 'Not ready' };
+
+    const settings = normalizeScoring(league.scoring);
+    if (!settings.free_agency_enabled) return { error: 'Free agency is not enabled for this league' };
+    if (!settings.waiver_enabled) return { error: 'Waivers are not enabled for this league' };
+
+    const week = league.current_week;
+    const myPendingClaims = claims.filter(c => c.user_id === user.id && c.status === 'pending');
+    const myMoves = moves.filter(m => m.user_id === user.id);
+    // A pending claim counts against the cap immediately, before it resolves.
+    if (myMoves.length + myPendingClaims.length >= settings.fa_max_moves_per_season) {
+      return { error: `You've reached the season limit of ${settings.fa_max_moves_per_season} moves` };
+    }
+    const myMovesThisWeek = myMoves.filter(m => m.week === week);
+    const myPendingClaimsThisWeek = myPendingClaims.filter(c => c.week === week);
+    if (myMovesThisWeek.length + myPendingClaimsThisWeek.length >= settings.fa_max_moves_per_week) {
+      return { error: `You've reached this week's limit of ${settings.fa_max_moves_per_week} moves` };
+    }
+    if (myPendingClaims.some(c => c.dropped_team_id === droppedTeamId || c.added_team_id === addedTeamId)) {
+      return { error: 'You already have a pending claim involving one of these teams' };
+    }
+
+    const myRoster = rosterAtWeek(user.id, week, draftPicks, moves);
+    if (!myRoster.some(t => t.team_id === droppedTeamId)) {
+      return { error: 'You do not currently own that team' };
+    }
+
+    const confCheck = checkConferenceLimits(myRoster, droppedTeamId, addedTeamConference, settings);
+    if (confCheck.error) return confCheck;
+
+    const droppedTeam = myRoster.find(t => t.team_id === droppedTeamId)!;
+
+    const { data, error: err } = await supabase.from('waiver_claims').insert({
+      league_id:               league.id,
+      user_id:                 user.id,
+      week,
+      dropped_team_id:         droppedTeamId,
+      dropped_team_name:       droppedTeam.team_name,
+      dropped_team_logo:       droppedTeam.team_logo,
+      dropped_team_conference: droppedTeam.team_conference,
+      added_team_id:           addedTeamId,
+      added_team_name:         addedTeamName,
+      added_team_logo:         addedTeamLogo,
+      added_team_conference:   addedTeamConference,
+      status:                  'pending',
+    }).select().single();
+
+    if (err) return { error: err.message };
+    if (data) setWaiverClaims(prev => [...prev, data as WaiverClaim]);
     return {};
   }, []);
 
@@ -756,13 +873,13 @@ export function useLeague(user: User | null) {
 
   return {
     league, allLeagues, allMemberships, selectedLeagueId,
-    members, draftPicks, captainPicks, manualBonuses, spreadPicks, freeAgencyMoves, seasonHistory,
+    members, draftPicks, captainPicks, manualBonuses, spreadPicks, freeAgencyMoves, waiverClaims, seasonHistory,
     rosters, myMembership, isCommissioner, loading, error,
     switchLeague, createLeague, sendInvite, startDraft, makeDraftPick, resetDraft, deleteLeague, endSeason,
     setCaptain, addManualBonus, removeManualBonus,
     setSpreadPick, removeSpreadPick, overrideSpreadResult, clearSpreadOverride,
-    updateWeek, updateScoring, removeFromRoster, makeFreeAgencyMove, updateDisplayName, updateAvatar,
-    updateMemberRole,
+    updateWeek, updateScoring, removeFromRoster, makeFreeAgencyMove, submitWaiverClaim,
+    updateDisplayName, updateAvatar, updateMemberRole,
     reload: () => loadAllLeagues(true),
   };
 }

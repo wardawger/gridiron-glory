@@ -169,9 +169,11 @@ export default function App() {
                 members={league.members}
                 draftPicks={league.draftPicks}
                 freeAgencyMoves={league.freeAgencyMoves}
+                waiverClaims={league.waiverClaims}
                 teams={cfb.teams}
                 userId={auth.user.id}
                 onMakeMove={league.makeFreeAgencyMove}
+                onSubmitClaim={league.submitWaiverClaim}
               />
             } />
             <Route path="/draft"          element={

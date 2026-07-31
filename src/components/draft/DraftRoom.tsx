@@ -1,13 +1,11 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { Search, Clock, CheckCircle2, Zap, ChevronDown, ChevronUp, AlertCircle, X, MapPin, Tv, Loader2 } from 'lucide-react';
 import type { League, LeagueMember, DraftPick, CfbTeam, GameData, TeamRatings, APRanking } from '../../types';
-import { getPickOwner, P4_CONFERENCES, DRAFT_CONF_MIN, DRAFT_CONF_MAX } from '../../services/scoring';
+import { normalizeScoring } from '../../types';
+import { getPickOwner, P4_CONFERENCES as P4_CONF_LIST, isP4Conference, confCategory } from '../../services/scoring';
 import { Tooltip } from '../ui/Tooltip';
 import { TeamLogo } from '../ui/TeamLogo';
 import { fireDraftCompleteConfetti } from '../../lib/confetti';
-
-// Re-export from types so DraftRoom can use them
-import { P4_CONFERENCES as P4_CONF_LIST } from '../../types';
 
 const WEEKS = Array.from({ length: 16 }, (_, i) => i); // weeks 0–15
 
@@ -50,6 +48,7 @@ export function DraftRoom({
     league.draft_order.length > 0 ? league.draft_order : members.map(m => m.user_id)
   );
   const picksRef = useRef<HTMLDivElement>(null);
+  const scoring = normalizeScoring(league.scoring);
 
   // draftOrder is only captured once on mount, so anyone who joins the
   // league after the commissioner opened the Draft Room (but before they
@@ -90,7 +89,8 @@ export function DraftRoom({
   const myPicks = draftPicks.filter(p => p.user_id === userId);
   const myPicksRemaining = league.max_teams_per_user - myPicks.length;
 
-  // Conference counts for MY roster
+  // Conference counts for MY roster — P4 tracked per-conference, G5 tracked
+  // as one combined bucket (a single min/max across every non-P4 conference).
   const myConfCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     myPicks.forEach(p => {
@@ -98,14 +98,21 @@ export function DraftRoom({
     });
     return counts;
   }, [myPicks]);
+  const myG5Count = useMemo(
+    () => myPicks.filter(p => !isP4Conference(p.team_conference)).length,
+    [myPicks]
+  );
+  const g5Configured = scoring.g5_conf_min > 0 || scoring.g5_conf_max < 99;
 
   // Check if a team is blocked by conference rules
   const getConfBlock = (team: CfbTeam): string | null => {
-    const isP4 = (P4_CONF_LIST as readonly string[]).includes(team.conference);
-    if (!isP4) return null;
-    const count = myConfCounts[team.conference] ?? 0;
-    if (count >= DRAFT_CONF_MAX) {
-      return `Max ${DRAFT_CONF_MAX} from ${team.conference}`;
+    if (isP4Conference(team.conference)) {
+      const count = myConfCounts[team.conference] ?? 0;
+      if (count >= scoring.p4_conf_max) {
+        return `Max ${scoring.p4_conf_max} from ${team.conference}`;
+      }
+    } else if (myG5Count >= scoring.g5_conf_max) {
+      return `Max ${scoring.g5_conf_max} G5/non-P4 teams`;
     }
     return null;
   };
@@ -116,13 +123,17 @@ export function DraftRoom({
     const warnings: string[] = [];
     (P4_CONF_LIST as readonly string[]).forEach(conf => {
       const current = myConfCounts[conf] ?? 0;
-      const needed = Math.max(0, DRAFT_CONF_MIN - current);
+      const needed = Math.max(0, scoring.p4_conf_min - current);
       if (needed > 0 && needed >= myPicksRemaining) {
         warnings.push(`Must pick ${needed} more from ${conf}`);
       }
     });
+    const g5Needed = Math.max(0, scoring.g5_conf_min - myG5Count);
+    if (g5Needed > 0 && g5Needed >= myPicksRemaining) {
+      warnings.push(`Must pick ${g5Needed} more G5/non-P4 team${g5Needed === 1 ? '' : 's'}`);
+    }
     return warnings;
-  }, [myConfCounts, myPicksRemaining, isMyTurn]);
+  }, [myConfCounts, myG5Count, myPicksRemaining, isMyTurn, scoring.p4_conf_min, scoring.g5_conf_min]);
 
   // Build draft board
   const pickSlots = useMemo(() => {
@@ -191,18 +202,20 @@ export function DraftRoom({
       return;
     }
 
-    const mustPickConfs = (P4_CONF_LIST as readonly string[]).filter(conf => {
+    // Categories (P4 conference names, or the 'G5' sentinel for the combined
+    // non-P4 bucket) the user must pick from this turn to still be able to
+    // hit their minimums before picks run out.
+    const mustPickCategories = (P4_CONF_LIST as readonly string[]).filter(conf => {
       const current = myConfCounts[conf] ?? 0;
-      const needed = Math.max(0, DRAFT_CONF_MIN - current);
+      const needed = Math.max(0, scoring.p4_conf_min - current);
       return needed > 0 && needed >= myPicksRemaining;
     });
-    if (mustPickConfs.length > 0 && !(P4_CONF_LIST as readonly string[]).includes(team.conference)) {
-      setPickError(`You must pick from: ${mustPickConfs.join(', ')}`);
-      setTimeout(() => setPickError(''), 3000);
-      return;
+    const g5Needed = Math.max(0, scoring.g5_conf_min - myG5Count);
+    if (g5Needed > 0 && g5Needed >= myPicksRemaining) {
+      mustPickCategories.push('G5');
     }
-    if (mustPickConfs.length > 0 && !mustPickConfs.includes(team.conference)) {
-      setPickError(`You must pick from: ${mustPickConfs.join(', ')}`);
+    if (mustPickCategories.length > 0 && !mustPickCategories.includes(confCategory(team.conference))) {
+      setPickError(`You must pick from: ${mustPickCategories.join(', ')}`);
       setTimeout(() => setPickError(''), 3000);
       return;
     }
@@ -239,8 +252,19 @@ export function DraftRoom({
         <div className="card p-4 text-left text-sm space-y-2">
           <p className="font-medium text-turf-300">Draft Rules</p>
           <ul className="text-turf-400 space-y-1">
-            <li>• Min <strong className="text-white">2</strong> and max <strong className="text-white">3</strong> teams from each P4 conference (SEC, Big Ten, Big 12, ACC)</li>
-            <li>• No limit on G5, Independents, or Pac-12 teams</li>
+            <li>
+              • Min <strong className="text-white">{scoring.p4_conf_min}</strong> and max{' '}
+              <strong className="text-white">{scoring.p4_conf_max}</strong> teams from each P4 conference
+              (SEC, Big Ten, Big 12, ACC)
+            </li>
+            {g5Configured ? (
+              <li>
+                • Min <strong className="text-white">{scoring.g5_conf_min}</strong> and max{' '}
+                <strong className="text-white">{scoring.g5_conf_max}</strong> combined G5/non-P4 teams
+              </li>
+            ) : (
+              <li>• No limit on G5/non-P4 teams</li>
+            )}
             <li>• Snake draft order</li>
           </ul>
         </div>
@@ -366,11 +390,11 @@ export function DraftRoom({
 
       {/* Conference tracker */}
       {isMyTurn && (
-        <div className="card p-3 grid grid-cols-4 gap-2">
-          {(['SEC', 'Big Ten', 'Big 12', 'ACC'] as const).map(conf => {
+        <div className={`card p-3 grid gap-2 ${g5Configured ? 'grid-cols-5' : 'grid-cols-4'}`}>
+          {(P4_CONF_LIST as readonly string[]).map(conf => {
             const count = myConfCounts[conf] ?? 0;
-            const atMax = count >= DRAFT_CONF_MAX;
-            const atMin = count >= DRAFT_CONF_MIN;
+            const atMax = count >= scoring.p4_conf_max;
+            const atMin = count >= scoring.p4_conf_min;
             return (
               <Tooltip
                 key={conf}
@@ -378,8 +402,8 @@ export function DraftRoom({
                   atMax
                     ? `Maximum reached — you can't draft any more ${conf} teams.`
                     : atMin
-                    ? `${conf} minimum met. You can draft up to ${DRAFT_CONF_MAX - count} more.`
-                    : `You need at least ${DRAFT_CONF_MIN - count} more from ${conf}.`
+                    ? `${conf} minimum met. You can draft up to ${scoring.p4_conf_max - count} more.`
+                    : `You need at least ${scoring.p4_conf_min - count} more from ${conf}.`
                 }
                 position="bottom"
                 width="w-52"
@@ -392,12 +416,41 @@ export function DraftRoom({
                   <p className="text-xs text-turf-400 truncate">{conf}</p>
                   <p className={`font-mono font-bold text-lg ${
                     atMax ? 'text-red-300' : atMin ? 'text-field-400' : 'text-white'
-                  }`}>{count}/{DRAFT_CONF_MAX}</p>
-                  <p className="text-xs text-turf-500">min {DRAFT_CONF_MIN}</p>
+                  }`}>{count}/{scoring.p4_conf_max}</p>
+                  <p className="text-xs text-turf-500">min {scoring.p4_conf_min}</p>
                 </div>
               </Tooltip>
             );
           })}
+          {g5Configured && (() => {
+            const atMax = myG5Count >= scoring.g5_conf_max;
+            const atMin = myG5Count >= scoring.g5_conf_min;
+            return (
+              <Tooltip
+                content={
+                  atMax
+                    ? `Maximum reached — you can't draft any more G5/non-P4 teams.`
+                    : atMin
+                    ? `G5 minimum met. You can draft up to ${scoring.g5_conf_max - myG5Count} more.`
+                    : `You need at least ${scoring.g5_conf_min - myG5Count} more G5/non-P4 teams.`
+                }
+                position="bottom"
+                width="w-52"
+              >
+                <div className={`text-center p-2 rounded-lg w-full cursor-default ${
+                  atMax ? 'bg-red-900/30 border border-red-800/50' :
+                  atMin ? 'bg-field-900/30 border border-field-800/50' :
+                  'bg-turf-800'
+                }`}>
+                  <p className="text-xs text-turf-400 truncate">G5</p>
+                  <p className={`font-mono font-bold text-lg ${
+                    atMax ? 'text-red-300' : atMin ? 'text-field-400' : 'text-white'
+                  }`}>{myG5Count}/{scoring.g5_conf_max}</p>
+                  <p className="text-xs text-turf-500">min {scoring.g5_conf_min}</p>
+                </div>
+              </Tooltip>
+            );
+          })()}
         </div>
       )}
 
@@ -500,7 +553,7 @@ export function DraftRoom({
 
               // Wrap blocked teams in a styled tooltip
               return isBlocked ? (
-                <Tooltip key={team.id} content={block} position="top" width="w-48">
+                <Tooltip key={team.id} content={block} position="top" width="w-48" fullWidth>
                   {card}
                 </Tooltip>
               ) : card;

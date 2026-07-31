@@ -1,6 +1,12 @@
-import { ClipboardList, Coins, ArrowLeftRight, Award, Gift, TrendingUp, TrendingDown } from 'lucide-react';
+import { ClipboardList, Coins, ArrowLeftRight, Award, Gift, TrendingUp, TrendingDown, Clock } from 'lucide-react';
 import type { League, LeagueMember } from '../../types';
 import { normalizeScoring, STAT_BONUS_CATEGORIES, STAT_BONUS_LABELS, BONUS_LABELS, BONUS_DEFAULT_POINTS, BONUS_GROUPS } from '../../types';
+
+const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const PRIORITY_METRIC_LABELS: Record<string, string> = {
+  worst_record: 'Worst record',
+  fewest_points: 'Fewest total points',
+};
 
 interface Props {
   league: League;
@@ -14,6 +20,7 @@ function pts(n: number): string {
 export function LeagueSettingsPage({ league, members }: Props) {
   const scoring = normalizeScoring(league.scoring);
   const postseasonGroups = BONUS_GROUPS.filter(g => !g.label.startsWith('Statistical Rankings'));
+  const g5Configured = scoring.g5_conf_min > 0 || scoring.g5_conf_max < 99;
 
   return (
     <div className="space-y-5 animate-fade-in max-w-3xl mx-auto">
@@ -43,7 +50,7 @@ export function LeagueSettingsPage({ league, members }: Props) {
             <p className="text-xs text-turf-500 mt-0.5">Teams each</p>
           </div>
           <div className="card-inner p-3 text-center">
-            <p className="font-mono text-xl font-bold text-white">2–3</p>
+            <p className="font-mono text-xl font-bold text-white">{scoring.p4_conf_min}–{scoring.p4_conf_max}</p>
             <p className="text-xs text-turf-500 mt-0.5">Per P4 conference</p>
           </div>
           <div className="card-inner p-3 text-center">
@@ -52,8 +59,11 @@ export function LeagueSettingsPage({ league, members }: Props) {
           </div>
         </div>
         <p className="text-xs text-turf-500">
-          Every roster needs at least 2 and at most 3 teams from each Power 4 conference (SEC, Big Ten, Big 12, ACC).
-          No limit on G5, Independent, or Pac-12 teams.
+          Every roster needs at least {scoring.p4_conf_min} and at most {scoring.p4_conf_max} teams from each Power 4
+          conference (SEC, Big Ten, Big 12, ACC).{' '}
+          {g5Configured
+            ? `Combined, G5/Independent/non-P4 teams must total between ${scoring.g5_conf_min} and ${scoring.g5_conf_max}.`
+            : 'No limit on G5, Independent, or non-P4 teams.'}
         </p>
       </div>
 
@@ -131,6 +141,32 @@ export function LeagueSettingsPage({ league, members }: Props) {
               ? `Each swap costs ${pts(-Math.abs(scoring.fa_penalty_points))} points that week.`
               : 'No point penalty for making a swap.'}
           </p>
+        </div>
+      )}
+
+      {/* Waiver wire */}
+      {scoring.free_agency_enabled && scoring.waiver_enabled && (
+        <div className="card p-5 space-y-3">
+          <div className="flex items-center gap-2">
+            <Clock className="w-4 h-4 text-amber-400" />
+            <h3 className="font-medium text-white text-sm">Waiver Wire</h3>
+            <span className="badge-green text-xs ml-auto">Enabled</span>
+          </div>
+          <p className="text-xs text-turf-500">
+            Free agency drops/adds don't take effect immediately — they queue as a claim and resolve on the next
+            processing day. If more than one manager claims the same team, priority goes to whoever has the{' '}
+            {PRIORITY_METRIC_LABELS[scoring.waiver_priority_metric].toLowerCase()}.
+          </p>
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            <div className="card-inner px-3 py-2 flex items-center justify-between">
+              <span className="text-turf-300">Priority</span>
+              <span className="font-mono font-medium text-white text-right">{PRIORITY_METRIC_LABELS[scoring.waiver_priority_metric]}</span>
+            </div>
+            <div className="card-inner px-3 py-2 flex items-center justify-between">
+              <span className="text-turf-300">Processes</span>
+              <span className="font-mono font-medium text-white">{WEEKDAY_NAMES[scoring.waiver_process_day]}</span>
+            </div>
+          </div>
         </div>
       )}
 

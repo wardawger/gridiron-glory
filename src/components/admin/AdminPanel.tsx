@@ -52,6 +52,8 @@ function Toggle({ checked, onChange, disabled, label }: { checked: boolean; onCh
 
 type Tab = 'members' | 'scoring' | 'bonuses';
 
+const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
 export function AdminPanel({
   league, members, draftPicks, captainPicks, manualBonuses, spreadPicks, freeAgencyMoves,
   gameData, seasonStats, isCommissioner,
@@ -581,6 +583,57 @@ export function AdminPanel({
       {/* ── SCORING TAB ──────────────────────────────────── */}
       {tab === 'scoring' && (
         <div className="space-y-4">
+          {/* Roster conference limits */}
+          <div className="card p-5 space-y-4">
+            <h3 className="font-medium text-white text-sm">Roster Conference Limits</h3>
+            <p className="text-xs text-turf-400">Applies during the draft and to free agency/waiver moves.</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="label">P4 Min (per conference)</label>
+                <input
+                  className="input font-mono"
+                  type="number"
+                  min="0"
+                  value={scoring.p4_conf_min}
+                  onChange={e => setScoring(prev => ({ ...prev, p4_conf_min: parseInt(e.target.value) || 0 }))}
+                />
+              </div>
+              <div>
+                <label className="label">P4 Max (per conference)</label>
+                <input
+                  className="input font-mono"
+                  type="number"
+                  min="1"
+                  value={scoring.p4_conf_max}
+                  onChange={e => setScoring(prev => ({ ...prev, p4_conf_max: parseInt(e.target.value) || 1 }))}
+                />
+              </div>
+              <div>
+                <label className="label">G5 Min (combined)</label>
+                <input
+                  className="input font-mono"
+                  type="number"
+                  min="0"
+                  value={scoring.g5_conf_min}
+                  onChange={e => setScoring(prev => ({ ...prev, g5_conf_min: parseInt(e.target.value) || 0 }))}
+                />
+              </div>
+              <div>
+                <label className="label">G5 Max (combined)</label>
+                <input
+                  className="input font-mono"
+                  type="number"
+                  min="1"
+                  value={scoring.g5_conf_max}
+                  onChange={e => setScoring(prev => ({ ...prev, g5_conf_max: parseInt(e.target.value) || 1 }))}
+                />
+              </div>
+            </div>
+            <p className="text-xs text-turf-500">
+              P4 = SEC, Big Ten, Big 12, ACC — each conference is capped separately. G5/non-P4 teams share one combined limit.
+            </p>
+          </div>
+
           {/* Base scoring */}
           <div className="card p-5 space-y-4">
             <h3 className="font-medium text-white text-sm">Base Scoring</h3>
@@ -910,6 +963,78 @@ export function AdminPanel({
               </div>
             )}
           </div>
+
+          {/* Waiver wire settings */}
+          {scoring.free_agency_enabled && (
+            <div className="card p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-medium text-white text-sm">Waiver Wire</h3>
+                  <p className="text-xs text-turf-400 mt-0.5">Queue adds/drops as claims resolved on a set day, with priority for contested teams</p>
+                </div>
+                <Toggle
+                  checked={scoring.waiver_enabled}
+                  onChange={() => setScoring(prev => ({ ...prev, waiver_enabled: !prev.waiver_enabled }))}
+                  label="Waiver Wire Enabled"
+                />
+              </div>
+
+              {scoring.waiver_enabled && (
+                <div className="space-y-4 pt-2 border-t border-turf-800">
+                  <div>
+                    <label className="label">Priority Metric</label>
+                    <p className="text-xs text-turf-500 mb-2">Who wins when two managers claim the same team</p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setScoring(prev => ({ ...prev, waiver_priority_metric: 'worst_record' }))}
+                        className={`flex-1 py-2 rounded-lg text-sm border transition-all ${scoring.waiver_priority_metric === 'worst_record' ? 'bg-field-500 text-turf-950 border-field-500' : 'border-turf-700 text-turf-400 hover:text-white'}`}
+                      >
+                        Worst Record
+                      </button>
+                      <button
+                        onClick={() => setScoring(prev => ({ ...prev, waiver_priority_metric: 'fewest_points' }))}
+                        className={`flex-1 py-2 rounded-lg text-sm border transition-all ${scoring.waiver_priority_metric === 'fewest_points' ? 'bg-field-500 text-turf-950 border-field-500' : 'border-turf-700 text-turf-400 hover:text-white'}`}
+                      >
+                        Fewest Points
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="label">Processing Day</label>
+                      <select
+                        className="input"
+                        value={scoring.waiver_process_day}
+                        onChange={e => setScoring(prev => ({ ...prev, waiver_process_day: parseInt(e.target.value) }))}
+                      >
+                        {WEEKDAY_NAMES.map((name, i) => (
+                          <option key={i} value={i}>{name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="label">League Timezone</label>
+                      <select
+                        className="input"
+                        value={scoring.waiver_timezone}
+                        onChange={e => setScoring(prev => ({ ...prev, waiver_timezone: e.target.value }))}
+                      >
+                        <option value="America/New_York">Eastern</option>
+                        <option value="America/Chicago">Central</option>
+                        <option value="America/Denver">Mountain</option>
+                        <option value="America/Los_Angeles">Pacific</option>
+                        <option value="UTC">UTC</option>
+                      </select>
+                    </div>
+                  </div>
+                  <p className="text-xs text-turf-500">
+                    Claims are resolved at 9am local time on the selected day.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
           <button onClick={handleSaveScoring} className="btn-primary">
             Save Scoring Settings

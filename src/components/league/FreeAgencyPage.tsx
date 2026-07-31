@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
-import { ArrowLeftRight, Search, ChevronDown, AlertCircle, CheckCircle2, X, ArrowRight, History } from 'lucide-react';
-import type { League, LeagueMember, DraftPick, FreeAgencyMove, CfbTeam } from '../../types';
-import { P4_CONFERENCES, DRAFT_CONF_MAX } from '../../types';
+import { ArrowLeftRight, Search, ChevronDown, AlertCircle, CheckCircle2, X, ArrowRight, History, Clock, Users } from 'lucide-react';
+import type { League, LeagueMember, DraftPick, FreeAgencyMove, CfbTeam, WaiverClaim } from '../../types';
+import { normalizeScoring } from '../../types';
+import { P4_CONFERENCES, isP4Conference, confCategory } from '../../services/scoring';
 import { rosterAtWeek, currentRosters } from '../../services/roster';
 import { Tooltip } from '../ui/Tooltip';
 import { TeamLogo } from '../ui/TeamLogo';
@@ -11,9 +12,14 @@ interface Props {
   members: LeagueMember[];
   draftPicks: DraftPick[];
   freeAgencyMoves: FreeAgencyMove[];
+  waiverClaims: WaiverClaim[];
   teams: CfbTeam[];
   userId: string;
   onMakeMove: (
+    droppedTeamId: string, droppedTeamName: string,
+    addedTeamId: string, addedTeamName: string, addedTeamLogo: string, addedTeamConference: string,
+  ) => Promise<{ error?: string }>;
+  onSubmitClaim: (
     droppedTeamId: string, droppedTeamName: string,
     addedTeamId: string, addedTeamName: string, addedTeamLogo: string, addedTeamConference: string,
   ) => Promise<{ error?: string }>;
@@ -26,8 +32,11 @@ function formatMoveTime(iso: string): string {
   return `${date} · ${time}`;
 }
 
-export function FreeAgencyPage({ league, members, draftPicks, freeAgencyMoves, teams, userId, onMakeMove }: Props) {
-  const scoring = league.scoring;
+export function FreeAgencyPage({
+  league, members, draftPicks, freeAgencyMoves, waiverClaims, teams, userId, onMakeMove, onSubmitClaim,
+}: Props) {
+  const scoring = normalizeScoring(league.scoring);
+  const waiverMode = scoring.waiver_enabled;
 
   const [search, setSearch]         = useState('');
   const [confFilter, setConfFilter] = useState('ALL');
@@ -57,9 +66,22 @@ export function FreeAgencyPage({ league, members, draftPicks, freeAgencyMoves, t
     () => freeAgencyMoves.filter(m => m.user_id === userId),
     [freeAgencyMoves, userId]
   );
+  const myPendingClaims = useMemo(
+    () => waiverClaims.filter(c => c.user_id === userId && c.status === 'pending'),
+    [waiverClaims, userId]
+  );
+  const myClaimsHistory = useMemo(
+    () => waiverClaims
+      .filter(c => c.user_id === userId && c.status !== 'pending')
+      .sort((a, b) => (b.processed_at ?? '').localeCompare(a.processed_at ?? ''))
+      .slice(0, 10),
+    [waiverClaims, userId]
+  );
   const myMovesThisWeek = myMoves.filter(m => m.week === league.current_week);
-  const seasonRemaining = scoring.fa_max_moves_per_season - myMoves.length;
-  const weekRemaining   = scoring.fa_max_moves_per_week - myMovesThisWeek.length;
+  const myPendingClaimsThisWeek = myPendingClaims.filter(c => c.week === league.current_week);
+  // A pending claim counts against the cap immediately, before it resolves.
+  const seasonRemaining = scoring.fa_max_moves_per_season - myMoves.length - myPendingClaims.length;
+  const weekRemaining   = scoring.fa_max_moves_per_week - myMovesThisWeek.length - myPendingClaimsThisWeek.length;
 
   const available = useMemo(() => {
     return teams.filter(t => {
@@ -79,18 +101,53 @@ export function FreeAgencyPage({ league, members, draftPicks, freeAgencyMoves, t
 
   const dropTeam = myRoster.find(t => t.team_id === dropId) ?? null;
 
+  // Competing pending claims on a given team, from OTHER users — shown as a
+  // transparency signal while waivers are on (everyone can see who else is
+  // in the running; resolution priority isn't revealed here).
+  const competingClaims = useMemo(() => {
+    const map = new Map<string, number>();
+    waiverClaims.forEach(c => {
+      if (c.status !== 'pending' || c.user_id === userId) return;
+      map.set(c.added_team_id, (map.get(c.added_team_id) ?? 0) + 1);
+    });
+    return map;
+  }, [waiverClaims, userId]);
+
   const getConfBlock = (team: CfbTeam): string | null => {
-    const isP4 = (P4_CONFERENCES as readonly string[]).includes(team.conference);
-    if (!isP4) return null;
-    const currentCount = myRoster.filter(t => t.team_conference === team.conference).length;
-    const newCount = currentCount - (dropTeam?.team_conference === team.conference ? 1 : 0) + 1;
-    if (newCount > DRAFT_CONF_MAX) return `Max ${DRAFT_CONF_MAX} from ${team.conference}`;
+    const category = confCategory(team.conference);
+    const max = category === 'G5' ? scoring.g5_conf_max : scoring.p4_conf_max;
+    const currentCount = category === 'G5'
+      ? myRoster.filter(t => !isP4Conference(t.team_conference)).length
+      : myRoster.filter(t => t.team_conference === team.conference).length;
+    const droppingSameCategory = dropTeam ? confCategory(dropTeam.team_conference) === category : false;
+    const newCount = currentCount - (droppingSameCategory ? 1 : 0) + 1;
+    if (newCount > max) return `Max ${max} ${category === 'G5' ? 'G5/non-P4' : category} teams`;
     return null;
   };
 
+  // Would dropping the selected team take that conference/category below its
+  // configured minimum, without the selected add-team backfilling the same
+  // category? Checked once both a drop and an add are chosen.
+  const minBlock = useMemo(() => {
+    if (!dropTeam) return null;
+    const category = confCategory(dropTeam.team_conference);
+    const min = category === 'G5' ? scoring.g5_conf_min : scoring.p4_conf_min;
+    if (min <= 0) return null;
+    const currentCount = category === 'G5'
+      ? myRoster.filter(t => !isP4Conference(t.team_conference)).length
+      : myRoster.filter(t => t.team_conference === dropTeam.team_conference).length;
+    const addTeam = teams.find(t => t.id === addId);
+    const addingSameCategory = addTeam ? confCategory(addTeam.conference) === category : false;
+    if (!addingSameCategory && currentCount - 1 < min) {
+      const label = category === 'G5' ? 'G5/non-P4' : category;
+      return `Dropping ${dropTeam.team_name} would leave you below the ${min}-team ${label} minimum — add another ${label} team instead`;
+    }
+    return null;
+  }, [dropTeam, addId, teams, myRoster, scoring.p4_conf_min, scoring.g5_conf_min]);
+
   const getMemberName = (uid: string) => members.find(m => m.user_id === uid)?.display_name ?? 'Unknown';
 
-  const canSubmit = !!dropId && !!addId && seasonRemaining > 0 && weekRemaining > 0 && !submitting;
+  const canSubmit = !!dropId && !!addId && seasonRemaining > 0 && weekRemaining > 0 && !submitting && !minBlock;
 
   const handleConfirm = async () => {
     const addTeam = teams.find(t => t.id === addId);
@@ -98,11 +155,14 @@ export function FreeAgencyPage({ league, members, draftPicks, freeAgencyMoves, t
     setSubmitting(true);
     setError('');
     setSuccess('');
-    const result = await onMakeMove(dropTeam.team_id, dropTeam.team_name, addTeam.id, addTeam.name, addTeam.logo, addTeam.conference);
+    const action = waiverMode ? onSubmitClaim : onMakeMove;
+    const result = await action(dropTeam.team_id, dropTeam.team_name, addTeam.id, addTeam.name, addTeam.logo, addTeam.conference);
     if (result.error) {
       setError(result.error);
     } else {
-      setSuccess(`Dropped ${dropTeam.team_name}, added ${addTeam.name}.`);
+      setSuccess(waiverMode
+        ? `Claim submitted — resolves on the next processing day.`
+        : `Dropped ${dropTeam.team_name}, added ${addTeam.name}.`);
       setDropId(null);
       setAddId(null);
       setTimeout(() => setSuccess(''), 4000);
@@ -233,6 +293,7 @@ export function FreeAgencyPage({ league, members, draftPicks, freeAgencyMoves, t
             )}
             {available.map(team => {
               const block = getConfBlock(team);
+              const competing = competingClaims.get(team.id) ?? 0;
               const row = (
                 <button
                   key={team.id}
@@ -248,12 +309,19 @@ export function FreeAgencyPage({ league, members, draftPicks, freeAgencyMoves, t
                     <p className="text-sm font-medium text-white truncate">{team.name}</p>
                     <p className="text-xs text-turf-500">{team.conference}</p>
                   </div>
+                  {waiverMode && competing > 0 && (
+                    <Tooltip content={`${competing} other pending claim${competing === 1 ? '' : 's'} on this team`} position="left" width="w-48">
+                      <span className="badge-gray text-xs flex items-center gap-1 flex-shrink-0">
+                        <Users className="w-3 h-3" />{competing}
+                      </span>
+                    </Tooltip>
+                  )}
                   {block && <span className="text-xs text-red-500 flex-shrink-0">Max</span>}
                   {!block && addId === team.id && <CheckCircle2 className="w-4 h-4 text-field-400 flex-shrink-0" />}
                 </button>
               );
               return block ? (
-                <Tooltip key={team.id} content={block} position="left" width="w-48">{row}</Tooltip>
+                <Tooltip key={team.id} content={block} position="left" width="w-48" fullWidth>{row}</Tooltip>
               ) : row;
             })}
           </div>
@@ -261,33 +329,70 @@ export function FreeAgencyPage({ league, members, draftPicks, freeAgencyMoves, t
       </div>
 
       {/* Confirm bar */}
-      <div className="card p-4 flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3 text-sm min-w-0">
-          {dropTeam ? (
-            <span className="flex items-center gap-1.5 text-turf-300 truncate">
-              <TeamLogo src={dropTeam.team_logo} alt="" fallbackName={dropTeam.team_name} size={20} />
-              {dropTeam.team_name}
-            </span>
-          ) : (
-            <span className="text-turf-500">No team selected to drop</span>
-          )}
-          <ArrowRight className="w-4 h-4 text-turf-600 flex-shrink-0" />
-          {addId ? (() => {
-            const t = teams.find(x => x.id === addId)!;
-            return (
+      <div className="card p-4 space-y-3">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-3 text-sm min-w-0">
+            {dropTeam ? (
               <span className="flex items-center gap-1.5 text-turf-300 truncate">
-                <TeamLogo src={t.logo} alt="" fallbackName={t.name} size={20} />
-                {t.name}
+                <TeamLogo src={dropTeam.team_logo} alt="" fallbackName={dropTeam.team_name} size={20} />
+                {dropTeam.team_name}
               </span>
-            );
-          })() : (
-            <span className="text-turf-500">No team selected to add</span>
-          )}
+            ) : (
+              <span className="text-turf-500">No team selected to drop</span>
+            )}
+            <ArrowRight className="w-4 h-4 text-turf-600 flex-shrink-0" />
+            {addId ? (() => {
+              const t = teams.find(x => x.id === addId)!;
+              return (
+                <span className="flex items-center gap-1.5 text-turf-300 truncate">
+                  <TeamLogo src={t.logo} alt="" fallbackName={t.name} size={20} />
+                  {t.name}
+                </span>
+              );
+            })() : (
+              <span className="text-turf-500">No team selected to add</span>
+            )}
+          </div>
+          <button onClick={handleConfirm} disabled={!canSubmit} className="btn-primary flex-shrink-0">
+            {submitting ? 'Submitting…' : waiverMode ? 'Submit Claim' : 'Confirm Swap'}
+          </button>
         </div>
-        <button onClick={handleConfirm} disabled={!canSubmit} className="btn-primary flex-shrink-0">
-          {submitting ? 'Submitting…' : 'Confirm Swap'}
-        </button>
+        {minBlock && (
+          <p className="text-xs text-red-300 flex items-center gap-1.5">
+            <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />{minBlock}
+          </p>
+        )}
       </div>
+
+      {/* My waiver claims */}
+      {waiverMode && myPendingClaims.length + myClaimsHistory.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-1.5 px-1">
+            <Clock className="w-3.5 h-3.5 text-turf-500" />
+            <p className="text-xs text-turf-500 uppercase tracking-wide font-medium">My Waiver Claims</p>
+          </div>
+          <div className="card divide-y divide-turf-800/60 overflow-hidden">
+            {[...myPendingClaims, ...myClaimsHistory].map(c => (
+              <div key={c.id} className="flex items-center gap-3 px-4 py-3 flex-wrap">
+                <div className="flex items-center gap-1.5 text-xs text-turf-500 flex-1 min-w-0">
+                  <TeamLogo src={c.dropped_team_logo} alt="" fallbackName={c.dropped_team_name} size={18} />
+                  <span className="truncate max-w-28">{c.dropped_team_name}</span>
+                  <ArrowRight className="w-3 h-3 flex-shrink-0" />
+                  <TeamLogo src={c.added_team_logo} alt="" fallbackName={c.added_team_name} size={18} />
+                  <span className="truncate max-w-28 text-turf-300">{c.added_team_name}</span>
+                </div>
+                <span className={
+                  c.status === 'pending' ? 'badge-gold text-xs' :
+                  c.status === 'processed' ? 'badge-green text-xs' : 'badge-red text-xs'
+                }>
+                  {c.status === 'pending' ? 'Pending' : c.status === 'processed' ? 'Won' : 'Lost priority'}
+                </span>
+                <span className="text-xs text-turf-500 font-mono flex-shrink-0">{formatMoveTime(c.submitted_at)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* League activity */}
       <div className="space-y-2">
