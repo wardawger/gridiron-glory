@@ -611,11 +611,11 @@ export function RosterView({
         {/* ── THIS WEEK VIEW ── */}
         {view === 'week' && (
           weekRoster.length === 0 ? (
-            <div className="card p-12 text-center text-turf-500">
+            <div className="card p-12 text-center text-turf-500 animate-content-fade-in">
               <p>{roster.length === 0 ? 'No teams drafted yet' : 'No teams rostered that week'}</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 animate-content-fade-in">
               {weekRoster.map(entry => {
                 const game = gameData[entry.team_id]?.[selectedWeek];
                 const isCaptain = entry.team_id === captainThisWeek;
@@ -838,7 +838,7 @@ export function RosterView({
 
         {/* ── FULL SCHEDULE VIEW ── */}
         {view === 'schedule' && scoring.spread_enabled && (
-          <div className="flex items-center justify-between px-1">
+          <div className="flex items-center justify-between px-1 animate-content-fade-in">
             <p className="text-xs text-turf-500 flex items-center gap-1.5">
               <Coins className="w-3.5 h-3.5 flex-shrink-0" />
               Spread picks available — click opponent logo to view scoring, use team row to pick spreads
@@ -860,7 +860,7 @@ export function RosterView({
         )}
 
         {view === 'schedule' && (
-          <div className="card overflow-hidden">
+          <div className="card overflow-hidden animate-content-fade-in">
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>

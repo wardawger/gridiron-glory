@@ -127,7 +127,7 @@ export function ScoringTab({ league, onUpdateScoring }: Props) {
         </div>
 
         {scoring.stat_bonus_enabled && (
-          <div className="space-y-3 pt-2 border-t border-turf-800">
+          <div className="space-y-3 pt-2 border-t border-turf-800 animate-content-fade-in">
             {STAT_BONUS_CATEGORIES.map(cat => {
               const c = scoring.stat_bonus_categories[cat];
               const updateCat = (patch: Partial<StatBonusCategorySettings>) =>
@@ -246,7 +246,7 @@ export function ScoringTab({ league, onUpdateScoring }: Props) {
         </div>
 
         {scoring.spread_enabled && (
-          <div className="space-y-4 pt-2 border-t border-turf-800">
+          <div className="space-y-4 pt-2 border-t border-turf-800 animate-content-fade-in">
             {/* Points mode toggle */}
             <div>
               <label className="label">Point Mode</label>
@@ -352,7 +352,7 @@ export function ScoringTab({ league, onUpdateScoring }: Props) {
         </div>
 
         {scoring.free_agency_enabled && (
-          <div className="space-y-4 pt-2 border-t border-turf-800">
+          <div className="space-y-4 pt-2 border-t border-turf-800 animate-content-fade-in">
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="label">Max Adds/Drops / Season</label>
@@ -428,7 +428,7 @@ export function ScoringTab({ league, onUpdateScoring }: Props) {
           </div>
 
           {scoring.waiver_enabled && (
-            <div className="space-y-4 pt-2 border-t border-turf-800">
+            <div className="space-y-4 pt-2 border-t border-turf-800 animate-content-fade-in">
               <div>
                 <label className="label">Priority Metric</label>
                 <p className="text-xs text-turf-500 mb-2">Who wins when two managers claim the same team</p>

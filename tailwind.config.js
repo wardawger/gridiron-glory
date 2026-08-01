@@ -48,6 +48,8 @@ export default {
         'fade-in': 'fadeIn 0.4s ease-out',
         'pick-flash': 'pickFlash 0.6s ease-out',
         'radar-in': 'radarIn 0.4s ease-out',
+        'content-fade-in': 'contentFadeIn 180ms cubic-bezier(0.16, 1, 0.3, 1)',
+        'content-fade-out': 'contentFadeOut 120ms ease-in',
       },
       keyframes: {
         shimmer: {
@@ -69,6 +71,14 @@ export default {
         radarIn: {
           '0%':   { transform: 'scale(0.8)', opacity: '0' },
           '100%': { transform: 'scale(1)',   opacity: '1' },
+        },
+        contentFadeIn: {
+          '0%':   { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
+        contentFadeOut: {
+          '0%':   { opacity: '1' },
+          '100%': { opacity: '0' },
         },
       },
     },

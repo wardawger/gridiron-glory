@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { Shield, UserPlus, Settings, Gift } from 'lucide-react';
 import type {
   League, LeagueMember, ManualBonus, DraftPick, SpreadPick, FreeAgencyMove,
@@ -43,6 +43,31 @@ export function AdminPanel({
   onEndSeason, onOverrideSpread, onClearSpreadOverride, onUpdateMemberRole,
 }: Props) {
   const [tab, setTab] = useState<Tab>('members');
+  // The clicked tab highlights instantly (via `tab`); the panel below it
+  // waits for a brief exit fade on the outgoing tab before swapping content
+  // and fading in, rather than cutting straight across.
+  const [displayedTab, setDisplayedTab] = useState<Tab>('members');
+  const [tabExiting, setTabExiting] = useState(false);
+  const tabSwitchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (tabSwitchTimeout.current) clearTimeout(tabSwitchTimeout.current);
+  }, []);
+
+  const selectTab = (next: Tab) => {
+    if (next === tab) return;
+    setTab(next);
+    setTabExiting(true);
+    if (tabSwitchTimeout.current) clearTimeout(tabSwitchTimeout.current);
+    tabSwitchTimeout.current = setTimeout(() => {
+      setDisplayedTab(next);
+      setTabExiting(false);
+    }, 120);
+  };
+
+  const tabPanelClass = useCallback((id: Tab) =>
+    displayedTab === id ? (tabExiting ? 'animate-content-fade-out' : 'animate-content-fade-in') : 'hidden',
+  [displayedTab, tabExiting]);
 
   // Computed here (not inside MembersTab) since it needs almost the full
   // prop surface (draftPicks/captainPicks/gameData/bonuses/spreadPicks) to
@@ -88,7 +113,7 @@ export function AdminPanel({
         {tabs.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
-            onClick={() => setTab(id)}
+            onClick={() => selectTab(id)}
             className={`flex items-center gap-1.5 flex-1 justify-center px-2 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${
               tab === id
                 ? 'bg-field-500 text-turf-950'
@@ -103,8 +128,10 @@ export function AdminPanel({
       {/* All three tabs stay mounted (hidden via CSS rather than unmounted
           via `&&`) so switching tabs never discards in-progress form edits —
           e.g. unsaved Scoring changes — the way the pre-split monolith's
-          single always-mounted component never did either. */}
-      <div className={tab === 'members' ? '' : 'hidden'}>
+          single always-mounted component never did either. tabPanelClass
+          also drives the brief exit-then-fade-in on the panel content when
+          switching, on top of that same always-mounted foundation. */}
+      <div className={tabPanelClass('members')}>
         <MembersTab
           league={league}
           members={members}
@@ -118,11 +145,11 @@ export function AdminPanel({
         />
       </div>
 
-      <div className={tab === 'scoring' ? '' : 'hidden'}>
+      <div className={tabPanelClass('scoring')}>
         <ScoringTab league={league} onUpdateScoring={onUpdateScoring} />
       </div>
 
-      <div className={tab === 'bonuses' ? '' : 'hidden'}>
+      <div className={tabPanelClass('bonuses')}>
         <BonusesTab
           league={league}
           members={members}

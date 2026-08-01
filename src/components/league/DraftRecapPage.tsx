@@ -156,7 +156,7 @@ export function DraftRecapPage({ league, members, draftPicks }: Props) {
 
           {/* TIMELINE VIEW */}
           {view === 'timeline' && (
-            <div className="card divide-y divide-turf-800/60 overflow-hidden">
+            <div className="card divide-y divide-turf-800/60 overflow-hidden animate-content-fade-in">
               {filtered.length === 0 && (
                 <p className="py-10 text-center text-turf-500">No picks match your search</p>
               )}
@@ -185,7 +185,7 @@ export function DraftRecapPage({ league, members, draftPicks }: Props) {
 
           {/* BY MANAGER VIEW */}
           {view === 'byManager' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 animate-content-fade-in">
               {byManager.length === 0 && (
                 <p className="col-span-2 py-10 text-center text-turf-500">No picks match your search</p>
               )}
