@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { ArrowLeftRight, Search, ChevronDown, AlertCircle, CheckCircle2, X, ArrowRight, History, Clock, Users } from 'lucide-react';
 import type { League, LeagueMember, DraftPick, FreeAgencyMove, CfbTeam, WaiverClaim } from '../../types';
 import { normalizeScoring } from '../../types';
 import { P4_CONFERENCES, isP4Conference, confCategory } from '../../services/scoring';
 import { rosterAtWeek, currentRosters } from '../../services/roster';
+import { markWaiverClaimsSeen } from '../../lib/waiverSeen';
 import { Tooltip } from '../ui/Tooltip';
 import { TeamLogo } from '../ui/TeamLogo';
 
@@ -77,6 +78,20 @@ export function FreeAgencyPage({
       .slice(0, 10),
     [waiverClaims, userId]
   );
+  // Visiting this page marks any currently-resolved claim as "seen," clearing
+  // the Header's unseen-claim badge without needing an extra click. Not
+  // gated on waiverMode — a claim resolved while waivers were on must still
+  // be dismissible even after a commissioner later turns waivers back off,
+  // or the badge would be stuck forever with no way to clear it.
+  useEffect(() => {
+    if (myClaimsHistory.length === 0) return;
+    markWaiverClaimsSeen(
+      league.id, userId,
+      myClaimsHistory.map(c => c.id),
+      new Set(waiverClaims.map(c => c.id)),
+    );
+  }, [waiverMode, myClaimsHistory, league.id, userId, waiverClaims]);
+
   const myMovesThisWeek = myMoves.filter(m => m.week === league.current_week);
   const myPendingClaimsThisWeek = myPendingClaims.filter(c => c.week === league.current_week);
   // A pending claim counts against the cap immediately, before it resolves.

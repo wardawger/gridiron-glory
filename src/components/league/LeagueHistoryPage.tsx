@@ -1,4 +1,6 @@
-import { Archive, Crown, Medal } from 'lucide-react';
+import { useMemo } from 'react';
+import { Archive, Crown, Medal, TrendingUp, Target, Rocket } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import type { League, SeasonHistory, SeasonHistoryEntry } from '../../types';
 import { Avatar } from '../ui/Avatar';
 
@@ -12,6 +14,10 @@ const PODIUM_STYLES = [
   { icon: Medal, iconClass: 'text-slate-300',  ring: 'ring-slate-400/30',  bg: 'bg-slate-500/10',  label: '2nd Place' },
   { icon: Medal, iconClass: 'text-amber-700',  ring: 'ring-amber-700/30',  bg: 'bg-amber-700/10',  label: '3rd Place' },
 ];
+
+// Matches Leaderboard.tsx's PLAYER_COLORS palette (not exported from there,
+// so duplicated here — this app doesn't share chart color constants across files).
+const PLAYER_COLORS = ['#f59e0b', '#60a5fa', '#a78bfa', '#34d399', '#f87171', '#fb923c'];
 
 function PodiumCard({ entry, place }: { entry: SeasonHistoryEntry; place: 0 | 1 | 2 }) {
   const style = PODIUM_STYLES[place];
@@ -68,6 +74,182 @@ function SeasonCard({ season }: { season: SeasonHistory }) {
   );
 }
 
+interface TrendCallout {
+  label: string;
+  name: string;
+  detail: string;
+}
+
+// seasonHistory is loaded newest-first. Members can join/leave between
+// seasons, so every derived stat here is keyed by user_id and tolerates
+// gaps rather than assuming every member appears in every season.
+function useSeasonTrends(seasonHistory: SeasonHistory[]) {
+  return useMemo(() => {
+    const chronological = [...seasonHistory].reverse(); // oldest → newest, for the chart's x-axis
+
+    const latestNameByUser = new Map<string, string>();
+    seasonHistory.forEach(season => {
+      season.standings.forEach(e => {
+        if (!latestNameByUser.has(e.user_id)) latestNameByUser.set(e.user_id, e.display_name);
+      });
+    });
+
+    const chartData = chronological.map(season => {
+      const row: Record<string, string | number> = { season_label: season.season_label };
+      season.standings.forEach(e => { row[e.user_id] = e.total_points; });
+      return row;
+    });
+
+    const userIds = Array.from(latestNameByUser.keys());
+
+    // Most championships: highest count of rank === 1 finishes.
+    const championshipCounts = new Map<string, number>();
+    seasonHistory.forEach(season => {
+      const champ = season.standings.find(e => e.rank === 1);
+      if (champ) championshipCounts.set(champ.user_id, (championshipCounts.get(champ.user_id) ?? 0) + 1);
+    });
+    let mostChampionships: TrendCallout | null = null;
+    if (championshipCounts.size > 0) {
+      const [userId, count] = [...championshipCounts.entries()].sort((a, b) => b[1] - a[1])[0];
+      mostChampionships = {
+        label: 'Most Championships',
+        name: latestNameByUser.get(userId) ?? 'Unknown',
+        detail: `${count} title${count === 1 ? '' : 's'}`,
+      };
+    }
+
+    // Most consistent: lowest variance in finishing rank, among members
+    // with at least 2 seasons played (a single appearance has zero variance
+    // by definition, which would be a misleading "most consistent" result).
+    const ranksByUser = new Map<string, number[]>();
+    seasonHistory.forEach(season => {
+      season.standings.forEach(e => {
+        if (!ranksByUser.has(e.user_id)) ranksByUser.set(e.user_id, []);
+        ranksByUser.get(e.user_id)!.push(e.rank);
+      });
+    });
+    const consistencyCandidates = Array.from(ranksByUser.entries())
+      .filter(([, ranks]) => ranks.length >= 2)
+      .map(([userId, ranks]) => {
+        const mean = ranks.reduce((s, r) => s + r, 0) / ranks.length;
+        const variance = ranks.reduce((s, r) => s + (r - mean) ** 2, 0) / ranks.length;
+        return { userId, mean, variance, seasons: ranks.length };
+      })
+      .sort((a, b) => a.variance - b.variance);
+    const mostConsistent: TrendCallout | null = consistencyCandidates.length > 0
+      ? {
+          label: 'Most Consistent',
+          name: latestNameByUser.get(consistencyCandidates[0].userId) ?? 'Unknown',
+          detail: `avg. rank ${consistencyCandidates[0].mean.toFixed(1)} across ${consistencyCandidates[0].seasons} seasons`,
+        }
+      : null;
+
+    // Biggest riser: largest rank improvement between the two most recent
+    // seasons, among members who appeared in both.
+    let riserCandidate: { name: string; prevRank: number; rank: number } | null = null;
+    if (seasonHistory.length >= 2) {
+      const [latest, previous] = seasonHistory;
+      const prevRankByUser = new Map(previous.standings.map(e => [e.user_id, e.rank]));
+      const risers = latest.standings
+        .map(e => {
+          const prevRank = prevRankByUser.get(e.user_id);
+          return prevRank == null ? null : { name: e.display_name, prevRank, rank: e.rank, improvement: prevRank - e.rank };
+        })
+        .filter((c): c is NonNullable<typeof c> => c !== null && c.improvement > 0)
+        .sort((a, b) => b.improvement - a.improvement);
+      riserCandidate = risers[0] ?? null;
+    }
+    const biggestRiser: TrendCallout | null = riserCandidate
+      ? {
+          label: 'Biggest Riser',
+          name: riserCandidate.name,
+          detail: `${riserCandidate.prevRank}${ordinal(riserCandidate.prevRank)} → ${riserCandidate.rank}${ordinal(riserCandidate.rank)}`,
+        }
+      : null;
+
+    return { chartData, userIds, latestNameByUser, mostChampionships, mostConsistent, biggestRiser };
+  }, [seasonHistory]);
+}
+
+function ordinal(n: number): string {
+  const s = ['th', 'st', 'nd', 'rd'];
+  const v = n % 100;
+  return s[(v - 20) % 10] ?? s[v] ?? s[0];
+}
+
+function TrendsSection({ seasonHistory }: { seasonHistory: SeasonHistory[] }) {
+  const { chartData, userIds, latestNameByUser, mostChampionships, mostConsistent, biggestRiser } =
+    useSeasonTrends(seasonHistory);
+
+  const callouts = [
+    mostChampionships && { ...mostChampionships, icon: Crown },
+    mostConsistent && { ...mostConsistent, icon: Target },
+    biggestRiser && { ...biggestRiser, icon: Rocket },
+  ].filter((c): c is TrendCallout & { icon: typeof Crown } => c !== null);
+
+  return (
+    <div className="card p-5 space-y-5">
+      <div className="flex items-center gap-2">
+        <TrendingUp className="w-4 h-4 text-field-400" />
+        <h2 className="font-display text-xl tracking-wide text-white">Trends</h2>
+      </div>
+
+      {callouts.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {callouts.map(c => (
+            <div key={c.label} className="card-inner p-3 text-center">
+              <c.icon className="w-4 h-4 mx-auto mb-1.5 text-gold-400" />
+              <p className="text-xs text-turf-500">{c.label}</p>
+              <p className="font-medium text-white mt-0.5 truncate">{c.name}</p>
+              <p className="text-xs text-turf-400 font-mono mt-0.5">{c.detail}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div>
+        <p className="text-xs text-turf-500 mb-3">Total points by season</p>
+        <div className="h-72">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={chartData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+              <XAxis dataKey="season_label" tick={{ fill: '#6c757d', fontSize: 11 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: '#6c757d', fontSize: 11 }} axisLine={false} tickLine={false} />
+              <Tooltip
+                contentStyle={{
+                  background: '#21262d',
+                  border: '1px solid #30363d',
+                  borderRadius: 8,
+                  fontSize: 12,
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+                }}
+                labelStyle={{ color: '#fff', marginBottom: 4, fontWeight: 600 }}
+                itemStyle={{ color: '#adb5bd' }}
+              />
+              <Legend
+                wrapperStyle={{ fontSize: 12, paddingTop: 12 }}
+                formatter={(value) => <span style={{ color: '#adb5bd' }}>{value}</span>}
+              />
+              {userIds.map((userId, i) => (
+                <Line
+                  key={userId}
+                  type="monotone"
+                  name={latestNameByUser.get(userId) ?? 'Unknown'}
+                  dataKey={userId}
+                  stroke={PLAYER_COLORS[i % PLAYER_COLORS.length]}
+                  strokeWidth={2}
+                  dot={{ r: 2 }}
+                  activeDot={{ r: 4 }}
+                  connectNulls
+                />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function LeagueHistoryPage({ league, seasonHistory }: Props) {
   return (
     <div className="space-y-5 animate-fade-in max-w-3xl mx-auto">
@@ -92,7 +274,10 @@ export function LeagueHistoryPage({ league, seasonHistory }: Props) {
           </p>
         </div>
       ) : (
-        seasonHistory.map(season => <SeasonCard key={season.id} season={season} />)
+        <>
+          {seasonHistory.length >= 2 && <TrendsSection seasonHistory={seasonHistory} />}
+          {seasonHistory.map(season => <SeasonCard key={season.id} season={season} />)}
+        </>
       )}
     </div>
   );

@@ -1,25 +1,45 @@
 import { Link, useLocation } from 'react-router-dom';
 import { Trophy, Users, Shield, BarChart3, LogOut, RefreshCw, Zap, ChevronDown, Plus, History, ArrowLeftRight, Award, Info, ClipboardList, Archive } from 'lucide-react';
-import { useState, useRef, useEffect } from 'react';
-import type { League, LeagueMember } from '../../types';
+import { useState, useRef, useEffect, useMemo } from 'react';
+import type { League, LeagueMember, WaiverClaim } from '../../types';
 import { Avatar } from '../ui/Avatar';
+import { getSeenWaiverClaimIds } from '../../lib/waiverSeen';
 
 interface Props {
   league: League | null;
   allLeagues: League[];
   myMembership: LeagueMember | undefined;
   displayName: string | undefined;
+  userId: string;
+  waiverClaims: WaiverClaim[];
   onSignOut: () => void;
   onRefresh: () => void;
   isRefreshing: boolean;
   onSwitchLeague: (id: string) => void;
 }
 
+function CountBadge({ count, className = '' }: { count: number; className?: string }) {
+  if (count <= 0) return null;
+  return (
+    <span className={`inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none ${className}`}>
+      {count}
+    </span>
+  );
+}
+
 export function Header({
-  league, allLeagues, myMembership, displayName,
+  league, allLeagues, myMembership, displayName, userId, waiverClaims,
   onSignOut, onRefresh, isRefreshing, onSwitchLeague,
 }: Props) {
   const loc = useLocation();
+
+  // Recomputed on every pathname change so the badge clears right after a
+  // visit to /free-agency marks the resolved claims as seen there.
+  const unseenWaiverCount = useMemo(() => {
+    if (!league) return 0;
+    const seenIds = getSeenWaiverClaimIds(league.id, userId);
+    return waiverClaims.filter(c => c.user_id === userId && c.status !== 'pending' && !seenIds.has(c.id)).length;
+  }, [league?.id, userId, waiverClaims, loc.pathname]);
   const [showLeaguePicker, setShowLeaguePicker] = useState(false);
   const [showLeagueInfo, setShowLeagueInfo] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
@@ -51,13 +71,13 @@ export function Header({
       : []),
   ];
 
-  const leagueInfoItems = [
+  const leagueInfoItems: { to: string; label: string; icon: any; description: string; badge?: number }[] = [
     { to: '/draft-recap', label: 'Draft Recap', icon: History, description: 'Every pick, in order' },
     ...(league?.scoring.stat_bonus_enabled
       ? [{ to: '/stat-bonuses', label: 'Stat Bonuses', icon: Award, description: "Who's earning bonus points" }]
       : []),
     ...(league?.scoring.free_agency_enabled
-      ? [{ to: '/free-agency', label: 'Free Agency', icon: ArrowLeftRight, description: 'Add and drop teams' }]
+      ? [{ to: '/free-agency', label: 'Free Agency', icon: ArrowLeftRight, description: 'Add and drop teams', badge: unseenWaiverCount }]
       : []),
     { to: '/league-settings', label: 'League Settings', icon: ClipboardList, description: 'How scoring works' },
     { to: '/league-history', label: 'League History', icon: Archive, description: 'Past seasons and champions' },
@@ -157,12 +177,13 @@ export function Header({
               >
                 <Info className="w-3.5 h-3.5" />
                 League Info
+                <CountBadge count={unseenWaiverCount} />
                 <ChevronDown className={`w-3 h-3 transition-transform ${showLeagueInfo ? 'rotate-180' : ''}`} />
               </button>
 
               {showLeagueInfo && (
                 <div className="absolute top-full left-0 mt-1 w-60 card shadow-xl shadow-black/40 overflow-hidden animate-slide-up z-50 p-1.5">
-                  {leagueInfoItems.map(({ to, label, icon: Icon, description }) => {
+                  {leagueInfoItems.map(({ to, label, icon: Icon, description, badge }) => {
                     const active = loc.pathname === to;
                     return (
                       <Link
@@ -176,8 +197,11 @@ export function Header({
                         }`}
                       >
                         <Icon className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                        <div className="min-w-0">
-                          <div className="font-medium">{label}</div>
+                        <div className="min-w-0 flex-1">
+                          <div className="font-medium flex items-center gap-1.5">
+                            {label}
+                            <CountBadge count={badge ?? 0} />
+                          </div>
                           <div className="text-xs text-turf-500 truncate">{description}</div>
                         </div>
                       </Link>
@@ -239,7 +263,7 @@ export function Header({
 
         {/* Mobile nav — League Info items flattened inline, no dropdown */}
         <div className="flex md:hidden gap-1 pb-2 overflow-x-auto">
-          {[...nav.slice(0, 3), ...leagueInfoItems, ...nav.slice(3)].map(({ to, label, icon: Icon }) => {
+          {[...nav.slice(0, 3), ...leagueInfoItems, ...nav.slice(3)].map(({ to, label, icon: Icon, badge }: any) => {
             const active = loc.pathname === to;
             return (
               <Link
@@ -253,6 +277,7 @@ export function Header({
               >
                 <Icon className="w-3 h-3" />
                 {label}
+                <CountBadge count={badge ?? 0} />
               </Link>
             );
           })}
