@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { TrendingUp, TrendingDown } from 'lucide-react';
 import type { League, ScoringSettings, StatBonusCategorySettings } from '../../types';
 import { normalizeScoring, STAT_BONUS_CATEGORIES, STAT_BONUS_LABELS } from '../../types';
 import { Toggle } from '../ui/Toggle';
+import { Toast } from '../ui/Toast';
 
 interface Props {
   league: League;
@@ -10,11 +11,23 @@ interface Props {
 }
 
 const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const TOAST_DURATION_MS = 3000;
 
 export function ScoringTab({ league, onUpdateScoring }: Props) {
   const [scoring, setScoring] = useState<ScoringSettings>(normalizeScoring(league.scoring));
+  const [showSavedToast, setShowSavedToast] = useState(false);
+  const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const handleSaveScoring = () => onUpdateScoring(scoring);
+  useEffect(() => () => {
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+  }, []);
+
+  const handleSaveScoring = () => {
+    onUpdateScoring(scoring);
+    setShowSavedToast(true);
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    toastTimeoutRef.current = setTimeout(() => setShowSavedToast(false), TOAST_DURATION_MS);
+  };
 
   return (
     <div className="space-y-4">
@@ -474,6 +487,8 @@ export function ScoringTab({ league, onUpdateScoring }: Props) {
       <button onClick={handleSaveScoring} className="btn-primary">
         Save Scoring Settings
       </button>
+
+      <Toast message="Scoring settings saved" show={showSavedToast} />
     </div>
   );
 }
