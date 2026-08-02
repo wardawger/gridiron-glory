@@ -5,6 +5,7 @@ import { normalizeScoring } from '../../types';
 import { getPickOwner, P4_CONFERENCES as P4_CONF_LIST, isP4Conference, confCategory } from '../../services/scoring';
 import { Tooltip } from '../ui/Tooltip';
 import { TeamLogo } from '../ui/TeamLogo';
+import { TriviaCard } from '../ui/TriviaCard';
 import { fireDraftCompleteConfetti } from '../../lib/confetti';
 
 const WEEKS = Array.from({ length: 16 }, (_, i) => i); // weeks 0–15
@@ -323,6 +324,7 @@ export function DraftRoom({
           <div className="card p-6 text-turf-400">
             <Clock className="w-8 h-8 mx-auto mb-2 animate-pulse-slow" />
             <p>Waiting for commissioner to start…</p>
+            <TriviaCard className="mt-6" />
           </div>
         )}
       </div>

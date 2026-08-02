@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { TrendingUp, TrendingDown } from 'lucide-react';
 import type { League, ScoringSettings, StatBonusCategorySettings } from '../../types';
 import { normalizeScoring, STAT_BONUS_CATEGORIES, STAT_BONUS_LABELS } from '../../types';
+import { useCrossfadeVisibility } from '../../hooks/useCrossfade';
 import { Toggle } from '../ui/Toggle';
 import { Toast } from '../ui/Toast';
 
@@ -17,6 +18,11 @@ export function ScoringTab({ league, onUpdateScoring }: Props) {
   const [scoring, setScoring] = useState<ScoringSettings>(normalizeScoring(league.scoring));
   const [showSavedToast, setShowSavedToast] = useState(false);
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const statBonusPanel  = useCrossfadeVisibility(scoring.stat_bonus_enabled);
+  const spreadPanel     = useCrossfadeVisibility(scoring.spread_enabled);
+  const freeAgencyPanel = useCrossfadeVisibility(scoring.free_agency_enabled);
+  const waiverPanel     = useCrossfadeVisibility(scoring.waiver_enabled);
 
   useEffect(() => () => {
     if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
@@ -126,8 +132,8 @@ export function ScoringTab({ league, onUpdateScoring }: Props) {
           />
         </div>
 
-        {scoring.stat_bonus_enabled && (
-          <div className="space-y-3 pt-2 border-t border-turf-800 animate-content-fade-in">
+        {statBonusPanel.shown && (
+          <div className={`space-y-3 pt-2 border-t border-turf-800 ${statBonusPanel.className}`}>
             {STAT_BONUS_CATEGORIES.map(cat => {
               const c = scoring.stat_bonus_categories[cat];
               const updateCat = (patch: Partial<StatBonusCategorySettings>) =>
@@ -245,8 +251,8 @@ export function ScoringTab({ league, onUpdateScoring }: Props) {
           </label>
         </div>
 
-        {scoring.spread_enabled && (
-          <div className="space-y-4 pt-2 border-t border-turf-800 animate-content-fade-in">
+        {spreadPanel.shown && (
+          <div className={`space-y-4 pt-2 border-t border-turf-800 ${spreadPanel.className}`}>
             {/* Points mode toggle */}
             <div>
               <label className="label">Point Mode</label>
@@ -351,8 +357,8 @@ export function ScoringTab({ league, onUpdateScoring }: Props) {
           </label>
         </div>
 
-        {scoring.free_agency_enabled && (
-          <div className="space-y-4 pt-2 border-t border-turf-800 animate-content-fade-in">
+        {freeAgencyPanel.shown && (
+          <div className={`space-y-4 pt-2 border-t border-turf-800 ${freeAgencyPanel.className}`}>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="label">Max Adds/Drops / Season</label>
@@ -427,8 +433,8 @@ export function ScoringTab({ league, onUpdateScoring }: Props) {
             />
           </div>
 
-          {scoring.waiver_enabled && (
-            <div className="space-y-4 pt-2 border-t border-turf-800 animate-content-fade-in">
+          {waiverPanel.shown && (
+            <div className={`space-y-4 pt-2 border-t border-turf-800 ${waiverPanel.className}`}>
               <div>
                 <label className="label">Priority Metric</label>
                 <p className="text-xs text-turf-500 mb-2">Who wins when two managers claim the same team</p>

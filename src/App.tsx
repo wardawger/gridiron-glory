@@ -1,5 +1,5 @@
-import { useEffect, lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect, useState, useRef, lazy, Suspense } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth }     from './hooks/useAuth';
 import { useLeague }   from './hooks/useLeague';
 import { useCfbData }  from './hooks/useCfbData';
@@ -31,6 +31,163 @@ function RouteFallback() {
   return (
     <div className="flex items-center justify-center py-20">
       <Loader2 className="w-6 h-6 animate-spin text-turf-500" />
+    </div>
+  );
+}
+
+const ROUTE_TRANSITION_MS = 120;
+
+interface AnimatedRoutesProps {
+  lg: NonNullable<ReturnType<typeof useLeague>['league']>;
+  league: ReturnType<typeof useLeague>;
+  auth: ReturnType<typeof useAuth>;
+  cfb: ReturnType<typeof useCfbData>;
+}
+
+// Decouples what <Routes> renders from the real browser location so a route
+// change can fade the outgoing view out before swapping to the new one,
+// instead of cutting across instantly — useLocation() must be called from
+// inside <BrowserRouter>, hence this being a separate component rather than
+// logic directly in App (which renders <BrowserRouter> itself).
+function AnimatedRoutes({ lg, league, auth, cfb }: AnimatedRoutesProps) {
+  const location = useLocation();
+  const [displayedLocation, setDisplayedLocation] = useState(location);
+  const [routeExiting, setRouteExiting] = useState(false);
+  const routeTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (location.pathname === displayedLocation.pathname) return;
+    setRouteExiting(true);
+    if (routeTimeout.current) clearTimeout(routeTimeout.current);
+    routeTimeout.current = setTimeout(() => {
+      setDisplayedLocation(location);
+      setRouteExiting(false);
+    }, ROUTE_TRANSITION_MS);
+  }, [location, displayedLocation]);
+
+  useEffect(() => () => {
+    if (routeTimeout.current) clearTimeout(routeTimeout.current);
+  }, []);
+
+  return (
+    <div className={routeExiting ? 'animate-content-fade-out' : 'animate-content-fade-in'}>
+      <Suspense fallback={<RouteFallback />}>
+        <Routes location={displayedLocation}>
+          <Route path="/" element={
+            <HomePage
+              league={lg}
+              members={league.members}
+              draftPicks={league.draftPicks}
+              captainPicks={league.captainPicks}
+              manualBonuses={league.manualBonuses}
+              spreadPicks={league.spreadPicks}
+              freeAgencyMoves={league.freeAgencyMoves}
+              gameData={cfb.gameData}
+              seasonStats={cfb.seasonStats}
+              rankings={cfb.rankings}
+              teams={cfb.teams}
+              userId={auth.user!.id}
+              cfbLoading={cfb.loading}
+            />
+          } />
+          <Route path="/roster"         element={<RosterPage league={lg} members={league.members} draftPicks={league.draftPicks} captainPicks={league.captainPicks} gameData={cfb.gameData} spreadData={cfb.spreadData} spreadPicks={league.spreadPicks} freeAgencyMoves={league.freeAgencyMoves} userId={auth.user!.id} onSetCaptain={league.setCaptain} onSetSpread={league.setSpreadPick} onRemoveSpread={league.removeSpreadPick} onRefreshSpreads={cfb.refreshSpreads} />} />
+          <Route path="/roster/:userId" element={<RosterPage league={lg} members={league.members} draftPicks={league.draftPicks} captainPicks={league.captainPicks} gameData={cfb.gameData} spreadData={cfb.spreadData} spreadPicks={league.spreadPicks} freeAgencyMoves={league.freeAgencyMoves} userId={auth.user!.id} onSetCaptain={league.setCaptain} onSetSpread={league.setSpreadPick} onRemoveSpread={league.removeSpreadPick} onRefreshSpreads={cfb.refreshSpreads} />} />
+          <Route path="/rankings" element={<RankingsPage rankings={cfb.rankings} teams={cfb.teams} records={cfb.records} />} />
+          <Route path="/account" element={
+            <AccountPage
+              auth={auth}
+              league={lg}
+              myMembership={league.myMembership}
+              allLeagues={league.allLeagues}
+              allMemberships={league.allMemberships}
+              teams={cfb.teams}
+              onUpdateDisplayName={league.updateDisplayName}
+              onUpdateAvatar={league.updateAvatar}
+            />
+          } />
+          <Route path="/draft-recap" element={<DraftRecapPage league={lg} members={league.members} draftPicks={league.draftPicks} />} />
+          <Route path="/league-settings" element={<LeagueSettingsPage league={lg} members={league.members} />} />
+          <Route path="/league-history" element={<LeagueHistoryPage league={lg} seasonHistory={league.seasonHistory} />} />
+          <Route path="/stat-bonuses" element={
+            <StatBonusPage
+              league={lg}
+              members={league.members}
+              rosters={league.rosters}
+              seasonStats={cfb.seasonStats}
+            />
+          } />
+          <Route path="/free-agency" element={
+            <FreeAgencyPage
+              league={lg}
+              members={league.members}
+              draftPicks={league.draftPicks}
+              freeAgencyMoves={league.freeAgencyMoves}
+              waiverClaims={league.waiverClaims}
+              teams={cfb.teams}
+              userId={auth.user!.id}
+              onMakeMove={league.makeFreeAgencyMove}
+              onSubmitClaim={league.submitWaiverClaim}
+            />
+          } />
+          <Route path="/draft"          element={
+            <DraftRoom
+              league={lg}
+              members={league.members}
+              draftPicks={league.draftPicks}
+              teams={cfb.teams}
+              gameData={cfb.gameData}
+              teamRatings={cfb.teamRatings}
+              rankings={cfb.rankings}
+              userId={auth.user!.id}
+              isCommissioner={league.isCommissioner}
+              onStartDraft={league.startDraft}
+              onMakePick={league.makeDraftPick}
+            />
+          } />
+          <Route path="/admin"          element={
+            <AdminPanel
+              league={lg}
+              members={league.members}
+              draftPicks={league.draftPicks}
+              captainPicks={league.captainPicks}
+              manualBonuses={league.manualBonuses}
+              spreadPicks={league.spreadPicks}
+              freeAgencyMoves={league.freeAgencyMoves}
+              gameData={cfb.gameData}
+              seasonStats={cfb.seasonStats}
+              isCommissioner={league.isCommissioner}
+              onSendInvite={league.sendInvite}
+              onUpdateWeek={league.updateWeek}
+              onUpdateScoring={league.updateScoring}
+              onAddBonus={league.addManualBonus}
+              onRemoveBonus={league.removeManualBonus}
+              onRemoveFromRoster={league.removeFromRoster}
+              onResetDraft={league.resetDraft}
+              onDeleteLeague={league.deleteLeague}
+              onEndSeason={league.endSeason}
+              onUpdateMemberRole={league.updateMemberRole}
+              onOverrideSpread={league.overrideSpreadResult}
+              onClearSpreadOverride={league.clearSpreadOverride}
+            />
+          } />
+          <Route path="/create-league"  element={
+            <CreateLeaguePage
+              displayName={auth.displayName ?? 'Commissioner'}
+              onCreate={league.createLeague}
+              hasExistingLeague
+            />
+          } />
+          <Route path="/join/:token"    element={
+            <JoinPage
+              user={auth.user}
+              onJoined={(leagueId) => {
+                league.switchLeague(leagueId);
+              }}
+            />
+          } />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
     </div>
   );
 }
@@ -136,123 +293,7 @@ export default function App() {
         />
         <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-6">
           <ErrorBoundary inline>
-            <Suspense fallback={<RouteFallback />}>
-              <Routes>
-                <Route path="/" element={
-                  <HomePage
-                    league={lg}
-                    members={league.members}
-                    draftPicks={league.draftPicks}
-                    captainPicks={league.captainPicks}
-                    manualBonuses={league.manualBonuses}
-                    spreadPicks={league.spreadPicks}
-                    freeAgencyMoves={league.freeAgencyMoves}
-                    gameData={cfb.gameData}
-                    seasonStats={cfb.seasonStats}
-                    rankings={cfb.rankings}
-                    teams={cfb.teams}
-                    userId={auth.user.id}
-                    cfbLoading={cfb.loading}
-                  />
-                } />
-                <Route path="/roster"         element={<RosterPage league={lg} members={league.members} draftPicks={league.draftPicks} captainPicks={league.captainPicks} gameData={cfb.gameData} spreadData={cfb.spreadData} spreadPicks={league.spreadPicks} freeAgencyMoves={league.freeAgencyMoves} userId={auth.user.id} onSetCaptain={league.setCaptain} onSetSpread={league.setSpreadPick} onRemoveSpread={league.removeSpreadPick} onRefreshSpreads={cfb.refreshSpreads} />} />
-                <Route path="/roster/:userId" element={<RosterPage league={lg} members={league.members} draftPicks={league.draftPicks} captainPicks={league.captainPicks} gameData={cfb.gameData} spreadData={cfb.spreadData} spreadPicks={league.spreadPicks} freeAgencyMoves={league.freeAgencyMoves} userId={auth.user.id} onSetCaptain={league.setCaptain} onSetSpread={league.setSpreadPick} onRemoveSpread={league.removeSpreadPick} onRefreshSpreads={cfb.refreshSpreads} />} />
-                <Route path="/rankings" element={<RankingsPage rankings={cfb.rankings} teams={cfb.teams} records={cfb.records} />} />
-                <Route path="/account" element={
-                  <AccountPage
-                    auth={auth}
-                    league={lg}
-                    myMembership={league.myMembership}
-                    allLeagues={league.allLeagues}
-                    allMemberships={league.allMemberships}
-                    teams={cfb.teams}
-                    onUpdateDisplayName={league.updateDisplayName}
-                    onUpdateAvatar={league.updateAvatar}
-                  />
-                } />
-                <Route path="/draft-recap" element={<DraftRecapPage league={lg} members={league.members} draftPicks={league.draftPicks} />} />
-                <Route path="/league-settings" element={<LeagueSettingsPage league={lg} members={league.members} />} />
-                <Route path="/league-history" element={<LeagueHistoryPage league={lg} seasonHistory={league.seasonHistory} />} />
-                <Route path="/stat-bonuses" element={
-                  <StatBonusPage
-                    league={lg}
-                    members={league.members}
-                    rosters={league.rosters}
-                    seasonStats={cfb.seasonStats}
-                  />
-                } />
-                <Route path="/free-agency" element={
-                  <FreeAgencyPage
-                    league={lg}
-                    members={league.members}
-                    draftPicks={league.draftPicks}
-                    freeAgencyMoves={league.freeAgencyMoves}
-                    waiverClaims={league.waiverClaims}
-                    teams={cfb.teams}
-                    userId={auth.user.id}
-                    onMakeMove={league.makeFreeAgencyMove}
-                    onSubmitClaim={league.submitWaiverClaim}
-                  />
-                } />
-                <Route path="/draft"          element={
-                  <DraftRoom
-                    league={lg}
-                    members={league.members}
-                    draftPicks={league.draftPicks}
-                    teams={cfb.teams}
-                    gameData={cfb.gameData}
-                    teamRatings={cfb.teamRatings}
-                    rankings={cfb.rankings}
-                    userId={auth.user.id}
-                    isCommissioner={league.isCommissioner}
-                    onStartDraft={league.startDraft}
-                    onMakePick={league.makeDraftPick}
-                  />
-                } />
-                <Route path="/admin"          element={
-                  <AdminPanel
-                    league={lg}
-                    members={league.members}
-                    draftPicks={league.draftPicks}
-                    captainPicks={league.captainPicks}
-                    manualBonuses={league.manualBonuses}
-                    spreadPicks={league.spreadPicks}
-                    freeAgencyMoves={league.freeAgencyMoves}
-                    gameData={cfb.gameData}
-                    seasonStats={cfb.seasonStats}
-                    isCommissioner={league.isCommissioner}
-                    onSendInvite={league.sendInvite}
-                    onUpdateWeek={league.updateWeek}
-                    onUpdateScoring={league.updateScoring}
-                    onAddBonus={league.addManualBonus}
-                    onRemoveBonus={league.removeManualBonus}
-                    onRemoveFromRoster={league.removeFromRoster}
-                    onResetDraft={league.resetDraft}
-                    onDeleteLeague={league.deleteLeague}
-                    onEndSeason={league.endSeason}
-                    onUpdateMemberRole={league.updateMemberRole}
-                    onOverrideSpread={league.overrideSpreadResult}
-                    onClearSpreadOverride={league.clearSpreadOverride}
-                  />
-                } />
-                <Route path="/create-league"  element={
-                  <CreateLeaguePage
-                    displayName={auth.displayName ?? 'Commissioner'}
-                    onCreate={league.createLeague}
-                    hasExistingLeague
-                  />
-                } />
-                <Route path="/join/:token"    element={
-                  <JoinPage
-                    user={auth.user}
-                    onJoined={(leagueId) => {
-                      league.switchLeague(leagueId);
-                    }}
-                  />
-                } />
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
-            </Suspense>
+            <AnimatedRoutes lg={lg} league={league} auth={auth} cfb={cfb} />
           </ErrorBoundary>
         </main>
       </div>

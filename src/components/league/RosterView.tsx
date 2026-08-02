@@ -3,9 +3,11 @@ import { Shield, TrendingUp, TrendingDown, Minus, Star, Calendar, List, X, MapPi
 import type { RosterEntry, CaptainPick, GameData, ScoringSettings, LeagueMember, WeeklyScore, GameResult, SpreadPick, SpreadData, FreeAgencyMove, DraftPick } from '../../types';
 import { calcWeeklyScore, scoreGame, didCoverSpread, scoreSpread } from '../../services/scoring';
 import { rosterAtWeek } from '../../services/roster';
+import { useTabCrossfade } from '../../hooks/useCrossfade';
 import { Tooltip } from '../ui/Tooltip';
 import { TeamLogo } from '../ui/TeamLogo';
 import { Avatar } from '../ui/Avatar';
+import { TriviaCard } from '../ui/TriviaCard';
 
 interface Props {
   member: LeagueMember;
@@ -419,7 +421,7 @@ export function RosterView({
   spreadData, spreadPicks, spreadUsage, onSetSpread, onRemoveSpread, onRefreshSpreads,
   freeAgencyMoves, viewUserId,
 }: Props) {
-  const [view, setView] = useState<'week' | 'schedule'>('week');
+  const { active: view, select: selectView, panelClass: viewPanelClass } = useTabCrossfade<'week' | 'schedule'>('week');
   // Which week the roster page is browsing — defaults to the league's actual
   // current week each time this page is opened, but can be changed freely
   // without affecting league.current_week (used elsewhere for free agency,
@@ -569,7 +571,7 @@ export function RosterView({
         <div className="flex gap-1 bg-turf-900 p-1 rounded-xl border border-turf-800">
           <div className="relative flex-1" ref={weekMenuRef}>
             <button
-              onClick={() => { setShowWeekMenu(v => !v); setView('week'); }}
+              onClick={() => { setShowWeekMenu(v => !v); selectView('week'); }}
               className={`w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium transition-all ${
                 view === 'week' ? 'bg-field-500 text-turf-950' : 'text-turf-400 hover:text-white'
               }`}
@@ -584,7 +586,7 @@ export function RosterView({
                 {WEEKS.map(w => (
                   <button
                     key={w}
-                    onClick={() => { setSelectedWeek(w); setView('week'); setShowWeekMenu(false); }}
+                    onClick={() => { setSelectedWeek(w); selectView('week'); setShowWeekMenu(false); }}
                     className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-sm transition-colors ${
                       w === selectedWeek
                         ? 'bg-field-900/60 text-field-400'
@@ -599,7 +601,7 @@ export function RosterView({
             )}
           </div>
           <button
-            onClick={() => setView('schedule')}
+            onClick={() => selectView('schedule')}
             className={`flex items-center gap-1.5 flex-1 justify-center py-2 rounded-lg text-sm font-medium transition-all ${
               view === 'schedule' ? 'bg-field-500 text-turf-950' : 'text-turf-400 hover:text-white'
             }`}
@@ -609,13 +611,14 @@ export function RosterView({
         </div>
 
         {/* ── THIS WEEK VIEW ── */}
-        {view === 'week' && (
-          weekRoster.length === 0 ? (
-            <div className="card p-12 text-center text-turf-500 animate-content-fade-in">
+        <div className={viewPanelClass('week')}>
+          {weekRoster.length === 0 ? (
+            <div className="card p-12 text-center text-turf-500">
               <p>{roster.length === 0 ? 'No teams drafted yet' : 'No teams rostered that week'}</p>
+              {roster.length === 0 && <TriviaCard className="mt-8" />}
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 animate-content-fade-in">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {weekRoster.map(entry => {
                 const game = gameData[entry.team_id]?.[selectedWeek];
                 const isCaptain = entry.team_id === captainThisWeek;
@@ -833,12 +836,12 @@ export function RosterView({
                 );
               })}
             </div>
-          )
-        )}
+          )}
+        </div>
 
         {/* ── FULL SCHEDULE VIEW ── */}
-        {view === 'schedule' && scoring.spread_enabled && (
-          <div className="flex items-center justify-between px-1 animate-content-fade-in">
+        {scoring.spread_enabled && (
+          <div className={`flex items-center justify-between px-1 ${viewPanelClass('schedule')}`}>
             <p className="text-xs text-turf-500 flex items-center gap-1.5">
               <Coins className="w-3.5 h-3.5 flex-shrink-0" />
               Spread picks available — click opponent logo to view scoring, use team row to pick spreads
@@ -859,8 +862,7 @@ export function RosterView({
           </div>
         )}
 
-        {view === 'schedule' && (
-          <div className="card overflow-hidden animate-content-fade-in">
+        <div className={`card overflow-hidden ${viewPanelClass('schedule')}`}>
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
@@ -1093,8 +1095,7 @@ export function RosterView({
               </span>
               <span className="text-turf-500 ml-auto">Scroll right →</span>
             </div>
-          </div>
-        )}
+        </div>
       </div>
     </>
   );

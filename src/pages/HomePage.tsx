@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Loader2, Coins, Trophy, BarChart3 } from 'lucide-react';
 import { Leaderboard } from '../components/league/Leaderboard';
+import { TriviaCard } from '../components/ui/TriviaCard';
 import type { League, LeagueMember, CaptainPick, GameData, ManualBonus, DraftPick, TeamSeasonStats, APRanking, SpreadPick, FreeAgencyMove, CfbTeam } from '../types';
 import { buildLeaderboard } from '../services/scoring';
 
@@ -68,6 +69,7 @@ export function HomePage({
             Each manager's total points, weekly trends, and roster analytics appear as soon as teams are drafted.
           </p>
           <Link to="/draft" className="btn-primary mt-4 inline-flex">Go to Draft Room</Link>
+          <TriviaCard className="mt-8" />
         </div>
       ) : (
         <Leaderboard

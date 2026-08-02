@@ -1,7 +1,11 @@
 import { useMemo, useState } from 'react';
 import { History, ListOrdered, Users, Search, Shield } from 'lucide-react';
 import type { League, LeagueMember, DraftPick } from '../../types';
+import { useTabCrossfade } from '../../hooks/useCrossfade';
 import { TeamLogo } from '../ui/TeamLogo';
+import { TriviaCard } from '../ui/TriviaCard';
+
+type View = 'timeline' | 'byManager';
 
 interface Props {
   league: League;
@@ -29,7 +33,7 @@ function formatDuration(ms: number): string {
 }
 
 export function DraftRecapPage({ league, members, draftPicks }: Props) {
-  const [view, setView]     = useState<'timeline' | 'byManager'>('timeline');
+  const { active: view, select: selectView, panelClass: viewPanelClass } = useTabCrossfade<View>('timeline');
   const [search, setSearch] = useState('');
 
   const getMemberName = (uid: string) =>
@@ -120,6 +124,7 @@ export function DraftRecapPage({ league, members, draftPicks }: Props) {
         <div className="card p-12 text-center text-turf-500">
           <History className="w-8 h-8 mx-auto mb-3 text-turf-700" />
           <p>No picks have been made yet.</p>
+          <TriviaCard className="mt-8" />
         </div>
       ) : (
         <>
@@ -127,7 +132,7 @@ export function DraftRecapPage({ league, members, draftPicks }: Props) {
           <div className="flex flex-col sm:flex-row gap-2">
             <div className="flex gap-1 bg-turf-900 p-1 rounded-xl border border-turf-800 sm:w-72">
               <button
-                onClick={() => setView('timeline')}
+                onClick={() => selectView('timeline')}
                 className={`flex items-center gap-1.5 flex-1 justify-center py-2 rounded-lg text-sm font-medium transition-all ${
                   view === 'timeline' ? 'bg-field-500 text-turf-950' : 'text-turf-400 hover:text-white'
                 }`}
@@ -135,7 +140,7 @@ export function DraftRecapPage({ league, members, draftPicks }: Props) {
                 <ListOrdered className="w-3.5 h-3.5" /> Timeline
               </button>
               <button
-                onClick={() => setView('byManager')}
+                onClick={() => selectView('byManager')}
                 className={`flex items-center gap-1.5 flex-1 justify-center py-2 rounded-lg text-sm font-medium transition-all ${
                   view === 'byManager' ? 'bg-field-500 text-turf-950' : 'text-turf-400 hover:text-white'
                 }`}
@@ -155,8 +160,7 @@ export function DraftRecapPage({ league, members, draftPicks }: Props) {
           </div>
 
           {/* TIMELINE VIEW */}
-          {view === 'timeline' && (
-            <div className="card divide-y divide-turf-800/60 overflow-hidden animate-content-fade-in">
+          <div className={`card divide-y divide-turf-800/60 overflow-hidden ${viewPanelClass('timeline')}`}>
               {filtered.length === 0 && (
                 <p className="py-10 text-center text-turf-500">No picks match your search</p>
               )}
@@ -180,12 +184,10 @@ export function DraftRecapPage({ league, members, draftPicks }: Props) {
                   </div>
                 </div>
               ))}
-            </div>
-          )}
+          </div>
 
           {/* BY MANAGER VIEW */}
-          {view === 'byManager' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 animate-content-fade-in">
+          <div className={`grid grid-cols-1 md:grid-cols-2 gap-3 ${viewPanelClass('byManager')}`}>
               {byManager.length === 0 && (
                 <p className="col-span-2 py-10 text-center text-turf-500">No picks match your search</p>
               )}
@@ -214,8 +216,7 @@ export function DraftRecapPage({ league, members, draftPicks }: Props) {
                   )}
                 </div>
               ))}
-            </div>
-          )}
+          </div>
         </>
       )}
     </div>

@@ -1,10 +1,11 @@
-import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { useMemo } from 'react';
 import { Shield, UserPlus, Settings, Gift } from 'lucide-react';
 import type {
   League, LeagueMember, ManualBonus, DraftPick, SpreadPick, FreeAgencyMove,
   ScoringSettings, LeagueRole, CaptainPick, GameData, TeamSeasonStats, SeasonHistoryEntry,
 } from '../../types';
 import { buildLeaderboard } from '../../services/scoring';
+import { useTabCrossfade } from '../../hooks/useCrossfade';
 import { MembersTab } from './MembersTab';
 import { ScoringTab } from './ScoringTab';
 import { BonusesTab } from './BonusesTab';
@@ -42,32 +43,7 @@ export function AdminPanel({
   onSendInvite, onUpdateWeek, onUpdateScoring, onAddBonus, onRemoveBonus, onResetDraft, onDeleteLeague,
   onEndSeason, onOverrideSpread, onClearSpreadOverride, onUpdateMemberRole,
 }: Props) {
-  const [tab, setTab] = useState<Tab>('members');
-  // The clicked tab highlights instantly (via `tab`); the panel below it
-  // waits for a brief exit fade on the outgoing tab before swapping content
-  // and fading in, rather than cutting straight across.
-  const [displayedTab, setDisplayedTab] = useState<Tab>('members');
-  const [tabExiting, setTabExiting] = useState(false);
-  const tabSwitchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => () => {
-    if (tabSwitchTimeout.current) clearTimeout(tabSwitchTimeout.current);
-  }, []);
-
-  const selectTab = (next: Tab) => {
-    if (next === tab) return;
-    setTab(next);
-    setTabExiting(true);
-    if (tabSwitchTimeout.current) clearTimeout(tabSwitchTimeout.current);
-    tabSwitchTimeout.current = setTimeout(() => {
-      setDisplayedTab(next);
-      setTabExiting(false);
-    }, 120);
-  };
-
-  const tabPanelClass = useCallback((id: Tab) =>
-    displayedTab === id ? (tabExiting ? 'animate-content-fade-out' : 'animate-content-fade-in') : 'hidden',
-  [displayedTab, tabExiting]);
+  const { active: tab, select: selectTab, panelClass: tabPanelClass } = useTabCrossfade<Tab>('members');
 
   // Computed here (not inside MembersTab) since it needs almost the full
   // prop surface (draftPicks/captainPicks/gameData/bonuses/spreadPicks) to
