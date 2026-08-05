@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { Search, Clock, CheckCircle2, Zap, ChevronDown, ChevronUp, AlertCircle, X, MapPin, Tv, Loader2 } from 'lucide-react';
+import { Search, Clock, CheckCircle2, Zap, ChevronDown, ChevronUp, AlertCircle, AlertTriangle, X, MapPin, Tv, Loader2 } from 'lucide-react';
 import type { League, LeagueMember, DraftPick, CfbTeam, GameData, TeamRatings, APRanking } from '../../types';
 import { normalizeScoring } from '../../types';
 import { getPickOwner, P4_CONFERENCES as P4_CONF_LIST, isP4Conference, confCategory } from '../../services/scoring';
@@ -197,10 +197,29 @@ export function DraftRoom({
     const map = new Map<string, number[]>();
     teams.forEach(t => {
       const g = gameData[t.id] ?? {};
-      map.set(t.id, WEEKS.filter(w => !g[w] && w >= 1 && w <= 15));
+      // Weeks 14–15 are excluded: week 14 is conference championship week,
+      // when only teams playing in a title game have a game at all, and
+      // week 15 is dead except for the Army-Navy game — neither is a real
+      // "off week" in the bye-week sense for the vast majority of teams.
+      map.set(t.id, WEEKS.filter(w => !g[w] && w >= 1 && w <= 13));
     });
     return map;
   }, [teams, gameData]);
+
+  // Teams already on my roster whose bye week(s) overlap the modal team's —
+  // not a hard block (a shared bye is legal, just worth knowing before you
+  // pick), so this only ever informs the modal, never getConfBlock.
+  const scheduleModalByeConflicts = useMemo(() => {
+    if (!scheduleModalTeam) return [];
+    const targetByes = new Set(byeWeeksByTeam.get(scheduleModalTeam.id) ?? []);
+    if (targetByes.size === 0) return [];
+    return myPicks
+      .map(p => ({
+        teamName: p.team_name,
+        weeks: (byeWeeksByTeam.get(p.team_id) ?? []).filter(w => targetByes.has(w)),
+      }))
+      .filter(c => c.weeks.length > 0);
+  }, [scheduleModalTeam, byeWeeksByTeam, myPicks]);
 
   // Always land on the top of the page when entering the Draft Room — on
   // mobile especially, starting scrolled down into the picks list buries
@@ -383,6 +402,7 @@ export function DraftRoom({
           gameData={gameData}
           ratings={teamRatings.get(scheduleModalTeam.id) ?? null}
           apRank={rankings.find(r => r.team_id === scheduleModalTeam.id)?.rank ?? null}
+          byeConflicts={scheduleModalByeConflicts}
           isMyTurn={isMyTurn}
           picking={picking}
           pickError={pickError}
@@ -678,6 +698,7 @@ interface DraftTeamModalProps {
   gameData: GameData;
   ratings: TeamRatings | null;
   apRank: number | null;
+  byeConflicts: { teamName: string; weeks: number[] }[];
   isMyTurn: boolean;
   picking: boolean;
   pickError: string;
@@ -686,10 +707,10 @@ interface DraftTeamModalProps {
   onClose: () => void;
 }
 
-function DraftTeamModal({ team, gameData, ratings, apRank, isMyTurn, picking, pickError, blockReason, onConfirmPick, onClose }: DraftTeamModalProps) {
+function DraftTeamModal({ team, gameData, ratings, apRank, byeConflicts, isMyTurn, picking, pickError, blockReason, onConfirmPick, onClose }: DraftTeamModalProps) {
   const teamGames = gameData[team.id] ?? {};
   const weeks = WEEKS.filter(w => teamGames[w]);
-  const byes  = WEEKS.filter(w => !teamGames[w] && w >= 1 && w <= 15);
+  const byes  = WEEKS.filter(w => !teamGames[w] && w >= 1 && w <= 13);
 
   const reason = !isMyTurn ? 'Not your turn yet' : blockReason;
   const canPick = isMyTurn && !picking && !blockReason;
@@ -743,6 +764,25 @@ function DraftTeamModal({ team, gameData, ratings, apRank, isMyTurn, picking, pi
               <span className="text-turf-400 font-medium">Bye weeks: </span>
               {byes.map(w => `Wk ${w}`).join(', ')}
             </p>
+          </div>
+        )}
+
+        {/* Bye week conflict warning — not a block, just a heads-up */}
+        {byeConflicts.length > 0 && (
+          <div className="px-6 pt-4">
+            <div className="flex items-start gap-2 rounded-lg border border-amber-800/40 bg-amber-950/20 px-3 py-2.5">
+              <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-300">
+                <span className="font-medium">Bye week overlap: </span>
+                {byeConflicts.map((c, i) => (
+                  <span key={c.teamName}>
+                    {i > 0 && ', '}
+                    {c.teamName} (Wk {c.weeks.join(', ')})
+                  </span>
+                ))}
+                {' '}{byeConflicts.length === 1 ? 'is' : 'are'} also on a bye then — you could be short a starter that week.
+              </p>
+            </div>
           </div>
         )}
 

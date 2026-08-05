@@ -284,7 +284,10 @@ function ScheduleModal({ team, gameData, captainPicks, userId, currentWeek, onCl
   const teamGames = gameData[team.team_id] ?? {};
 
   const weeks = WEEKS.filter(w => teamGames[w]);
-  const byes  = WEEKS.filter(w => !teamGames[w] && w >= 1 && w <= 15);
+  // Weeks 14–15 excluded: week 14 is conference championship week (most
+  // teams simply don't play), and week 15 is dead except Army-Navy — not
+  // real "off weeks" in the bye-week sense for most teams.
+  const byes  = WEEKS.filter(w => !teamGames[w] && w >= 1 && w <= 13);
 
   return (
     <div
