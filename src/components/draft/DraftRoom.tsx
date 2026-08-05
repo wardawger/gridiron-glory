@@ -40,6 +40,7 @@ export function DraftRoom({
 }: Props) {
   const [search, setSearch]     = useState('');
   const [confFilter, setConf]   = useState('ALL');
+  const [sortBy, setSortBy]     = useState<'name' | 'fpi' | 'ap' | 'offense' | 'defense' | 'sos'>('name');
   const [picking, setPicking]   = useState(false);
   const [showAllPicksMobile, setShowAllPicksMobile] = useState(false);
   const [lastPick, setLastPick] = useState<string | null>(null);
@@ -147,9 +148,17 @@ export function DraftRoom({
     return slots;
   }, [totalPicks, league.draft_order, draftPicks]);
 
-  // Available teams with search/filter
+  // AP Top 25 rank isn't on TeamRatings — it comes from the separate
+  // `rankings` prop, keyed by team_id like the schedule modal's lookup above.
+  const apRankByTeam = useMemo(() => {
+    const map = new Map<string, number>();
+    rankings.forEach(r => { if (r.team_id) map.set(r.team_id, r.rank); });
+    return map;
+  }, [rankings]);
+
+  // Available teams with search/filter/sort
   const available = useMemo(() => {
-    return teams.filter(t => {
+    const filtered = teams.filter(t => {
       if (pickedTeamIds.has(t.id)) return false;
       if (search && !t.name.toLowerCase().includes(search.toLowerCase())) return false;
       if (confFilter === 'P4' && !(P4_CONF_LIST as readonly string[]).includes(t.conference)) return false;
@@ -157,7 +166,27 @@ export function DraftRoom({
       if (confFilter !== 'ALL' && confFilter !== 'P4' && confFilter !== 'G5' && t.conference !== confFilter) return false;
       return true;
     });
-  }, [teams, pickedTeamIds, search, confFilter]);
+
+    if (sortBy === 'name') return filtered;
+
+    const rankGetters: Record<Exclude<typeof sortBy, 'name'>, (team: CfbTeam) => number | null | undefined> = {
+      fpi:     t => teamRatings.get(t.id)?.fpi_rank,
+      ap:      t => apRankByTeam.get(t.id),
+      offense: t => teamRatings.get(t.id)?.offense_rank,
+      defense: t => teamRatings.get(t.id)?.defense_rank,
+      sos:     t => teamRatings.get(t.id)?.sos_rank,
+    };
+    const getRank = rankGetters[sortBy];
+    return [...filtered].sort((a, b) => {
+      const aRank = getRank(a);
+      const bRank = getRank(b);
+      // Teams without a published rank sort to the end, not to the top.
+      if (aRank == null && bRank == null) return a.name.localeCompare(b.name);
+      if (aRank == null) return 1;
+      if (bRank == null) return -1;
+      return aRank - bRank;
+    });
+  }, [teams, pickedTeamIds, search, confFilter, sortBy, teamRatings, apRankByTeam]);
 
   const conferences = useMemo(() => {
     const set = new Set(teams.map(t => t.conference));
@@ -494,6 +523,22 @@ export function DraftRoom({
                 onChange={e => setConf(e.target.value)}
               >
                 {conferences.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-turf-500 pointer-events-none" />
+            </div>
+            <div className="relative">
+              <select
+                className="input appearance-none pr-8"
+                value={sortBy}
+                onChange={e => setSortBy(e.target.value as typeof sortBy)}
+                aria-label="Sort available teams"
+              >
+                <option value="name">Name (A–Z)</option>
+                <option value="fpi">FPI Rank</option>
+                <option value="ap">AP Rank</option>
+                <option value="offense">Offense Rank</option>
+                <option value="defense">Defense Rank</option>
+                <option value="sos">Strength of Schedule</option>
               </select>
               <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-turf-500 pointer-events-none" />
             </div>
