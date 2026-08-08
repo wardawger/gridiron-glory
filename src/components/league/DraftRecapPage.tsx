@@ -26,6 +26,20 @@ function conferenceCategory(conference: string): string {
   return isP4Conference(conference) ? conference : 'Other';
 }
 
+// Stylized per-conference identity — CFBD has no conference logo data (only
+// team logos), so this is a designed monogram + accent color per category,
+// not a real crest. Short codes are plain descriptive abbreviations (not
+// trademarked wordmarks like the Big Ten's stylized "B1G" mark). Green is
+// deliberately not used here since it's already the app's own semantic
+// color (primary actions, success, "covered" spread results).
+const CONFERENCE_BADGE: Record<string, { short: string; text: string; bg: string; border: string; bar: string }> = {
+  'SEC':     { short: 'SEC', text: 'text-amber-400',  bg: 'bg-amber-500/15',  border: 'border-amber-500/30',  bar: 'bg-amber-400' },
+  'Big Ten': { short: 'B10', text: 'text-blue-400',   bg: 'bg-blue-500/15',   border: 'border-blue-500/30',   bar: 'bg-blue-400' },
+  'Big 12':  { short: 'B12', text: 'text-purple-400', bg: 'bg-purple-500/15', border: 'border-purple-500/30', bar: 'bg-purple-400' },
+  'ACC':     { short: 'ACC', text: 'text-rose-400',   bg: 'bg-rose-500/15',   border: 'border-rose-500/30',   bar: 'bg-rose-400' },
+  'Other':   { short: 'OTH', text: 'text-turf-300',   bg: 'bg-turf-700/40',   border: 'border-turf-600/50',   bar: 'bg-turf-400' },
+};
+
 function formatPickTime(iso: string): string {
   const d = new Date(iso);
   const date = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -177,14 +191,24 @@ export function DraftRecapPage({ league, members, draftPicks, teams }: Props) {
         <div className="card p-5 space-y-4">
           <h3 className="font-medium text-white text-sm">League Conference Breakdown</h3>
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-            {CONFERENCE_CATEGORIES.map(cat => (
-              <div key={cat} className="card-inner p-3 text-center">
-                <p className="font-mono text-lg font-bold text-white">
-                  {leagueDraftedCounts[cat]}/{conferenceTotals[cat]}
-                </p>
-                <p className="text-xs text-turf-500 mt-0.5">{cat}</p>
-              </div>
-            ))}
+            {CONFERENCE_CATEGORIES.map(cat => {
+              const badge = CONFERENCE_BADGE[cat];
+              const drafted = leagueDraftedCounts[cat];
+              const total = conferenceTotals[cat];
+              const pct = total > 0 ? Math.min(100, Math.round((drafted / total) * 100)) : 0;
+              return (
+                <div key={cat} className="card-inner p-3 text-center">
+                  <div className={`w-9 h-9 mx-auto mb-2 rounded-lg flex items-center justify-center font-display text-xs font-bold border ${badge.text} ${badge.bg} ${badge.border}`}>
+                    {badge.short}
+                  </div>
+                  <p className="font-mono text-lg font-bold text-white">{drafted}/{total}</p>
+                  <p className="text-xs text-turf-500 mt-0.5">{cat}</p>
+                  <div className="h-1 rounded-full bg-turf-800 mt-2 overflow-hidden">
+                    <div className={`h-full rounded-full ${badge.bar}`} style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           <div className="space-y-2 pt-3 border-t border-turf-800">
@@ -195,16 +219,20 @@ export function DraftRecapPage({ league, members, draftPicks, teams }: Props) {
                 return (
                   <div key={m.user_id} className="card-inner px-3 py-2">
                     <p className="text-sm text-white font-medium mb-1.5 truncate">{m.display_name}</p>
-                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+                    <div className="flex flex-wrap gap-1.5">
                       {CONFERENCE_CATEGORIES.map(cat => {
+                        const badge = CONFERENCE_BADGE[cat];
                         const denom = cat === 'Other'
                           ? (g5Configured ? scoring.g5_conf_max : null)
                           : scoring.p4_conf_max;
+                        const count = counts[cat] ?? 0;
                         return (
-                          <span key={cat} className="text-turf-400">
-                            {cat}: <span className="font-mono text-turf-200">
-                              {counts[cat] ?? 0}{denom != null ? `/${denom}` : ''}
-                            </span>
+                          <span
+                            key={cat}
+                            className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-[11px] font-medium ${badge.text} ${badge.bg} ${badge.border}`}
+                          >
+                            {badge.short}
+                            <span className="font-mono">{count}{denom != null ? `/${denom}` : ''}</span>
                           </span>
                         );
                       })}
