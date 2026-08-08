@@ -3,8 +3,10 @@ import { Shield, UserPlus, Settings, Gift } from 'lucide-react';
 import type {
   League, LeagueMember, ManualBonus, DraftPick, SpreadPick, FreeAgencyMove,
   ScoringSettings, LeagueRole, CaptainPick, GameData, TeamSeasonStats, SeasonHistoryEntry, CfbTeam,
+  TrophySnapshot,
 } from '../../types';
 import { buildLeaderboard } from '../../services/scoring';
+import { computeTrophies } from '../../services/trophies';
 import { useTabCrossfade } from '../../hooks/useCrossfade';
 import { MembersTab } from './MembersTab';
 import { ScoringTab } from './ScoringTab';
@@ -30,7 +32,7 @@ interface Props {
   onRemoveFromRoster: (userId: string, teamId: string) => void;
   onResetDraft: () => Promise<{ error?: string }>;
   onDeleteLeague: () => Promise<{ error?: string }>;
-  onEndSeason: (seasonLabel: string, standings: SeasonHistoryEntry[]) => Promise<{ error?: string }>;
+  onEndSeason: (seasonLabel: string, standings: SeasonHistoryEntry[], trophies: TrophySnapshot) => Promise<{ error?: string }>;
   onOverrideSpread: (pickId: string, result: 'covered' | 'missed', points: number) => Promise<{ error?: string }>;
   onClearSpreadOverride: (pickId: string) => Promise<{ error?: string }>;
   onUpdateMemberRole: (userId: string, role: LeagueRole) => Promise<{ error?: string }>;
@@ -62,6 +64,13 @@ export function AdminPanel({
       total_points: e.total_points, rank: i + 1,
     }));
   }, [members, draftPicks, captainPicks, gameData, league.scoring, manualBonuses, seasonStats, spreadPicks, freeAgencyMoves, league.current_week]);
+
+  // Snapshotted alongside finalStandings so End Season can freeze both at
+  // once — trophies are unrecoverable once the underlying tables are wiped.
+  const trophySnapshot = useMemo(
+    () => computeTrophies(members, draftPicks, captainPicks, spreadPicks, freeAgencyMoves, manualBonuses, gameData, league.scoring),
+    [members, draftPicks, captainPicks, spreadPicks, freeAgencyMoves, manualBonuses, gameData, league.scoring]
+  );
 
   if (!isCommissioner) {
     return (
@@ -113,6 +122,7 @@ export function AdminPanel({
           league={league}
           members={members}
           finalStandings={finalStandings}
+          trophySnapshot={trophySnapshot}
           onSendInvite={onSendInvite}
           onUpdateWeek={onUpdateWeek}
           onUpdateMemberRole={onUpdateMemberRole}

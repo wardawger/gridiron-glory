@@ -23,7 +23,7 @@ const AdminPanel         = lazy(() => import('./components/admin/AdminPanel').th
 const RankingsPage       = lazy(() => import('./components/league/RankingsPage').then(m => ({ default: m.RankingsPage })));
 const DraftRecapPage     = lazy(() => import('./components/league/DraftRecapPage').then(m => ({ default: m.DraftRecapPage })));
 const LeagueSettingsPage = lazy(() => import('./components/league/LeagueSettingsPage').then(m => ({ default: m.LeagueSettingsPage })));
-const LeagueHistoryPage  = lazy(() => import('./components/league/LeagueHistoryPage').then(m => ({ default: m.LeagueHistoryPage })));
+const TrophyCasePage     = lazy(() => import('./components/league/TrophyCasePage').then(m => ({ default: m.TrophyCasePage })));
 const FreeAgencyPage     = lazy(() => import('./components/league/FreeAgencyPage').then(m => ({ default: m.FreeAgencyPage })));
 const StatBonusPage      = lazy(() => import('./components/league/StatBonusPage').then(m => ({ default: m.StatBonusPage })));
 
@@ -107,7 +107,19 @@ function AnimatedRoutes({ lg, league, auth, cfb }: AnimatedRoutesProps) {
           } />
           <Route path="/draft-recap" element={<DraftRecapPage league={lg} members={league.members} draftPicks={league.draftPicks} teams={cfb.teams} />} />
           <Route path="/league-settings" element={<LeagueSettingsPage league={lg} members={league.members} />} />
-          <Route path="/league-history" element={<LeagueHistoryPage league={lg} seasonHistory={league.seasonHistory} />} />
+          <Route path="/league-history" element={
+            <TrophyCasePage
+              league={lg}
+              seasonHistory={league.seasonHistory}
+              members={league.members}
+              draftPicks={league.draftPicks}
+              captainPicks={league.captainPicks}
+              spreadPicks={league.spreadPicks}
+              freeAgencyMoves={league.freeAgencyMoves}
+              manualBonuses={league.manualBonuses}
+              gameData={cfb.gameData}
+            />
+          } />
           <Route path="/stat-bonuses" element={
             <StatBonusPage
               league={lg}

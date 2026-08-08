@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Shield, UserPlus, Copy, Check, Trash2, Mail, RotateCcw, AlertTriangle, Loader2, Archive } from 'lucide-react';
-import type { League, LeagueMember, LeagueRole, SeasonHistoryEntry } from '../../types';
+import type { League, LeagueMember, LeagueRole, SeasonHistoryEntry, TrophySnapshot } from '../../types';
 import { Avatar } from '../ui/Avatar';
 import { Toggle } from '../ui/Toggle';
 
@@ -8,16 +8,17 @@ interface Props {
   league: League;
   members: LeagueMember[];
   finalStandings: SeasonHistoryEntry[];
+  trophySnapshot: TrophySnapshot;
   onSendInvite: (email: string) => Promise<{ token?: string; error?: string }>;
   onUpdateWeek: (week: number) => void;
   onUpdateMemberRole: (userId: string, role: LeagueRole) => Promise<{ error?: string }>;
   onResetDraft: () => Promise<{ error?: string }>;
   onDeleteLeague: () => Promise<{ error?: string }>;
-  onEndSeason: (seasonLabel: string, standings: SeasonHistoryEntry[]) => Promise<{ error?: string }>;
+  onEndSeason: (seasonLabel: string, standings: SeasonHistoryEntry[], trophies: TrophySnapshot) => Promise<{ error?: string }>;
 }
 
 export function MembersTab({
-  league, members, finalStandings,
+  league, members, finalStandings, trophySnapshot,
   onSendInvite, onUpdateWeek, onUpdateMemberRole, onResetDraft, onDeleteLeague, onEndSeason,
 }: Props) {
   const [inviteEmail, setEmail] = useState('');
@@ -48,7 +49,7 @@ export function MembersTab({
   const handleEndSeason = async () => {
     setEndingSeason(true);
     setEndSeasonError('');
-    const result = await onEndSeason(seasonLabel, finalStandings);
+    const result = await onEndSeason(seasonLabel, finalStandings, trophySnapshot);
     setEndingSeason(false);
     if (result.error) { setEndSeasonError(result.error); return; }
     setShowEndSeasonModal(false);
@@ -216,7 +217,7 @@ export function MembersTab({
               <p className="font-medium text-white">End Season</p>
               <p className="text-xs text-turf-500 mt-0.5">
                 Once the national championship game is final, archive this season's standings
-                to League History and reset the league — draft, free agency, captain picks,
+                to Trophy Case and reset the league — draft, free agency, captain picks,
                 bonuses, and spread picks — so it's ready for a new draft. This cannot be undone.
               </p>
             </div>
@@ -317,7 +318,7 @@ export function MembersTab({
             )}
 
             <p className="text-sm text-turf-300">
-              This archives the standings above to <span className="text-white font-medium">League History</span> and
+              This archives the standings above to <span className="text-white font-medium">Trophy Case</span> and
               resets <span className="text-white font-medium">{league.name}</span> — draft picks, free agency, captain
               picks, bonuses, and spread picks — for a new season.{' '}
               <span className="text-red-300 font-medium">There is no way to recover the current data afterward.</span>

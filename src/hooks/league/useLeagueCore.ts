@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase';
 import type {
   League, LeagueMember, DraftPick, CaptainPick,
   ManualBonus, SpreadPick, FreeAgencyMove, LeagueRole, AvatarType,
-  SeasonHistory, SeasonHistoryEntry, WaiverClaim,
+  SeasonHistory, SeasonHistoryEntry, WaiverClaim, TrophySnapshot,
 } from '../../types';
 import { DEFAULT_SCORING } from '../../types';
 import { currentRosters } from '../../services/roster';
@@ -373,7 +373,8 @@ export function useLeagueCore(user: User | null) {
   // deliberately leaves alone for mid-season redos).
   const endSeason = async (
     seasonLabel: string,
-    standings: SeasonHistoryEntry[]
+    standings: SeasonHistoryEntry[],
+    trophies: TrophySnapshot
   ): Promise<{ error?: string }> => {
     if (!league || !user || !isCommissioner) return { error: 'Not authorized' };
     if (!seasonLabel.trim()) return { error: 'Season label is required' };
@@ -384,6 +385,7 @@ export function useLeagueCore(user: User | null) {
         league_id:    league.id,
         season_label: seasonLabel.trim(),
         standings,
+        trophies,
         archived_by:  user.id,
       }).select().single();
 

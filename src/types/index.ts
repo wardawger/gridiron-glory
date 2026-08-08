@@ -561,6 +561,54 @@ export interface SeasonHistory {
   season_label: string;
   standings: SeasonHistoryEntry[];
   archived_at: string;
+  trophies?: TrophySnapshot | null; // absent/null for seasons archived before this feature shipped
+}
+
+// ─── Trophy Case ───────────────────────────────────────────────────────────
+// Achievement categories computed by src/services/trophies.ts, either live
+// (current season) or frozen into SeasonHistory.trophies at endSeason() time.
+
+export type TrophyCategoryId =
+  | 'undefeated_team'
+  | 'captain_pick'
+  | 'beat_spread'
+  | 'used_free_agency'
+  | 'heisman_winner'
+  | 'p4_conf_champion'
+  | 'negative_week'
+  | 'first_losing_record_draft'
+  | 'g5_team'
+  | 'independent_team'
+  | 'bad_week_tier'
+  | 'made_cfp'
+  | 'made_conf_championship';
+
+export interface TrophyTeamRef {
+  team_id: string;
+  team_name: string;
+  team_logo: string;
+}
+
+export interface TrophyWinner {
+  user_id: string;
+  display_name: string;
+  avatar_type: AvatarType;
+  avatar_value: string;
+  teams: TrophyTeamRef[]; // empty for whole-roster trophies (negative week, bad week tier)
+  tier?: number;          // conference-champion count, bad-week threshold index
+  detail?: string;        // e.g. "Week 6 · −14 pts", or a date for the "first" trophy
+}
+
+export interface TrophyCategory {
+  id: TrophyCategoryId;
+  label: string;
+  description: string;
+  winners: TrophyWinner[];
+}
+
+export interface TrophySnapshot {
+  computedAt: string;
+  categories: TrophyCategory[];
 }
 
 // ─── Invites ───────────────────────────────────────────────────────────────

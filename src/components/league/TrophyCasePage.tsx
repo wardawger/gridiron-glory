@@ -1,12 +1,24 @@
-import { useMemo } from 'react';
-import { Archive, Crown, Medal, TrendingUp, Target, Rocket } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Archive, Crown, Medal, TrendingUp, Target, Rocket, Trophy, ChevronDown } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import type { League, SeasonHistory, SeasonHistoryEntry } from '../../types';
+import type {
+  League, SeasonHistory, SeasonHistoryEntry, LeagueMember, DraftPick, CaptainPick,
+  SpreadPick, FreeAgencyMove, ManualBonus, GameData, TrophyCategory,
+} from '../../types';
 import { Avatar } from '../ui/Avatar';
+import { TeamLogo } from '../ui/TeamLogo';
+import { computeTrophies } from '../../services/trophies';
 
 interface Props {
   league: League;
   seasonHistory: SeasonHistory[];
+  members: LeagueMember[];
+  draftPicks: DraftPick[];
+  captainPicks: CaptainPick[];
+  spreadPicks: SpreadPick[];
+  freeAgencyMoves: FreeAgencyMove[];
+  manualBonuses: ManualBonus[];
+  gameData: GameData;
 }
 
 const PODIUM_STYLES = [
@@ -39,9 +51,66 @@ function PodiumCard({ entry, place }: { entry: SeasonHistoryEntry; place: 0 | 1 
   );
 }
 
+// One achievement category: name, description, and the qualifying
+// manager(s) — with their team(s) where applicable. Shared by the live
+// current-season grid and each past season's "Trophy highlights" toggle.
+function TrophyCategoryCard({ category }: { category: TrophyCategory }) {
+  return (
+    <div className="card-inner p-4 space-y-3">
+      <div>
+        <p className="font-medium text-white text-sm">{category.label}</p>
+        <p className="text-xs text-turf-500 mt-0.5">{category.description}</p>
+      </div>
+      {category.winners.length === 0 ? (
+        <p className="text-xs text-turf-600 italic">Nobody yet</p>
+      ) : (
+        <div className="space-y-2.5">
+          {category.winners.map(w => (
+            <div key={w.user_id} className="flex items-center gap-2.5">
+              <Avatar displayName={w.display_name} avatarType={w.avatar_type} avatarValue={w.avatar_value} size={28} />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-turf-200 truncate">{w.display_name}</p>
+                {(w.teams.length > 0 || w.detail) && (
+                  <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                    {w.teams.map(t => (
+                      <span key={t.team_id} className="inline-flex items-center gap-1 text-xs text-turf-400">
+                        <TeamLogo src={t.team_logo} alt={t.team_name} fallbackName={t.team_name} size={16} />
+                        {t.team_name}
+                      </span>
+                    ))}
+                    {w.detail && <span className="text-xs text-turf-500 font-mono">{w.detail}</span>}
+                  </div>
+                )}
+              </div>
+              {w.tier != null && (
+                <span
+                  className="w-6 h-6 rounded-full bg-gold-500/15 text-gold-400 text-xs font-mono font-bold flex items-center justify-center flex-shrink-0"
+                  title={`Tier ${w.tier}`}
+                >
+                  {w.tier}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TrophyGrid({ categories }: { categories: TrophyCategory[] }) {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      {categories.map(cat => <TrophyCategoryCard key={cat.id} category={cat} />)}
+    </div>
+  );
+}
+
 function SeasonCard({ season }: { season: SeasonHistory }) {
   const [first, second, third] = season.standings;
   const rest = season.standings.slice(3);
+  const [showTrophies, setShowTrophies] = useState(false);
+  const trophyCategories = (season.trophies?.categories ?? []).filter(c => c.winners.length > 0);
 
   return (
     <div className="card overflow-hidden">
@@ -68,6 +137,25 @@ function SeasonCard({ season }: { season: SeasonHistory }) {
               <span className="font-mono text-sm text-white">{e.total_points} pts</span>
             </div>
           ))}
+        </div>
+      )}
+
+      {trophyCategories.length > 0 && (
+        <div className="border-t border-turf-800">
+          <button
+            onClick={() => setShowTrophies(v => !v)}
+            className="w-full flex items-center justify-between px-5 py-3 text-sm text-turf-300 hover:text-white transition-colors"
+          >
+            <span className="flex items-center gap-2">
+              <Trophy className="w-3.5 h-3.5 text-gold-400" /> Trophy highlights
+            </span>
+            <ChevronDown className={`w-4 h-4 transition-transform ${showTrophies ? 'rotate-180' : ''}`} />
+          </button>
+          {showTrophies && (
+            <div className="px-5 pb-5">
+              <TrophyGrid categories={trophyCategories} />
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -250,7 +338,14 @@ function TrendsSection({ seasonHistory }: { seasonHistory: SeasonHistory[] }) {
   );
 }
 
-export function LeagueHistoryPage({ league, seasonHistory }: Props) {
+export function TrophyCasePage({
+  league, seasonHistory, members, draftPicks, captainPicks, spreadPicks, freeAgencyMoves, manualBonuses, gameData,
+}: Props) {
+  const currentTrophies = useMemo(
+    () => computeTrophies(members, draftPicks, captainPicks, spreadPicks, freeAgencyMoves, manualBonuses, gameData, league.scoring),
+    [members, draftPicks, captainPicks, spreadPicks, freeAgencyMoves, manualBonuses, gameData, league.scoring]
+  );
+
   return (
     <div className="space-y-5 animate-fade-in max-w-3xl mx-auto">
       <div className="card p-5">
@@ -259,11 +354,21 @@ export function LeagueHistoryPage({ league, seasonHistory }: Props) {
             <Archive className="w-5 h-5 text-turf-950" />
           </div>
           <div>
-            <h1 className="font-display text-2xl tracking-wide text-white">League History</h1>
-            <p className="text-turf-500 text-sm">Past seasons and champions in {league.name}</p>
+            <h1 className="font-display text-2xl tracking-wide text-white">Trophy Case</h1>
+            <p className="text-turf-500 text-sm">Achievements, champions, and past seasons in {league.name}</p>
           </div>
         </div>
       </div>
+
+      {draftPicks.length > 0 && (
+        <div className="card p-5 space-y-4">
+          <div className="flex items-center gap-2">
+            <Trophy className="w-4 h-4 text-gold-400" />
+            <h2 className="font-display text-xl tracking-wide text-white">This Season's Trophies</h2>
+          </div>
+          <TrophyGrid categories={currentTrophies.categories} />
+        </div>
+      )}
 
       {seasonHistory.length === 0 ? (
         <div className="card p-12 text-center">

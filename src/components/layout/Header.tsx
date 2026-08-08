@@ -80,7 +80,7 @@ export function Header({
       ? [{ to: '/free-agency', label: 'Free Agency', icon: ArrowLeftRight, description: 'Add and drop teams', badge: unseenWaiverCount }]
       : []),
     { to: '/league-settings', label: 'League Settings', icon: ClipboardList, description: 'How scoring works' },
-    { to: '/league-history', label: 'League History', icon: Archive, description: 'Past seasons and champions' },
+    { to: '/league-history', label: 'Trophy Case', icon: Archive, description: 'Achievements and past seasons' },
   ];
   const infoActive = leagueInfoItems.some(i => i.to === loc.pathname);
 
