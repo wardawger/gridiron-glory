@@ -1,5 +1,6 @@
 import { useCallback, type MutableRefObject } from 'react';
 import type { User } from '@supabase/supabase-js';
+import posthog from 'posthog-js';
 import { supabase } from '../../lib/supabase';
 import type { League, CaptainPick } from '../../types';
 import type { SetState } from './useLeagueCore';
@@ -21,7 +22,8 @@ export function useCaptainPicks(
     if (existing?.team_id === teamId) {
       // Remove captain — update local state immediately
       setCaptainPicks(prev => prev.filter(p => p.id !== existing.id));
-      await supabase.from('captain_picks').delete().eq('id', existing.id);
+      const { error } = await supabase.from('captain_picks').delete().eq('id', existing.id);
+      if (!error) posthog.capture('captain_removed', { week });
     } else {
       if (!existing && uses >= 2) return;
       // Replace or add captain — update local state immediately
@@ -52,6 +54,7 @@ export function useCaptainPicks(
         setCaptainPicks(prev => prev.map(p =>
           p.id === newPick.id ? data as CaptainPick : p
         ));
+        posthog.capture('captain_selected', { week });
       }
     }
   }, []);

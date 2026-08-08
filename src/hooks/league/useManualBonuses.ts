@@ -1,4 +1,5 @@
 import type { User } from '@supabase/supabase-js';
+import posthog from 'posthog-js';
 import { supabase } from '../../lib/supabase';
 import type { League, ManualBonus } from '../../types';
 import type { SetState } from './useLeagueCore';
@@ -15,7 +16,10 @@ export function useManualBonuses(
       league_id:  league.id,
       awarded_by: user.id,
     }).select().single();
-    if (!error && data) setManualBonuses(prev => [...prev, data]);
+    if (!error && data) {
+      setManualBonuses(prev => [...prev, data]);
+      posthog.capture('manual_bonus_awarded', { bonus_type: bonus.type });
+    }
   };
 
   const removeManualBonus = async (id: string) => {

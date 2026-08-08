@@ -1,5 +1,6 @@
 import { useCallback, type MutableRefObject } from 'react';
 import type { User } from '@supabase/supabase-js';
+import posthog from 'posthog-js';
 import { supabase } from '../../lib/supabase';
 import type { League, SpreadPick, CaptainPick } from '../../types';
 import type { SetState } from './useLeagueCore';
@@ -79,6 +80,7 @@ export function useSpreadPicks(
         const without = prev.filter(p => !(p.user_id === user.id && p.team_id === teamId && p.week === week));
         return [...without, saved as SpreadPick];
       });
+      posthog.capture('spread_pick_made', { week });
     }
     return {};
   }, []);
@@ -101,6 +103,7 @@ export function useSpreadPicks(
       setSpreadPicks(prev => [...prev, pick]);
       return { error: err.message };
     }
+    posthog.capture('spread_pick_removed', { week });
     return {};
   }, []);
 

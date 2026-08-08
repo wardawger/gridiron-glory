@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
+import posthog from 'posthog-js';
 import type { useAuth } from '../hooks/useAuth';
 import { PasswordInput } from '../components/ui/PasswordInput';
 
@@ -28,7 +29,10 @@ export function AuthPage({ auth }: Props) {
       if (!name.trim()) { setMsg({ type: 'error', text: 'Display name required' }); setSubmitting(false); return; }
       const err = await auth.signUp(email, password, name.trim());
       if (err) setMsg({ type: 'error', text: err.message });
-      else setMsg({ type: 'success', text: 'Check your email to confirm your account, then sign in.' });
+      else {
+        posthog.capture('account_signed_up');
+        setMsg({ type: 'success', text: 'Check your email to confirm your account, then sign in.' });
+      }
     } else {
       const err = await auth.resetPasswordForEmail(email);
       if (err) setMsg({ type: 'error', text: err.message });
