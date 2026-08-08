@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, type Dispatch, type SetStateAction } from 'react';
 import type { User } from '@supabase/supabase-js';
+import posthog from 'posthog-js';
 import { supabase } from '../../lib/supabase';
 import type {
   League, LeagueMember, DraftPick, CaptainPick,
@@ -261,6 +262,10 @@ export function useLeagueCore(user: User | null) {
     setAllLeagues(prev => [...prev, lg]);
     setSelectedLeagueId(lg.id);
     localStorage.setItem(`gridiron_league_${user.id}`, lg.id);
+    posthog.capture('league_created', {
+      max_teams_per_user: maxTeams,
+      player_count: playerCount,
+    });
 
     return { league: lg };
   };
@@ -273,6 +278,7 @@ export function useLeagueCore(user: User | null) {
       .select()
       .single();
     if (error) return { error: error.message };
+    posthog.capture('league_invite_created');
     return { token: data.token };
   };
 
@@ -286,6 +292,7 @@ export function useLeagueCore(user: User | null) {
 
     if (!error && data) {
       setAllLeagues(prev => prev.map(l => l.id === league.id ? data as League : l));
+      posthog.capture('draft_started', { member_count: orderedUserIds.length });
     }
   };
 
@@ -325,6 +332,11 @@ export function useLeagueCore(user: User | null) {
     if (!leagueErr && updatedLeague) {
       setAllLeagues(prev => prev.map(l => l.id === league.id ? updatedLeague as League : l));
     }
+    posthog.capture('draft_pick_made', {
+      pick_number: pickNum,
+      round,
+      team_conference: teamConf,
+    });
 
     return {};
   };
@@ -427,6 +439,7 @@ export function useLeagueCore(user: User | null) {
     if (updatedLeague) {
       setAllLeagues(prev => prev.map(l => l.id === league.id ? updatedLeague as League : l));
     }
+    posthog.capture('season_archived', { standing_count: standings.length });
     return {};
   };
 
@@ -468,7 +481,8 @@ export function useLeagueCore(user: User | null) {
 
   const updateScoring = async (scoring: League['scoring']) => {
     if (!league) return;
-    await supabase.from('leagues').update({ scoring }).eq('id', league.id);
+    const { error } = await supabase.from('leagues').update({ scoring }).eq('id', league.id);
+    if (!error) posthog.capture('scoring_settings_saved');
   };
 
   const removeFromRoster = async (userId: string, teamId: string) => {

@@ -1,5 +1,6 @@
 import { useCallback, type MutableRefObject } from 'react';
 import type { User } from '@supabase/supabase-js';
+import posthog from 'posthog-js';
 import { supabase } from '../../lib/supabase';
 import type {
   League, LeagueMember, DraftPick, FreeAgencyMove, WaiverClaim, RosterEntry, ScoringSettings,
@@ -114,7 +115,10 @@ export function useFreeAgencyAndWaivers(
     }).select().single();
 
     if (err) return { error: err.message };
-    if (data) setFreeAgencyMoves(prev => [...prev, data as FreeAgencyMove]);
+    if (data) {
+      setFreeAgencyMoves(prev => [...prev, data as FreeAgencyMove]);
+      posthog.capture('free_agency_move_completed', { week });
+    }
     return {};
   }, []);
 
@@ -175,7 +179,10 @@ export function useFreeAgencyAndWaivers(
     }).select().single();
 
     if (err) return { error: err.message };
-    if (data) setWaiverClaims(prev => [...prev, data as WaiverClaim]);
+    if (data) {
+      setWaiverClaims(prev => [...prev, data as WaiverClaim]);
+      posthog.capture('waiver_claim_submitted', { week });
+    }
     return {};
   }, []);
 

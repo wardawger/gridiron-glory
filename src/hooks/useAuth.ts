@@ -1,20 +1,46 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { User } from '@supabase/supabase-js';
+import posthog from 'posthog-js';
 import { supabase } from '../lib/supabase';
+
+const posthogConfigured = Boolean(
+  import.meta.env.VITE_POSTHOG_KEY && import.meta.env.VITE_POSTHOG_HOST,
+);
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [passwordRecovery, setPasswordRecovery] = useState(false);
+  const identifiedUserId = useRef<string | null>(null);
 
   useEffect(() => {
+    const identifyUser = (authenticatedUser: User) => {
+      if (!posthogConfigured || identifiedUserId.current === authenticatedUser.id) return;
+
+      if (identifiedUserId.current) posthog.reset();
+
+      posthog.identify(authenticatedUser.id, {
+        email: authenticatedUser.email,
+        display_name: authenticatedUser.user_metadata?.display_name as string | undefined,
+      });
+      identifiedUserId.current = authenticatedUser.id;
+    };
+
     supabase.auth.getSession().then(({ data }) => {
-      setUser(data.session?.user ?? null);
+      const authenticatedUser = data.session?.user ?? null;
+      setUser(authenticatedUser);
+      if (authenticatedUser) identifyUser(authenticatedUser);
       setLoading(false);
     });
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
-      setUser(session?.user ?? null);
+      const authenticatedUser = session?.user ?? null;
+      setUser(authenticatedUser);
+      if (authenticatedUser) identifyUser(authenticatedUser);
+      if (event === 'SIGNED_OUT' && posthogConfigured) {
+        posthog.reset();
+        identifiedUserId.current = null;
+      }
       if (event === 'PASSWORD_RECOVERY') setPasswordRecovery(true);
     });
 

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import type { User } from '@supabase/supabase-js';
+import posthog from 'posthog-js';
 import { supabase } from '../lib/supabase';
 
 interface Props {
@@ -107,6 +108,7 @@ export function JoinPage({ user, onJoined }: Props) {
       }
 
       await supabase.from('invites').update({ accepted: true }).eq('id', invite.id);
+      posthog.capture('league_joined');
 
       setStatus('success');
       setMsg(`Welcome to "${name}"! Taking you there now…`);
