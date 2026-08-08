@@ -10,7 +10,6 @@ import { rosterAtWeek } from './roster';
 
 export const TROPHY_META: Record<TrophyCategoryId, { label: string; description: string }> = {
   undefeated_team:            { label: 'Undefeated',          description: 'Drafted a team that finished with zero losses' },
-  captain_pick:                { label: 'Captain',             description: 'Named a team as weekly captain' },
   beat_spread:                 { label: 'Beat the Spread',     description: 'Covered the spread on a pick' },
   used_free_agency:            { label: 'Free Agent',          description: 'Made a free agency swap' },
   heisman_winner:               { label: 'Heisman',             description: 'Drafted the Heisman winner' },
@@ -76,20 +75,6 @@ function computeUndefeated(members: LeagueMember[], draftPicks: DraftPick[], gam
       }
     });
     if (teams.length > 0) winners.push(winnerFor(member, teams));
-  });
-  return winners;
-}
-
-function computeCaptainPick(members: LeagueMember[], captainPicks: CaptainPick[], teamInfo: Map<string, TeamInfo>): TrophyWinner[] {
-  const winners: TrophyWinner[] = [];
-  members.forEach(member => {
-    const teamIds = new Set(captainPicks.filter(c => c.user_id === member.user_id).map(c => c.team_id));
-    if (teamIds.size === 0) return;
-    const teams = Array.from(teamIds).map(id => {
-      const info = teamInfo.get(id);
-      return { team_id: id, team_name: info?.team_name ?? id, team_logo: info?.team_logo ?? '' };
-    });
-    winners.push(winnerFor(member, teams));
   });
   return winners;
 }
@@ -283,7 +268,6 @@ export function computeTrophies(
   };
 
   add('undefeated_team', computeUndefeated(members, draftPicks, gameData));
-  add('captain_pick', computeCaptainPick(members, captainPicks, teamInfo));
   if (scoring.spread_enabled) add('beat_spread', computeBeatSpread(members, spreadPicks, teamInfo));
   if (scoring.free_agency_enabled) add('used_free_agency', computeUsedFreeAgency(members, freeAgencyMoves));
   add('heisman_winner', computeBonusCategory(members, manualBonuses, teamInfo, 'heisman_winner'));

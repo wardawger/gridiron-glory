@@ -570,7 +570,6 @@ export interface SeasonHistory {
 
 export type TrophyCategoryId =
   | 'undefeated_team'
-  | 'captain_pick'
   | 'beat_spread'
   | 'used_free_agency'
   | 'heisman_winner'
