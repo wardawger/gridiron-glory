@@ -101,13 +101,14 @@ export function FreeAgencyPage({
   const available = useMemo(() => {
     return teams.filter(t => {
       if (rosteredTeamIds.has(t.id)) return false;
+      if (scoring.excluded_conferences.includes(t.conference)) return false;
       if (search && !t.name.toLowerCase().includes(search.toLowerCase())) return false;
       if (confFilter === 'P4' && !(P4_CONFERENCES as readonly string[]).includes(t.conference)) return false;
       if (confFilter === 'G5' && (P4_CONFERENCES as readonly string[]).includes(t.conference)) return false;
       if (confFilter !== 'ALL' && confFilter !== 'P4' && confFilter !== 'G5' && t.conference !== confFilter) return false;
       return true;
     });
-  }, [teams, rosteredTeamIds, search, confFilter]);
+  }, [teams, rosteredTeamIds, search, confFilter, scoring.excluded_conferences]);
 
   const conferences = useMemo(() => {
     const set = new Set(teams.map(t => t.conference));
@@ -129,6 +130,9 @@ export function FreeAgencyPage({
   }, [waiverClaims, userId]);
 
   const getConfBlock = (team: CfbTeam): string | null => {
+    if (scoring.excluded_conferences.includes(team.conference)) {
+      return `${team.conference} is excluded by your commissioner`;
+    }
     const category = confCategory(team.conference);
     const max = category === 'G5' ? scoring.g5_conf_max : scoring.p4_conf_max;
     const currentCount = category === 'G5'

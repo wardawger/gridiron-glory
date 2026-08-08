@@ -76,6 +76,13 @@ export function scoreSpread(
   const covered = didCoverSpread(game, lockedSpread, isHome);
   if (covered === null) return 0; // game not complete yet
 
+  // Commissioner-overridden flat penalty on a miss, independent of flat vs
+  // multiplier mode. Off by default — with the toggle off, a miss costs
+  // exactly what it always has (the negated cover reward, below).
+  if (!covered && settings.spread_miss_penalty_enabled) {
+    return -Math.abs(settings.spread_miss_penalty_points);
+  }
+
   if (settings.spread_is_multiplier) {
     // Multiplier mode: earn/lose a fraction of base game points
     const bonus = Math.round(Math.abs(baseGamePoints) * (settings.spread_points - 1));

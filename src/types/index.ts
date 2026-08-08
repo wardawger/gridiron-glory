@@ -88,6 +88,8 @@ export interface ScoringSettings {
   spread_max_per_week: number;    // max spread picks per user per week
   spread_max_per_team: number;    // max times one team can be spread-picked all season
   spread_allow_captain_stack: boolean; // allow spread + captain on same team same week
+  spread_miss_penalty_enabled: boolean; // override the miss penalty below instead of using the negated cover reward
+  spread_miss_penalty_points: number;   // flat points subtracted on a miss when the override above is on (entered as a positive number)
   // Free agency settings
   free_agency_enabled: boolean;
   fa_max_moves_per_season: number; // max adds/drops per user for the whole season
@@ -97,11 +99,15 @@ export interface ScoringSettings {
   // Statistical ranking bonus settings (top-N / bottom-N per category, among all drafted teams)
   stat_bonus_enabled: boolean; // master toggle for the whole feature
   stat_bonus_categories: Record<StatBonusCategory, StatBonusCategorySettings>;
+  // Postseason/manual bonus point values — commissioner-configurable per league;
+  // BONUS_DEFAULT_POINTS below is only the starting value for a brand-new league.
+  bonus_points: Record<BonusType, number>;
   // Roster conference limits — enforced during the draft and free agency/waivers
   p4_conf_min: number;   // min teams required per P4 conference (SEC/Big Ten/Big 12/ACC), each
   p4_conf_max: number;   // max teams allowed per P4 conference, each
   g5_conf_min: number;   // min teams required from the combined G5/non-P4 pool (0 = no minimum)
   g5_conf_max: number;   // max teams allowed from the combined G5/non-P4 pool (99 = effectively unlimited)
+  excluded_conferences: string[]; // conference names entirely banned from the draft/free-agency pool (empty = no restriction)
   // Waiver wire settings — when disabled, free agency stays instant (first-come-first-served)
   waiver_enabled: boolean;
   waiver_priority_metric: 'worst_record' | 'fewest_points';
@@ -123,6 +129,8 @@ export const DEFAULT_SCORING: ScoringSettings = {
   spread_max_per_week: 2,
   spread_max_per_team: 3,
   spread_allow_captain_stack: false,
+  spread_miss_penalty_enabled: false,
+  spread_miss_penalty_points: 2,
   // Free agency defaults — off until commissioner enables
   free_agency_enabled: false,
   fa_max_moves_per_season: 10,
@@ -141,6 +149,12 @@ export const DEFAULT_SCORING: ScoringSettings = {
   p4_conf_max: 3,
   g5_conf_min: 0,
   g5_conf_max: 99,
+  excluded_conferences: [],
+  // Real values are filled in by normalizeScoring() from BONUS_DEFAULT_POINTS,
+  // declared further down this file — referencing it directly here would be a
+  // temporal-dead-zone error (BONUS_DEFAULT_POINTS isn't initialized yet at
+  // the point this module-level object literal itself evaluates).
+  bonus_points: {} as Record<BonusType, number>,
   waiver_enabled: false,
   waiver_priority_metric: 'worst_record',
   waiver_process_day: 3, // Wednesday
@@ -164,10 +178,20 @@ export function normalizeScoring(raw: Partial<ScoringSettings> | null | undefine
     categories[cat] = { ...DEFAULT_SCORING.stat_bonus_categories[cat], ...rawCat };
   });
 
+  const rawBonusPoints = isPlainObject((raw as any)?.bonus_points)
+    ? (raw as any).bonus_points as Record<string, unknown>
+    : {};
+  const bonusPoints = { ...BONUS_DEFAULT_POINTS } as Record<BonusType, number>;
+  (Object.keys(BONUS_DEFAULT_POINTS) as BonusType[]).forEach(type => {
+    const rawValue = rawBonusPoints[type];
+    if (typeof rawValue === 'number') bonusPoints[type] = rawValue;
+  });
+
   return {
     ...DEFAULT_SCORING,
     ...(raw ?? {}),
     stat_bonus_categories: categories,
+    bonus_points: bonusPoints,
   };
 }
 

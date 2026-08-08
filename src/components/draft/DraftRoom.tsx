@@ -108,6 +108,9 @@ export function DraftRoom({
 
   // Check if a team is blocked by conference rules
   const getConfBlock = (team: CfbTeam): string | null => {
+    if (scoring.excluded_conferences.includes(team.conference)) {
+      return `${team.conference} is excluded by your commissioner`;
+    }
     if (isP4Conference(team.conference)) {
       const count = myConfCounts[team.conference] ?? 0;
       if (count >= scoring.p4_conf_max) {
@@ -160,6 +163,7 @@ export function DraftRoom({
   const available = useMemo(() => {
     const filtered = teams.filter(t => {
       if (pickedTeamIds.has(t.id)) return false;
+      if (scoring.excluded_conferences.includes(t.conference)) return false;
       if (search && !t.name.toLowerCase().includes(search.toLowerCase())) return false;
       if (confFilter === 'P4' && !(P4_CONF_LIST as readonly string[]).includes(t.conference)) return false;
       if (confFilter === 'G5' && (P4_CONF_LIST as readonly string[]).includes(t.conference)) return false;
@@ -186,7 +190,7 @@ export function DraftRoom({
       if (bRank == null) return -1;
       return aRank - bRank;
     });
-  }, [teams, pickedTeamIds, search, confFilter, sortBy, teamRatings, apRankByTeam]);
+  }, [teams, pickedTeamIds, search, confFilter, sortBy, teamRatings, apRankByTeam, scoring.excluded_conferences]);
 
   const conferences = useMemo(() => {
     const set = new Set(teams.map(t => t.conference));

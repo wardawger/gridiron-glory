@@ -1,23 +1,40 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { TrendingUp, TrendingDown } from 'lucide-react';
-import type { League, ScoringSettings, StatBonusCategorySettings } from '../../types';
-import { normalizeScoring, STAT_BONUS_CATEGORIES, STAT_BONUS_LABELS } from '../../types';
+import type { League, ScoringSettings, StatBonusCategorySettings, CfbTeam } from '../../types';
+import { normalizeScoring, STAT_BONUS_CATEGORIES, STAT_BONUS_LABELS, BONUS_GROUPS, BONUS_LABELS } from '../../types';
 import { useCrossfadeVisibility } from '../../hooks/useCrossfade';
 import { Toggle } from '../ui/Toggle';
 import { Toast } from '../ui/Toast';
 
 interface Props {
   league: League;
+  teams: CfbTeam[];
   onUpdateScoring: (s: ScoringSettings) => void;
 }
 
 const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const TOAST_DURATION_MS = 3000;
 
-export function ScoringTab({ league, onUpdateScoring }: Props) {
+export function ScoringTab({ league, teams, onUpdateScoring }: Props) {
   const [scoring, setScoring] = useState<ScoringSettings>(normalizeScoring(league.scoring));
   const [showSavedToast, setShowSavedToast] = useState(false);
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Live conference list, not hardcoded — avoids the exact kind of drift the
+  // P4 conference list itself once had before it was consolidated.
+  const allConferences = useMemo(
+    () => Array.from(new Set(teams.map(t => t.conference))).sort(),
+    [teams]
+  );
+
+  const toggleExcludedConference = (conference: string) => {
+    setScoring(prev => ({
+      ...prev,
+      excluded_conferences: prev.excluded_conferences.includes(conference)
+        ? prev.excluded_conferences.filter(c => c !== conference)
+        : [...prev.excluded_conferences, conference],
+    }));
+  };
 
   const statBonusPanel  = useCrossfadeVisibility(scoring.stat_bonus_enabled);
   const spreadPanel     = useCrossfadeVisibility(scoring.spread_enabled);
@@ -88,6 +105,35 @@ export function ScoringTab({ league, onUpdateScoring }: Props) {
         </p>
       </div>
 
+      {/* Excluded conferences */}
+      <div className="card p-5 space-y-3">
+        <h3 className="font-medium text-white text-sm">Excluded Conferences</h3>
+        <p className="text-xs text-turf-400">
+          Teams from checked conferences can't be drafted or picked up via free agency/waivers.
+        </p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          {allConferences.map(conference => {
+            const excluded = scoring.excluded_conferences.includes(conference);
+            return (
+              <button
+                key={conference}
+                type="button"
+                onClick={() => toggleExcludedConference(conference)}
+                aria-pressed={excluded}
+                className={`flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm border transition-colors text-left ${
+                  excluded
+                    ? 'border-red-800 bg-red-950/30 text-red-300'
+                    : 'border-turf-700 text-turf-300 hover:border-turf-600 hover:bg-turf-800/40'
+                }`}
+              >
+                <span className="truncate">{conference}</span>
+                {excluded && <span className="text-[10px] uppercase tracking-wide flex-shrink-0">Excluded</span>}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Base scoring */}
       <div className="card p-5 space-y-4">
         <h3 className="font-medium text-white text-sm">Base Scoring</h3>
@@ -111,6 +157,38 @@ export function ScoringTab({ league, onUpdateScoring }: Props) {
               </div>
             );
           })}
+        </div>
+      </div>
+
+      {/* Postseason bonus points */}
+      <div className="card p-5 space-y-4">
+        <h3 className="font-medium text-white text-sm">Postseason Bonus Points</h3>
+        <p className="text-xs text-turf-400">
+          Starting point values for manually-awarded bonuses (Admin → Bonuses). Each award can still be edited individually when given.
+        </p>
+        <div className="space-y-4">
+          {BONUS_GROUPS.map(group => (
+            <div key={group.label} className="space-y-2">
+              <p className="text-xs font-medium text-turf-300 uppercase tracking-wide">{group.label}</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {group.types.map(type => (
+                  <div key={type}>
+                    <label className="text-[10px] text-turf-500 uppercase tracking-wide block mb-1">{BONUS_LABELS[type]}</label>
+                    <input
+                      className="input font-mono text-center"
+                      type="number"
+                      step="0.5"
+                      value={scoring.bonus_points[type]}
+                      onChange={e => setScoring(prev => ({
+                        ...prev,
+                        bonus_points: { ...prev.bonus_points, [type]: parseFloat(e.target.value) || 0 },
+                      }))}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -291,7 +369,9 @@ export function ScoringTab({ league, onUpdateScoring }: Props) {
                   onChange={e => setScoring(prev => ({ ...prev, spread_points: parseFloat(e.target.value) || 0 }))}
                 />
                 <p className="text-xs text-turf-500 mt-0.5">
-                  Penalty for missing: {scoring.spread_is_multiplier ? `×${scoring.spread_points}` : `-${scoring.spread_points} pts`}
+                  Penalty for missing: {scoring.spread_miss_penalty_enabled
+                    ? `-${scoring.spread_miss_penalty_points} pts (custom)`
+                    : scoring.spread_is_multiplier ? `×${scoring.spread_points}` : `-${scoring.spread_points} pts`}
                 </p>
               </div>
 
@@ -335,6 +415,39 @@ export function ScoringTab({ league, onUpdateScoring }: Props) {
                 <p className="text-xs text-turf-500 mt-0.5">Pick spread on captain's team</p>
               </div>
             </div>
+
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-white">Miss Penalty</p>
+                <p className="text-xs text-turf-500 mt-0.5">Override the points lost when a spread pick misses (defaults to the same amount as covering)</p>
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <span className="text-xs text-turf-400">{scoring.spread_miss_penalty_enabled ? 'Enabled' : 'Disabled'}</span>
+                <button
+                  onClick={() => setScoring(prev => ({ ...prev, spread_miss_penalty_enabled: !prev.spread_miss_penalty_enabled }))}
+                  className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${scoring.spread_miss_penalty_enabled ? 'bg-field-500' : 'bg-turf-700'}`}
+                >
+                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${scoring.spread_miss_penalty_enabled ? 'left-5' : 'left-0.5'}`} />
+                </button>
+              </label>
+            </div>
+
+            {scoring.spread_miss_penalty_enabled && (
+              <div>
+                <label className="label">Points for Missing</label>
+                <input
+                  className="input font-mono"
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  value={scoring.spread_miss_penalty_points}
+                  onChange={e => setScoring(prev => ({ ...prev, spread_miss_penalty_points: parseFloat(e.target.value) || 0 }))}
+                />
+                <p className="text-xs text-turf-500 mt-0.5">
+                  −{scoring.spread_miss_penalty_points} pts applied whenever a spread pick misses, regardless of point mode
+                </p>
+              </div>
+            )}
           </div>
         )}
       </div>

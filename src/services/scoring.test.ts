@@ -126,6 +126,37 @@ describe('didCoverSpread / scoreSpread', () => {
     // bonus = round(|basePts| * (multiplier - 1)) = round(4 * 0.5) = 2
     expect(scoreSpread(covered, settings, -7, true, 4)).toBe(2);
   });
+
+  it('with the miss-penalty override off (default), a miss still costs the negated cover reward', () => {
+    const flatSettings = { ...DEFAULT_SCORING, spread_is_multiplier: false, spread_points: 2 };
+    const flatMissed = makeGame({ home_score: 20, away_score: 17 });
+    expect(scoreSpread(flatMissed, flatSettings, -7, true, 1)).toBe(-2);
+
+    const multiplierSettings = { ...DEFAULT_SCORING, spread_is_multiplier: true, spread_points: 1.5 };
+    const multiplierMissed = makeGame({ home_score: 20, away_score: 17 });
+    // bonus = round(|basePts| * (multiplier - 1)) = round(4 * 0.5) = 2, negated on a miss
+    expect(scoreSpread(multiplierMissed, multiplierSettings, -7, true, 4)).toBe(-2);
+  });
+
+  it('with the miss-penalty override on, a miss costs the flat custom amount regardless of mode', () => {
+    const flatSettings = {
+      ...DEFAULT_SCORING, spread_is_multiplier: false, spread_points: 2,
+      spread_miss_penalty_enabled: true, spread_miss_penalty_points: 5,
+    };
+    const flatMissed = makeGame({ home_score: 20, away_score: 17 });
+    expect(scoreSpread(flatMissed, flatSettings, -7, true, 1)).toBe(-5);
+
+    const multiplierSettings = {
+      ...DEFAULT_SCORING, spread_is_multiplier: true, spread_points: 1.5,
+      spread_miss_penalty_enabled: true, spread_miss_penalty_points: 5,
+    };
+    const multiplierMissed = makeGame({ home_score: 20, away_score: 17 });
+    expect(scoreSpread(multiplierMissed, multiplierSettings, -7, true, 4)).toBe(-5);
+
+    // A cover is unaffected by the override, in either mode.
+    const flatCovered = makeGame({ home_score: 30, away_score: 10 });
+    expect(scoreSpread(flatCovered, flatSettings, -7, true, 1)).toBe(2);
+  });
 });
 
 describe('buildLeaderboard', () => {

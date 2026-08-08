@@ -1,6 +1,6 @@
 import { ClipboardList, Coins, ArrowLeftRight, Award, Gift, TrendingUp, TrendingDown, Clock } from 'lucide-react';
 import type { League, LeagueMember } from '../../types';
-import { normalizeScoring, STAT_BONUS_CATEGORIES, STAT_BONUS_LABELS, BONUS_LABELS, BONUS_DEFAULT_POINTS, BONUS_GROUPS } from '../../types';
+import { normalizeScoring, STAT_BONUS_CATEGORIES, STAT_BONUS_LABELS, BONUS_LABELS, BONUS_GROUPS } from '../../types';
 
 const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const PRIORITY_METRIC_LABELS: Record<string, string> = {
@@ -106,7 +106,9 @@ export function LeagueSettingsPage({ league, members }: Props) {
             <div className="card-inner px-3 py-2 flex items-center justify-between">
               <span className="text-turf-300">Missing the spread</span>
               <span className="font-mono font-medium text-red-300">
-                {scoring.spread_is_multiplier ? `×${scoring.spread_points}` : `-${scoring.spread_points}`}
+                {scoring.spread_miss_penalty_enabled
+                  ? `-${scoring.spread_miss_penalty_points}`
+                  : scoring.spread_is_multiplier ? `×${scoring.spread_points}` : `-${scoring.spread_points}`}
               </span>
             </div>
             <div className="card-inner px-3 py-2 flex items-center justify-between"><span className="text-turf-300">Max picks / week</span><span className="font-mono font-medium text-white">{scoring.spread_max_per_week}</span></div>
@@ -216,7 +218,7 @@ export function LeagueSettingsPage({ league, members }: Props) {
         </div>
         <p className="text-xs text-turf-500">
           Awarded manually by the commissioner as each milestone happens through bowl season and the CFP —
-          the values below are the defaults they start from, and can be adjusted per award.
+          the values below are this league's configured starting points, and can still be adjusted per award.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {postseasonGroups.map(group => (
@@ -226,8 +228,8 @@ export function LeagueSettingsPage({ league, members }: Props) {
                 {group.types.map(type => (
                   <div key={type} className="px-3 py-1.5 flex items-center justify-between text-xs">
                     <span className="text-turf-300">{BONUS_LABELS[type]}</span>
-                    <span className={`font-mono font-medium ${BONUS_DEFAULT_POINTS[type] >= 0 ? 'text-field-400' : 'text-red-300'}`}>
-                      {pts(BONUS_DEFAULT_POINTS[type])}
+                    <span className={`font-mono font-medium ${scoring.bonus_points[type] >= 0 ? 'text-field-400' : 'text-red-300'}`}>
+                      {pts(scoring.bonus_points[type])}
                     </span>
                   </div>
                 ))}

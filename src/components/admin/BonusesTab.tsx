@@ -3,7 +3,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import type {
   League, LeagueMember, ManualBonus, DraftPick, SpreadPick, FreeAgencyMove, BonusType,
 } from '../../types';
-import { BONUS_LABELS, BONUS_DEFAULT_POINTS } from '../../types';
+import { BONUS_LABELS, normalizeScoring } from '../../types';
 import { rosterAtWeek } from '../../services/roster';
 
 interface Props {
@@ -23,11 +23,13 @@ export function BonusesTab({
   league, members, draftPicks, freeAgencyMoves, manualBonuses, spreadPicks,
   onAddBonus, onRemoveBonus, onOverrideSpread, onClearSpreadOverride,
 }: Props) {
+  const bonusPointsConfig = useMemo(() => normalizeScoring(league.scoring).bonus_points, [league.scoring]);
+
   const [bonusUserId, setBonusUser]       = useState('');
   const [bonusType, setBonusType]         = useState<BonusType>('win_bowl');
   const [bonusTeamId, setBonusTeamId]     = useState('');
   const [bonusTeamName, setBonusTeamName] = useState('');
-  const [bonusPoints, setBonusPoints]     = useState<string>('5');
+  const [bonusPoints, setBonusPoints]     = useState<string>(() => String(bonusPointsConfig.win_bowl));
   const [bonusNote, setBonusNote]         = useState('');
 
   // Teams currently rostered by the selected user (draft + free agency swaps)
@@ -91,7 +93,7 @@ export function BonusesTab({
               onChange={e => {
                 const t = e.target.value as BonusType;
                 setBonusType(t);
-                setBonusPoints(String(BONUS_DEFAULT_POINTS[t]));
+                setBonusPoints(String(bonusPointsConfig[t]));
               }}
             >
               {(Object.entries(BONUS_LABELS) as [BonusType, string][]).map(([k, v]) => (

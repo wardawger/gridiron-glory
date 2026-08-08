@@ -105,7 +105,7 @@ function AnimatedRoutes({ lg, league, auth, cfb }: AnimatedRoutesProps) {
               onUpdateAvatar={league.updateAvatar}
             />
           } />
-          <Route path="/draft-recap" element={<DraftRecapPage league={lg} members={league.members} draftPicks={league.draftPicks} />} />
+          <Route path="/draft-recap" element={<DraftRecapPage league={lg} members={league.members} draftPicks={league.draftPicks} teams={cfb.teams} />} />
           <Route path="/league-settings" element={<LeagueSettingsPage league={lg} members={league.members} />} />
           <Route path="/league-history" element={<LeagueHistoryPage league={lg} seasonHistory={league.seasonHistory} />} />
           <Route path="/stat-bonuses" element={
@@ -155,6 +155,7 @@ function AnimatedRoutes({ lg, league, auth, cfb }: AnimatedRoutesProps) {
               freeAgencyMoves={league.freeAgencyMoves}
               gameData={cfb.gameData}
               seasonStats={cfb.seasonStats}
+              teams={cfb.teams}
               isCommissioner={league.isCommissioner}
               onSendInvite={league.sendInvite}
               onUpdateWeek={league.updateWeek}

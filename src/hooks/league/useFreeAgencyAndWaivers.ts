@@ -16,6 +16,10 @@ import type { SetState } from './useLeagueCore';
 function checkConferenceLimits(
   myRoster: RosterEntry[], droppedTeamId: string, addedTeamConference: string, settings: ScoringSettings,
 ): { error?: string } {
+  if (settings.excluded_conferences.includes(addedTeamConference)) {
+    return { error: `${addedTeamConference} is excluded by your commissioner` };
+  }
+
   const droppedTeam = myRoster.find(t => t.team_id === droppedTeamId);
   const addCategory = confCategory(addedTeamConference);
   const addMax = addCategory === 'G5' ? settings.g5_conf_max : settings.p4_conf_max;

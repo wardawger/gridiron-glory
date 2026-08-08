@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import { History, ListOrdered, Users, Search, Shield } from 'lucide-react';
-import type { League, LeagueMember, DraftPick } from '../../types';
+import type { League, LeagueMember, DraftPick, CfbTeam } from '../../types';
+import { normalizeScoring } from '../../types';
+import { P4_CONFERENCES, isP4Conference } from '../../services/scoring';
 import { useTabCrossfade } from '../../hooks/useCrossfade';
 import { TeamLogo } from '../ui/TeamLogo';
 import { TriviaCard } from '../ui/TriviaCard';
@@ -11,6 +13,17 @@ interface Props {
   league: League;
   members: LeagueMember[];
   draftPicks: DraftPick[];
+  teams: CfbTeam[];
+}
+
+// Each P4 conference gets its own bucket; every non-P4 conference is
+// combined into one "Other" bucket, matching how the rest of the app
+// (roster conference limits, the excluded-conferences setting) already
+// treats G5/non-P4 as one combined category.
+const CONFERENCE_CATEGORIES = [...P4_CONFERENCES, 'Other'] as const;
+
+function conferenceCategory(conference: string): string {
+  return isP4Conference(conference) ? conference : 'Other';
 }
 
 function formatPickTime(iso: string): string {
@@ -32,9 +45,49 @@ function formatDuration(ms: number): string {
   return `${days}d ${remHrs}h`;
 }
 
-export function DraftRecapPage({ league, members, draftPicks }: Props) {
+export function DraftRecapPage({ league, members, draftPicks, teams }: Props) {
   const { active: view, select: selectView, panelClass: viewPanelClass } = useTabCrossfade<View>('timeline');
   const [search, setSearch] = useState('');
+  const scoring = normalizeScoring(league.scoring);
+  const g5Configured = scoring.g5_conf_min > 0 || scoring.g5_conf_max < 99;
+
+  // Total real FBS teams per category — the denominator for the league-wide
+  // breakdown (e.g. "SEC: 10/14").
+  const conferenceTotals = useMemo(() => {
+    const totals: Record<string, number> = {};
+    CONFERENCE_CATEGORIES.forEach(c => { totals[c] = 0; });
+    teams.forEach(t => {
+      const cat = conferenceCategory(t.conference);
+      totals[cat] = (totals[cat] ?? 0) + 1;
+    });
+    return totals;
+  }, [teams]);
+
+  const leagueDraftedCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    CONFERENCE_CATEGORIES.forEach(c => { counts[c] = 0; });
+    draftPicks.forEach(p => {
+      const cat = conferenceCategory(p.team_conference);
+      counts[cat] = (counts[cat] ?? 0) + 1;
+    });
+    return counts;
+  }, [draftPicks]);
+
+  const perManagerCounts = useMemo(() => {
+    const map = new Map<string, Record<string, number>>();
+    members.forEach(m => {
+      const counts: Record<string, number> = {};
+      CONFERENCE_CATEGORIES.forEach(c => { counts[c] = 0; });
+      map.set(m.user_id, counts);
+    });
+    draftPicks.forEach(p => {
+      const counts = map.get(p.user_id);
+      if (!counts) return;
+      const cat = conferenceCategory(p.team_conference);
+      counts[cat] = (counts[cat] ?? 0) + 1;
+    });
+    return map;
+  }, [draftPicks, members]);
 
   const getMemberName = (uid: string) =>
     members.find(m => m.user_id === uid)?.display_name ?? 'Unknown';
@@ -119,6 +172,50 @@ export function DraftRecapPage({ league, members, draftPicks }: Props) {
           </div>
         )}
       </div>
+
+      {sortedPicks.length > 0 && (
+        <div className="card p-5 space-y-4">
+          <h3 className="font-medium text-white text-sm">League Conference Breakdown</h3>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            {CONFERENCE_CATEGORIES.map(cat => (
+              <div key={cat} className="card-inner p-3 text-center">
+                <p className="font-mono text-lg font-bold text-white">
+                  {leagueDraftedCounts[cat]}/{conferenceTotals[cat]}
+                </p>
+                <p className="text-xs text-turf-500 mt-0.5">{cat}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="space-y-2 pt-3 border-t border-turf-800">
+            <p className="text-xs text-turf-500 uppercase tracking-wide font-medium">By Manager</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {members.map(m => {
+                const counts = perManagerCounts.get(m.user_id) ?? {};
+                return (
+                  <div key={m.user_id} className="card-inner px-3 py-2">
+                    <p className="text-sm text-white font-medium mb-1.5 truncate">{m.display_name}</p>
+                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+                      {CONFERENCE_CATEGORIES.map(cat => {
+                        const denom = cat === 'Other'
+                          ? (g5Configured ? scoring.g5_conf_max : null)
+                          : scoring.p4_conf_max;
+                        return (
+                          <span key={cat} className="text-turf-400">
+                            {cat}: <span className="font-mono text-turf-200">
+                              {counts[cat] ?? 0}{denom != null ? `/${denom}` : ''}
+                            </span>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {sortedPicks.length === 0 ? (
         <div className="card p-12 text-center text-turf-500">

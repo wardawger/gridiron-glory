@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Shield, UserPlus, Settings, Gift } from 'lucide-react';
 import type {
   League, LeagueMember, ManualBonus, DraftPick, SpreadPick, FreeAgencyMove,
-  ScoringSettings, LeagueRole, CaptainPick, GameData, TeamSeasonStats, SeasonHistoryEntry,
+  ScoringSettings, LeagueRole, CaptainPick, GameData, TeamSeasonStats, SeasonHistoryEntry, CfbTeam,
 } from '../../types';
 import { buildLeaderboard } from '../../services/scoring';
 import { useTabCrossfade } from '../../hooks/useCrossfade';
@@ -20,6 +20,7 @@ interface Props {
   freeAgencyMoves: FreeAgencyMove[];
   gameData: GameData;
   seasonStats: Map<string, TeamSeasonStats>;
+  teams: CfbTeam[];
   isCommissioner: boolean;
   onSendInvite: (email: string) => Promise<{ token?: string; error?: string }>;
   onUpdateWeek: (week: number) => void;
@@ -39,7 +40,7 @@ type Tab = 'members' | 'scoring' | 'bonuses';
 
 export function AdminPanel({
   league, members, draftPicks, captainPicks, manualBonuses, spreadPicks, freeAgencyMoves,
-  gameData, seasonStats, isCommissioner,
+  gameData, seasonStats, teams, isCommissioner,
   onSendInvite, onUpdateWeek, onUpdateScoring, onAddBonus, onRemoveBonus, onResetDraft, onDeleteLeague,
   onEndSeason, onOverrideSpread, onClearSpreadOverride, onUpdateMemberRole,
 }: Props) {
@@ -122,7 +123,7 @@ export function AdminPanel({
       </div>
 
       <div className={tabPanelClass('scoring')}>
-        <ScoringTab league={league} onUpdateScoring={onUpdateScoring} />
+        <ScoringTab league={league} teams={teams} onUpdateScoring={onUpdateScoring} />
       </div>
 
       <div className={tabPanelClass('bonuses')}>
