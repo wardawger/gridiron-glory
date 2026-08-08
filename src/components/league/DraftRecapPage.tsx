@@ -26,18 +26,23 @@ function conferenceCategory(conference: string): string {
   return isP4Conference(conference) ? conference : 'Other';
 }
 
-// Stylized per-conference identity — CFBD has no conference logo data (only
-// team logos), so this is a designed monogram + accent color per category,
-// not a real crest. Short codes are plain descriptive abbreviations (not
-// trademarked wordmarks like the Big Ten's stylized "B1G" mark). Green is
-// deliberately not used here since it's already the app's own semantic
-// color (primary actions, success, "covered" spread results).
-const CONFERENCE_BADGE: Record<string, { short: string; text: string; bg: string; border: string; bar: string }> = {
-  'SEC':     { short: 'SEC', text: 'text-amber-400',  bg: 'bg-amber-500/15',  border: 'border-amber-500/30',  bar: 'bg-amber-400' },
-  'Big Ten': { short: 'B10', text: 'text-blue-400',   bg: 'bg-blue-500/15',   border: 'border-blue-500/30',   bar: 'bg-blue-400' },
-  'Big 12':  { short: 'B12', text: 'text-purple-400', bg: 'bg-purple-500/15', border: 'border-purple-500/30', bar: 'bg-purple-400' },
-  'ACC':     { short: 'ACC', text: 'text-rose-400',   bg: 'bg-rose-500/15',   border: 'border-rose-500/30',   bar: 'bg-rose-400' },
-  'Other':   { short: 'OTH', text: 'text-turf-300',   bg: 'bg-turf-700/40',   border: 'border-turf-600/50',   bar: 'bg-turf-400' },
+// Per-conference identity. CFBD has no conference logo data, but ESPN's
+// public API does (verified directly against it — same a.espncdn.com CDN
+// this app already trusts for team logos), so the 4 real P4 conferences get
+// their actual logo. "Other" isn't a real conference, so it gets ESPN's own
+// generic NCAA college-football icon (its API tags this logo rel:
+// ["full","default"] — the same fallback ESPN itself uses) rather than a
+// specific conference mark. Accent colors stay on all 5 chips regardless,
+// since "Other" combines several real conferences and still benefits from a
+// distinct color at a glance; green is deliberately excluded from the
+// palette since it's already the app's own semantic color (primary
+// actions, success, "covered" spread results).
+const CONFERENCE_BADGE: Record<string, { short: string; text: string; bg: string; border: string; bar: string; logo: string }> = {
+  'SEC':     { short: 'SEC', text: 'text-amber-400',  bg: 'bg-amber-500/15',  border: 'border-amber-500/30',  bar: 'bg-amber-400', logo: 'https://a.espncdn.com/i/teamlogos/ncaa_conf/500/sec.png' },
+  'Big Ten': { short: 'B10', text: 'text-blue-400',   bg: 'bg-blue-500/15',   border: 'border-blue-500/30',   bar: 'bg-blue-400',  logo: 'https://a.espncdn.com/i/teamlogos/ncaa_conf/500/big_ten.png' },
+  'Big 12':  { short: 'B12', text: 'text-purple-400', bg: 'bg-purple-500/15', border: 'border-purple-500/30', bar: 'bg-purple-400', logo: 'https://a.espncdn.com/i/teamlogos/ncaa_conf/500/big_12.png' },
+  'ACC':     { short: 'ACC', text: 'text-rose-400',   bg: 'bg-rose-500/15',   border: 'border-rose-500/30',   bar: 'bg-rose-400',  logo: 'https://a.espncdn.com/i/teamlogos/ncaa_conf/500/acc.png' },
+  'Other':   { short: 'OTH', text: 'text-turf-300',   bg: 'bg-turf-700/40',   border: 'border-turf-600/50',   bar: 'bg-turf-400',  logo: 'https://a.espncdn.com/redesign/assets/img/icons/ESPN-icon-football-college.png' },
 };
 
 function formatPickTime(iso: string): string {
@@ -198,9 +203,7 @@ export function DraftRecapPage({ league, members, draftPicks, teams }: Props) {
               const pct = total > 0 ? Math.min(100, Math.round((drafted / total) * 100)) : 0;
               return (
                 <div key={cat} className="card-inner p-3 text-center">
-                  <div className={`w-9 h-9 mx-auto mb-2 rounded-lg flex items-center justify-center font-display text-xs font-bold border ${badge.text} ${badge.bg} ${badge.border}`}>
-                    {badge.short}
-                  </div>
+                  <TeamLogo src={badge.logo} alt={`${cat} logo`} fallbackName={badge.short} size={36} className="mx-auto mb-2" />
                   <p className="font-mono text-lg font-bold text-white">{drafted}/{total}</p>
                   <p className="text-xs text-turf-500 mt-0.5">{cat}</p>
                   <div className="h-1 rounded-full bg-turf-800 mt-2 overflow-hidden">
@@ -231,7 +234,7 @@ export function DraftRecapPage({ league, members, draftPicks, teams }: Props) {
                             key={cat}
                             className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-[11px] font-medium ${badge.text} ${badge.bg} ${badge.border}`}
                           >
-                            {badge.short}
+                            <TeamLogo src={badge.logo} alt={`${cat} logo`} fallbackName={badge.short} size={14} />
                             <span className="font-mono">{count}{denom != null ? `/${denom}` : ''}</span>
                           </span>
                         );
