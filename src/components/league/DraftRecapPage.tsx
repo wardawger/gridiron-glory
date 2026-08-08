@@ -6,6 +6,7 @@ import { P4_CONFERENCES, isP4Conference } from '../../services/scoring';
 import { useTabCrossfade } from '../../hooks/useCrossfade';
 import { TeamLogo } from '../ui/TeamLogo';
 import { TriviaCard } from '../ui/TriviaCard';
+import ncaaLogo from '../../assets/ncaa-logo.webp';
 
 type View = 'timeline' | 'byManager';
 
@@ -29,10 +30,9 @@ function conferenceCategory(conference: string): string {
 // Per-conference identity. CFBD has no conference logo data, but ESPN's
 // public API does (verified directly against it — same a.espncdn.com CDN
 // this app already trusts for team logos), so the 4 real P4 conferences get
-// their actual logo. "Other" isn't a real conference, so it gets ESPN's own
-// generic NCAA college-football icon (its API tags this logo rel:
-// ["full","default"] — the same fallback ESPN itself uses) rather than a
-// specific conference mark. Accent colors stay on all 5 chips regardless,
+// their actual logo. "Other" isn't a real conference, so it gets the NCAA's
+// own circular mark (bundled locally as a static asset) rather than a
+// specific conference logo. Accent colors stay on all 5 chips regardless,
 // since "Other" combines several real conferences and still benefits from a
 // distinct color at a glance; green is deliberately excluded from the
 // palette since it's already the app's own semantic color (primary
@@ -42,7 +42,7 @@ const CONFERENCE_BADGE: Record<string, { short: string; text: string; bg: string
   'Big Ten': { short: 'B10', text: 'text-blue-400',   bg: 'bg-blue-500/15',   border: 'border-blue-500/30',   bar: 'bg-blue-400',  logo: 'https://a.espncdn.com/i/teamlogos/ncaa_conf/500/big_ten.png' },
   'Big 12':  { short: 'B12', text: 'text-purple-400', bg: 'bg-purple-500/15', border: 'border-purple-500/30', bar: 'bg-purple-400', logo: 'https://a.espncdn.com/i/teamlogos/ncaa_conf/500/big_12.png' },
   'ACC':     { short: 'ACC', text: 'text-rose-400',   bg: 'bg-rose-500/15',   border: 'border-rose-500/30',   bar: 'bg-rose-400',  logo: 'https://a.espncdn.com/i/teamlogos/ncaa_conf/500/acc.png' },
-  'Other':   { short: 'OTH', text: 'text-turf-300',   bg: 'bg-turf-700/40',   border: 'border-turf-600/50',   bar: 'bg-turf-400',  logo: 'https://a.espncdn.com/redesign/assets/img/icons/ESPN-icon-football-college.png' },
+  'Other':   { short: 'OTH', text: 'text-turf-300',   bg: 'bg-turf-700/40',   border: 'border-turf-600/50',   bar: 'bg-turf-400',  logo: ncaaLogo },
 };
 
 function formatPickTime(iso: string): string {
