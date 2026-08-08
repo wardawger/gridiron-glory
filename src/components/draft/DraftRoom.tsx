@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Search, Clock, CheckCircle2, Zap, ChevronDown, ChevronUp, AlertCircle, AlertTriangle, X, MapPin, Tv, Loader2 } from 'lucide-react';
 import type { League, LeagueMember, DraftPick, CfbTeam, GameData, TeamRatings, APRanking } from '../../types';
 import { normalizeScoring } from '../../types';
@@ -38,8 +39,12 @@ export function DraftRoom({
   league, members, draftPicks, teams, gameData, teamRatings, rankings, userId, isCommissioner,
   onStartDraft, onMakePick,
 }: Props) {
+  const [searchParams] = useSearchParams();
   const [search, setSearch]     = useState('');
-  const [confFilter, setConf]   = useState('ALL');
+  // Seeded once from a `?conference=` link (e.g. the Draft Recap conference
+  // breakdown tiles) — a one-time preset, not kept in sync with the URL
+  // afterward, so changing the dropdown doesn't fight the address bar.
+  const [confFilter, setConf]   = useState(() => searchParams.get('conference') ?? 'ALL');
   const [sortBy, setSortBy]     = useState<'name' | 'fpi' | 'ap' | 'offense' | 'defense' | 'sos'>('name');
   const [picking, setPicking]   = useState(false);
   const [showAllPicksMobile, setShowAllPicksMobile] = useState(false);

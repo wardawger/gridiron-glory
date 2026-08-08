@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { History, ListOrdered, Users, Search, Shield } from 'lucide-react';
 import type { League, LeagueMember, DraftPick, CfbTeam } from '../../types';
 import { normalizeScoring } from '../../types';
@@ -201,14 +202,32 @@ export function DraftRecapPage({ league, members, draftPicks, teams }: Props) {
               const drafted = leagueDraftedCounts[cat];
               const total = conferenceTotals[cat];
               const pct = total > 0 ? Math.min(100, Math.round((drafted / total) * 100)) : 0;
-              return (
-                <div key={cat} className="card-inner p-3 text-center">
+              // 'Other' isn't a real conference — the Draft Room's own filter
+              // already collapses every non-P4 conference into a 'G5' option.
+              const draftFilter = cat === 'Other' ? 'G5' : cat;
+              const tileContent = (
+                <>
                   <TeamLogo src={badge.logo} alt={`${cat} logo`} fallbackName={badge.short} size={36} className="mx-auto mb-2" />
                   <p className="font-mono text-lg font-bold text-white">{drafted}/{total}</p>
                   <p className="text-xs text-turf-500 mt-0.5">{cat}</p>
                   <div className="h-1 rounded-full bg-turf-800 mt-2 overflow-hidden">
                     <div className={`h-full rounded-full ${badge.bar}`} style={{ width: `${pct}%` }} />
                   </div>
+                </>
+              );
+              // Only linkable while the draft is actively running — once it's
+              // complete there's nothing left to filter for in the Draft Room.
+              return league.draft_status === 'active' ? (
+                <Link
+                  key={cat}
+                  to={`/draft?conference=${encodeURIComponent(draftFilter)}`}
+                  className="card-inner p-3 text-center transition-colors hover:border-field-500/40"
+                >
+                  {tileContent}
+                </Link>
+              ) : (
+                <div key={cat} className="card-inner p-3 text-center">
+                  {tileContent}
                 </div>
               );
             })}
