@@ -90,6 +90,8 @@ export function RosterPage({
       onRemoveSpread={targetId === userId ? onRemoveSpread : undefined}
       onRefreshSpreads={onRefreshSpreads}
       viewUserId={targetId}
+      members={members}
+      currentUserId={userId}
     />
   );
 }

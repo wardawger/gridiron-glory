@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Shield, TrendingUp, TrendingDown, Minus, Star, Calendar, List, X, MapPin, Tv, Clock, Zap, Coins, ChevronDown } from 'lucide-react';
 import type { RosterEntry, CaptainPick, GameData, ScoringSettings, LeagueMember, WeeklyScore, GameResult, SpreadPick, SpreadData, FreeAgencyMove, DraftPick, ScoreCorrection } from '../../types';
 import { calcWeeklyScore, scoreGame, didCoverSpread, scoreSpread } from '../../services/scoring';
@@ -31,6 +32,8 @@ interface Props {
   freeAgencyMoves: FreeAgencyMove[];
   scoreCorrections: ScoreCorrection[];
   viewUserId: string;
+  members: LeagueMember[];
+  currentUserId: string;
 }
 
 const WEEKS = Array.from({ length: 16 }, (_, i) => i); // weeks 0–15
@@ -447,8 +450,9 @@ export function RosterView({
   member, roster, draftPicks, captainPicks, gameData, scoring,
   currentWeek, weeklyScores, isOwner, onSetCaptain, captainUsage,
   spreadData, spreadPicks, spreadUsage, onSetSpread, onRemoveSpread, onRefreshSpreads,
-  freeAgencyMoves, scoreCorrections, viewUserId,
+  freeAgencyMoves, scoreCorrections, viewUserId, members, currentUserId,
 }: Props) {
+  const navigate = useNavigate();
   const { active: view, select: selectView, panelClass: viewPanelClass } = useTabCrossfade<'week' | 'schedule'>('week');
   // Which week the roster page is browsing — defaults to the league's actual
   // current week each time this page is opened, but can be changed freely
@@ -457,6 +461,8 @@ export function RosterView({
   const [selectedWeek, setSelectedWeek] = useState(currentWeek);
   const [showWeekMenu, setShowWeekMenu] = useState(false);
   const weekMenuRef = useRef<HTMLDivElement>(null);
+  const [showManagerMenu, setShowManagerMenu] = useState(false);
+  const managerMenuRef = useRef<HTMLDivElement>(null);
   const [modalTeam, setModalTeam] = useState<RosterEntry | null>(null);
   const [spreadError, setSpreadError] = useState<string | null>(null);
   const [spreadsLoading, setSpreadsLoading] = useState(false);
@@ -473,16 +479,24 @@ export function RosterView({
     [viewUserId, selectedWeek, draftPicks, freeAgencyMoves]
   );
 
-  // Close the week menu when clicking outside it
+  // Close the week menu and/or the manager switcher when clicking outside them
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (weekMenuRef.current && !weekMenuRef.current.contains(e.target as Node)) {
         setShowWeekMenu(false);
       }
+      if (managerMenuRef.current && !managerMenuRef.current.contains(e.target as Node)) {
+        setShowManagerMenu(false);
+      }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
+
+  const goToManager = (targetUserId: string) => {
+    setShowManagerMenu(false);
+    navigate(targetUserId === currentUserId ? '/roster' : `/roster/${targetUserId}`);
+  };
 
   // Auto-fetch spreads when feature is on and we don't have data for the selected week
   useEffect(() => {
@@ -538,22 +552,61 @@ export function RosterView({
 
         {/* Header */}
         <div className="card p-5 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Avatar
-              displayName={member.display_name}
-              avatarType={member.avatar_type}
-              avatarValue={member.avatar_value}
-              size={40}
-              bgClassName="bg-field-500"
-              textClassName="text-turf-950"
-            />
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="font-display text-2xl tracking-wide text-white">{member.display_name}</h2>
-                {member.role === 'commissioner' && <Shield className="w-4 h-4 text-field-400" />}
+          <div className="relative" ref={managerMenuRef}>
+            <button
+              onClick={() => members.length > 1 && setShowManagerMenu(v => !v)}
+              className={`flex items-center gap-3 group rounded-lg -m-1 p-1 transition-colors ${
+                members.length > 1 ? 'hover:bg-turf-800' : 'cursor-default'
+              }`}
+            >
+              <Avatar
+                displayName={member.display_name}
+                avatarType={member.avatar_type}
+                avatarValue={member.avatar_value}
+                size={40}
+                bgClassName="bg-field-500"
+                textClassName="text-turf-950"
+              />
+              <div className="text-left">
+                <div className="flex items-center gap-2">
+                  <h2 className="font-display text-2xl tracking-wide text-white group-hover:text-field-400 transition-colors">
+                    {member.display_name}
+                  </h2>
+                  {member.role === 'commissioner' && <Shield className="w-4 h-4 text-field-400 flex-shrink-0" />}
+                  {members.length > 1 && (
+                    <ChevronDown className={`w-4 h-4 text-turf-500 transition-transform flex-shrink-0 ${showManagerMenu ? 'rotate-180' : ''}`} />
+                  )}
+                </div>
+                <p className="text-turf-500 text-sm">{roster.length} teams drafted</p>
               </div>
-              <p className="text-turf-500 text-sm">{roster.length} teams drafted</p>
-            </div>
+            </button>
+
+            {showManagerMenu && (
+              <div className="absolute top-full left-0 mt-1 w-72 card shadow-xl shadow-black/40 overflow-hidden animate-slide-up z-50 p-1.5 max-h-80 overflow-y-auto">
+                {members.map(m => (
+                  <button
+                    key={m.user_id}
+                    onClick={() => goToManager(m.user_id)}
+                    className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors ${
+                      m.user_id === viewUserId
+                        ? 'bg-field-900/60 text-field-300'
+                        : 'text-turf-300 hover:bg-turf-800 hover:text-white'
+                    }`}
+                  >
+                    <Avatar
+                      displayName={m.display_name}
+                      avatarType={m.avatar_type}
+                      avatarValue={m.avatar_value}
+                      size={24}
+                    />
+                    <span className="flex-1 text-left truncate">{m.display_name}</span>
+                    {m.user_id === currentUserId && (
+                      <span className="text-xs text-field-500 flex-shrink-0">You</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           <div className="text-right">
             <div className="font-mono text-3xl font-bold text-white">{currentScore.points}</div>
