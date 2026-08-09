@@ -7,6 +7,12 @@ interface TooltipProps {
   position?: 'top' | 'bottom' | 'left' | 'right';
   width?: string; // e.g. 'w-48', 'w-64'
   fullWidth?: boolean; // stretch to fill the parent instead of shrinking to content width — for wrapping a w-full row in a block/list layout
+  // Opt-in: tapping the trigger opens the tooltip (needed since touch has no
+  // hover). Off by default because most Tooltip usages wrap an element with
+  // its own real click action (a draft card, a "view schedule" button) —
+  // turning every tap into "also open the tooltip" would fight that action.
+  // InfoTooltip's little (i) icon has no other purpose, so it opts in.
+  clickToOpen?: boolean;
 }
 
 /**
@@ -18,7 +24,7 @@ interface TooltipProps {
  *     <span>Hover me</span>
  *   </Tooltip>
  */
-export function Tooltip({ content, children, position = 'bottom', width = 'w-56', fullWidth = false }: TooltipProps) {
+export function Tooltip({ content, children, position = 'bottom', width = 'w-56', fullWidth = false, clickToOpen = false }: TooltipProps) {
   const [show, setShow] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -54,6 +60,11 @@ export function Tooltip({ content, children, position = 'bottom', width = 'w-56'
       className={`relative ${fullWidth ? 'flex w-full' : 'inline-flex'}`}
       onMouseEnter={() => setShow(true)}
       onMouseLeave={() => setShow(false)}
+      // Touch devices fire a click but no hover events at all — without this,
+      // tapping the trigger on mobile would never open the tooltip in the
+      // first place. stopPropagation keeps this same tap from immediately
+      // re-triggering the window click-listener below and closing it again.
+      onClick={clickToOpen ? e => { e.stopPropagation(); setShow(true); } : undefined}
     >
       {children}
       {show && (
@@ -88,10 +99,14 @@ export function InfoTooltip({ content, position = 'bottom', width = 'w-56' }: {
   width?: string;
 }) {
   return (
-    <Tooltip content={content} position={position} width={width}>
-      <span className="w-3.5 h-3.5 rounded-full bg-turf-700 text-turf-400 text-xs flex items-center justify-center flex-shrink-0 hover:bg-turf-600 hover:text-white transition-colors cursor-default select-none">
+    <Tooltip content={content} position={position} width={width} clickToOpen>
+      <button
+        type="button"
+        aria-label="More info"
+        className="w-3.5 h-3.5 rounded-full bg-turf-700 text-turf-400 text-xs flex items-center justify-center flex-shrink-0 hover:bg-turf-600 hover:text-white transition-colors select-none"
+      >
         i
-      </span>
+      </button>
     </Tooltip>
   );
 }

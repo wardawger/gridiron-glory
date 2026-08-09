@@ -10,6 +10,7 @@ import type { LeaderboardEntry, DraftPick, APRanking, CfbTeam } from '../../type
 import { computeAnalytics, heatColor } from '../../services/analytics';
 import { Avatar } from '../ui/Avatar';
 import { TeamLogo } from '../ui/TeamLogo';
+import { InfoTooltip } from '../ui/Tooltip';
 
 interface Props {
   entries: LeaderboardEntry[];
@@ -63,36 +64,10 @@ interface MetricTooltipProps {
 }
 
 function MetricLabel({ label, tooltip }: MetricTooltipProps) {
-  const [hovering, setHovering] = useState(false);
-  const [pinned, setPinned] = useState(false);
-  const show = hovering || pinned;
-  const tooltipId = `metric-tooltip-${label.replace(/\s+/g, '-').toLowerCase()}`;
-
   return (
-    <div
-      className="relative inline-flex items-center gap-1.5 select-none"
-      onMouseEnter={() => setHovering(true)}
-      onMouseLeave={() => setHovering(false)}
-    >
+    <div className="inline-flex items-center gap-1.5 select-none">
       <span className="text-turf-300 text-xs font-medium">{label}</span>
-      <button
-        type="button"
-        onClick={() => setPinned(p => !p)}
-        aria-expanded={show}
-        aria-describedby={tooltipId}
-        className="w-3.5 h-3.5 rounded-full bg-turf-700 text-turf-400 text-xs flex items-center justify-center flex-shrink-0 hover:bg-turf-600 hover:text-white transition-colors"
-      >
-        i
-      </button>
-      {show && (
-        <div className="absolute left-0 top-full mt-1.5 z-50 w-56">
-          <div id={tooltipId} role="tooltip" className="bg-turf-800 border border-turf-600 rounded-lg px-3 py-2.5 shadow-xl shadow-black/50">
-            <p className="text-xs text-turf-200 leading-relaxed">{tooltip}</p>
-          </div>
-          {/* Arrow */}
-          <div className="absolute -top-1 left-3 w-2 h-2 bg-turf-800 border-l border-t border-turf-600 rotate-45" />
-        </div>
-      )}
+      <InfoTooltip content={tooltip} position="bottom" width="w-56" />
     </div>
   );
 }
