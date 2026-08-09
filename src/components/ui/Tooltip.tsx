@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { X } from 'lucide-react';
 
 interface TooltipProps {
   content: string;
@@ -60,8 +61,16 @@ export function Tooltip({ content, children, position = 'bottom', width = 'w-56'
           {/* Arrow */}
           <div className={`absolute w-2 h-2 bg-turf-800 ${arrowClasses[position]}`} />
           {/* Card */}
-          <div className="bg-turf-800 border border-turf-600 rounded-lg px-3 py-2.5 shadow-xl shadow-black/50">
-            <p className="text-xs text-turf-200 leading-relaxed">{content}</p>
+          <div className="relative bg-turf-800 border border-turf-600 rounded-lg px-3 py-2.5 shadow-xl shadow-black/50">
+            {/* Close button — mobile only, since touch has no hover-to-dismiss */}
+            <button
+              onClick={e => { e.stopPropagation(); setShow(false); }}
+              aria-label="Close"
+              className="sm:hidden absolute top-1.5 right-1.5 rounded p-0.5 text-turf-400 hover:text-white transition-colors pointer-events-auto"
+            >
+              <X className="w-3 h-3" />
+            </button>
+            <p className="text-xs text-turf-200 leading-relaxed pr-4 sm:pr-0">{content}</p>
           </div>
         </div>
       )}
