@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
 import { Shield, TrendingUp, TrendingDown, Minus, Star, Calendar, List, X, MapPin, Tv, Clock, Zap, Coins, ChevronDown } from 'lucide-react';
-import type { RosterEntry, CaptainPick, GameData, ScoringSettings, LeagueMember, WeeklyScore, GameResult, SpreadPick, SpreadData, FreeAgencyMove, DraftPick } from '../../types';
+import type { RosterEntry, CaptainPick, GameData, ScoringSettings, LeagueMember, WeeklyScore, GameResult, SpreadPick, SpreadData, FreeAgencyMove, DraftPick, ScoreCorrection } from '../../types';
 import { calcWeeklyScore, scoreGame, didCoverSpread, scoreSpread } from '../../services/scoring';
 import { rosterAtWeek } from '../../services/roster';
 import { useTabCrossfade } from '../../hooks/useCrossfade';
@@ -29,6 +29,7 @@ interface Props {
   onRemoveSpread?: (week: number, teamId: string) => Promise<{ error?: string }>;
   onRefreshSpreads: (week: number) => Promise<void>;
   freeAgencyMoves: FreeAgencyMove[];
+  scoreCorrections: ScoreCorrection[];
   viewUserId: string;
 }
 
@@ -446,7 +447,7 @@ export function RosterView({
   member, roster, draftPicks, captainPicks, gameData, scoring,
   currentWeek, weeklyScores, isOwner, onSetCaptain, captainUsage,
   spreadData, spreadPicks, spreadUsage, onSetSpread, onRemoveSpread, onRefreshSpreads,
-  freeAgencyMoves, viewUserId,
+  freeAgencyMoves, scoreCorrections, viewUserId,
 }: Props) {
   const { active: view, select: selectView, panelClass: viewPanelClass } = useTabCrossfade<'week' | 'schedule'>('week');
   // Which week the roster page is browsing — defaults to the league's actual
@@ -492,8 +493,8 @@ export function RosterView({
   }, [scoring.spread_enabled, selectedWeek]);
 
   const currentScore = useMemo(
-    () => calcWeeklyScore(member.user_id, selectedWeek, weekRoster, captainPicks, gameData, scoring, spreadPicks, freeAgencyMoves),
-    [member.user_id, selectedWeek, weekRoster, captainPicks, gameData, scoring, spreadPicks, freeAgencyMoves]
+    () => calcWeeklyScore(member.user_id, selectedWeek, weekRoster, captainPicks, gameData, scoring, spreadPicks, freeAgencyMoves, scoreCorrections),
+    [member.user_id, selectedWeek, weekRoster, captainPicks, gameData, scoring, spreadPicks, freeAgencyMoves, scoreCorrections]
   );
 
   const captainThisWeek = captainPicks.find(

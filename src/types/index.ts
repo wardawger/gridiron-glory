@@ -326,6 +326,26 @@ export interface ManualBonus {
   awarded_by: string;
 }
 
+// ─── Score Correction ──────────────────────────────────────────────────────
+// A flat, week-scoped point adjustment a commissioner can add on top of the
+// auto-calculated weekly score to correct a wrong calculation — same role
+// as fa_points, but commissioner-entered. team_id/team_name are optional
+// context for the commissioner's own audit trail only — they never affect
+// the math (no ScoreBreakdown line item), keeping this a simple, low-risk
+// week-total delta identical in shape to how free-agency penalties work.
+export interface ScoreCorrection {
+  id: string;
+  league_id: string;
+  user_id: string;
+  week: number;
+  team_id: string | null;
+  team_name: string | null;
+  points: number;
+  note: string;
+  created_at: string;
+  created_by: string;
+}
+
 export const BONUS_LABELS: Record<BonusType, string> = {
   // Bowl
   bowl_eligible:          'Bowl Eligible',
@@ -518,6 +538,7 @@ export interface WeeklyScore {
   spread_team_ids: string[];
   breakdown: ScoreBreakdown[];
   fa_points: number; // free agency penalty applied this week (<= 0)
+  correction_points: number; // commissioner score corrections applied this week
 }
 
 export interface ScoreBreakdown {

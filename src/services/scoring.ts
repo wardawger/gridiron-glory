@@ -2,7 +2,7 @@ import type {
   ScoringSettings, GameResult, WeeklyScore, ScoreBreakdown,
   LeaderboardEntry, LeagueMember, RosterEntry, CaptainPick,
   GameData, ManualBonus, TeamSeasonStats, StatRankingBonus,
-  SpreadPick, DraftPick, FreeAgencyMove,
+  SpreadPick, DraftPick, FreeAgencyMove, ScoreCorrection,
 } from '../types';
 import { STAT_BONUS_CATEGORIES, normalizeScoring } from '../types';
 import { rosterAtWeek, currentRosters } from './roster';
@@ -102,6 +102,7 @@ export function calcWeeklyScore(
   settings: ScoringSettings,
   spreadPicks: SpreadPick[] = [],
   freeAgencyMoves: FreeAgencyMove[] = [],
+  scoreCorrections: ScoreCorrection[] = [],
 ): WeeklyScore {
   const captainPick = captainPicks.find(
     p => p.user_id === userId && p.week === week
@@ -149,14 +150,19 @@ export function calcWeeklyScore(
     .filter(m => m.user_id === userId && m.week === week)
     .reduce((s, m) => s + m.penalty_points, 0);
 
+  const correctionPoints = scoreCorrections
+    .filter(c => c.user_id === userId && c.week === week)
+    .reduce((s, c) => s + c.points, 0);
+
   return {
     user_id:         userId,
     week,
-    points:          breakdown.reduce((s, b) => s + b.points, 0) + faPoints,
+    points:          breakdown.reduce((s, b) => s + b.points, 0) + faPoints + correctionPoints,
     captain_team_id: captainTeamId,
     spread_team_ids: spreadTeamIds,
     breakdown,
     fa_points:       faPoints,
+    correction_points: correctionPoints,
   };
 }
 
@@ -227,6 +233,7 @@ export function buildLeaderboard(
   confChampComplete: boolean,
   spreadPicks: SpreadPick[] = [],
   freeAgencyMoves: FreeAgencyMove[] = [],
+  scoreCorrections: ScoreCorrection[] = [],
   currentWeek = 0,
   totalWeeks = 17,
 ): LeaderboardEntry[] {
@@ -241,7 +248,7 @@ export function buildLeaderboard(
       for (let w = 0; w <= totalWeeks; w++) {
         const weekRoster = rosterAtWeek(member.user_id, w, draftPicks, freeAgencyMoves);
         weekly.push(calcWeeklyScore(
-          member.user_id, w, weekRoster, captainPicks, gameData, settings, spreadPicks, freeAgencyMoves
+          member.user_id, w, weekRoster, captainPicks, gameData, settings, spreadPicks, freeAgencyMoves, scoreCorrections
         ));
       }
 

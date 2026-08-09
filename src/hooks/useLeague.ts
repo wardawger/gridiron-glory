@@ -4,6 +4,7 @@ import { useCaptainPicks } from './league/useCaptainPicks';
 import { useSpreadPicks } from './league/useSpreadPicks';
 import { useFreeAgencyAndWaivers } from './league/useFreeAgencyAndWaivers';
 import { useManualBonuses } from './league/useManualBonuses';
+import { useScoreCorrections } from './league/useScoreCorrections';
 
 // Thin composer: useLeagueCore owns all raw state + both realtime/polling
 // effects + core league/draft/member actions; the domain hooks below are
@@ -30,18 +31,23 @@ export function useLeague(user: User | null) {
     core.league, user, core.setManualBonuses,
   );
 
+  const { addScoreCorrection, removeScoreCorrection } = useScoreCorrections(
+    core.league, user, core.isCommissioner, core.setScoreCorrections,
+  );
+
   return {
     league: core.league, allLeagues: core.allLeagues, allMemberships: core.allMemberships,
     selectedLeagueId: core.selectedLeagueId,
     members: core.members, draftPicks: core.draftPicks, captainPicks: core.captainPicks,
     manualBonuses: core.manualBonuses, spreadPicks: core.spreadPicks,
-    freeAgencyMoves: core.freeAgencyMoves, waiverClaims: core.waiverClaims, seasonHistory: core.seasonHistory,
+    freeAgencyMoves: core.freeAgencyMoves, waiverClaims: core.waiverClaims,
+    scoreCorrections: core.scoreCorrections, seasonHistory: core.seasonHistory,
     rosters: core.rosters, myMembership: core.myMembership, isCommissioner: core.isCommissioner,
     loading: core.loading, error: core.error,
     switchLeague: core.switchLeague, createLeague: core.createLeague, sendInvite: core.sendInvite,
     startDraft: core.startDraft, makeDraftPick: core.makeDraftPick, resetDraft: core.resetDraft,
     deleteLeague: core.deleteLeague, endSeason: core.endSeason,
-    setCaptain, addManualBonus, removeManualBonus,
+    setCaptain, addManualBonus, removeManualBonus, addScoreCorrection, removeScoreCorrection,
     setSpreadPick, removeSpreadPick, overrideSpreadResult, clearSpreadOverride,
     updateWeek: core.updateWeek, updateScoring: core.updateScoring, removeFromRoster: core.removeFromRoster,
     makeFreeAgencyMove, submitWaiverClaim,

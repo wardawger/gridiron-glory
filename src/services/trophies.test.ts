@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { computeTrophies } from './trophies';
 import { DEFAULT_SCORING } from '../types';
 import type {
-  GameResult, GameData, LeagueMember, DraftPick, CaptainPick, SpreadPick, FreeAgencyMove, ManualBonus,
+  GameResult, GameData, LeagueMember, DraftPick, CaptainPick, SpreadPick, FreeAgencyMove, ManualBonus, ScoreCorrection,
 } from '../types';
 
 function makeGame(overrides: Partial<GameResult> = {}): GameResult {
@@ -131,6 +131,23 @@ describe('computeTrophies', () => {
 
     expect(ids).not.toContain('beat_spread');
     expect(ids).not.toContain('used_free_agency');
+  });
+
+  it('lets a score correction push a week into negative_week/bad_week_tier that game data alone would not', () => {
+    const draftPicks = [pick({ team_id: 't1', user_id: 'u1' })];
+    // Win (+1), not negative and not a bad week on its own.
+    const gameData: GameData = { t1: { 1: makeGame({ result: 'W' }) } };
+    const scoreCorrections: ScoreCorrection[] = [
+      { id: 'sc1', league_id: 'L', user_id: 'u1', week: 1, team_id: null, team_name: null, points: -15, note: 'fix', created_at: '', created_by: 'commish' },
+    ];
+
+    const snapshot = computeTrophies(members, draftPicks, [], [], [], [], gameData, DEFAULT_SCORING, scoreCorrections);
+    const negative = snapshot.categories.find(c => c.id === 'negative_week')!;
+    const badWeek = snapshot.categories.find(c => c.id === 'bad_week_tier')!;
+
+    expect(negative.winners.map(w => w.user_id)).toEqual(['u1']);
+    expect(badWeek.winners).toHaveLength(1);
+    expect(badWeek.winners[0].tier).toBe(1); // 1 (win) - 15 = -14, clears the -10 threshold
   });
 
   it('shows beat_spread and used_free_agency once their scoring toggles are on', () => {

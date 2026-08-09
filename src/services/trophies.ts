@@ -1,7 +1,7 @@
 import type {
   LeagueMember, DraftPick, CaptainPick, SpreadPick, FreeAgencyMove, ManualBonus,
   GameData, ScoringSettings, BonusType, TrophyCategoryId, TrophyCategory,
-  TrophySnapshot, TrophyTeamRef, TrophyWinner,
+  TrophySnapshot, TrophyTeamRef, TrophyWinner, ScoreCorrection,
 } from '../types';
 import { normalizeScoring } from '../types';
 import { isP4Conference } from './scoring';
@@ -200,8 +200,9 @@ function computeFirstLosingRecordDraft(members: LeagueMember[], draftPicks: Draf
 interface WeeklyExtreme { week: number; points: number; }
 
 // Each member's single worst-scoring week across the season, using the same
-// game/spread/FA-penalty basis as calcWeeklyScore (manual/stat bonuses
-// aren't week-scoped in this data model, so they're intentionally excluded).
+// game/spread/FA-penalty/correction basis as calcWeeklyScore (manual/stat
+// bonuses aren't week-scoped in this data model, so they're intentionally
+// excluded).
 function computeWeeklyExtremes(
   members: LeagueMember[],
   draftPicks: DraftPick[],
@@ -210,6 +211,7 @@ function computeWeeklyExtremes(
   scoring: ScoringSettings,
   spreadPicks: SpreadPick[],
   freeAgencyMoves: FreeAgencyMove[],
+  scoreCorrections: ScoreCorrection[],
 ): Map<string, WeeklyExtreme | null> {
   const result = new Map<string, WeeklyExtreme | null>();
   members.forEach(member => {
@@ -217,7 +219,7 @@ function computeWeeklyExtremes(
     for (let w = 1; w <= 17; w++) {
       const roster = rosterAtWeek(member.user_id, w, draftPicks, freeAgencyMoves);
       if (roster.length === 0) continue;
-      const weekly = calcWeeklyScore(member.user_id, w, roster, captainPicks, gameData, scoring, spreadPicks, freeAgencyMoves);
+      const weekly = calcWeeklyScore(member.user_id, w, roster, captainPicks, gameData, scoring, spreadPicks, freeAgencyMoves, scoreCorrections);
       if (!worst || weekly.points < worst.points) worst = { week: w, points: weekly.points };
     }
     result.set(member.user_id, worst);
@@ -257,10 +259,11 @@ export function computeTrophies(
   manualBonuses: ManualBonus[],
   gameData: GameData,
   rawScoring: ScoringSettings,
+  scoreCorrections: ScoreCorrection[] = [],
 ): TrophySnapshot {
   const scoring = normalizeScoring(rawScoring);
   const teamInfo = buildTeamInfoMap(draftPicks, freeAgencyMoves);
-  const weeklyExtremes = computeWeeklyExtremes(members, draftPicks, captainPicks, gameData, scoring, spreadPicks, freeAgencyMoves);
+  const weeklyExtremes = computeWeeklyExtremes(members, draftPicks, captainPicks, gameData, scoring, spreadPicks, freeAgencyMoves, scoreCorrections);
 
   const categories: TrophyCategory[] = [];
   const add = (id: TrophyCategoryId, winners: TrophyWinner[]) => {

@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
-  isP4Conference, confCategory, scoreGame, didCoverSpread, scoreSpread, buildLeaderboard,
+  isP4Conference, confCategory, scoreGame, didCoverSpread, scoreSpread, buildLeaderboard, calcWeeklyScore,
 } from './scoring';
 import { DEFAULT_SCORING } from '../types';
-import type { GameResult, GameData, LeagueMember, DraftPick, CaptainPick, TeamSeasonStats } from '../types';
+import type { GameResult, GameData, LeagueMember, DraftPick, CaptainPick, TeamSeasonStats, ScoreCorrection } from '../types';
 
 function makeGame(overrides: Partial<GameResult> = {}): GameResult {
   return {
@@ -190,7 +190,7 @@ describe('buildLeaderboard', () => {
 
     const board = buildLeaderboard(
       members, draftPicks, captainPicks, gameData, settings, manualBonuses, seasonStats,
-      true, [], [], 1, 1,
+      true, [], [], [], 1, 1,
     );
 
     const alice = board.find(e => e.user_id === 'u1')!;
@@ -203,5 +203,45 @@ describe('buildLeaderboard', () => {
 
     // Sorted descending by total_points
     expect(board[0].user_id).toBe('u1');
+  });
+});
+
+describe('calcWeeklyScore correction_points', () => {
+  const roster = [{ team_id: 't1', team_name: 'Team One', team_logo: '', team_conference: 'SEC', team_color: '' }];
+  const gameData: GameData = { t1: { 1: makeGame({ week: 1, result: 'W' }) } };
+
+  function makeCorrection(overrides: Partial<ScoreCorrection> = {}): ScoreCorrection {
+    return {
+      id: 'c1', league_id: 'L', user_id: 'u1', week: 1, team_id: null, team_name: null,
+      points: 3, note: '', created_at: '', created_by: 'commish',
+      ...overrides,
+    };
+  }
+
+  it('adds a matching correction into the week total and correction_points', () => {
+    const score = calcWeeklyScore('u1', 1, roster, [], gameData, DEFAULT_SCORING, [], [], [makeCorrection({ points: 3 })]);
+    expect(score.correction_points).toBe(3);
+    expect(score.points).toBe(DEFAULT_SCORING.win + 3);
+  });
+
+  it('sums multiple corrections in the same week for the same user', () => {
+    const corrections = [makeCorrection({ id: 'c1', points: 3 }), makeCorrection({ id: 'c2', points: -1 })];
+    const score = calcWeeklyScore('u1', 1, roster, [], gameData, DEFAULT_SCORING, [], [], corrections);
+    expect(score.correction_points).toBe(2);
+  });
+
+  it('excludes corrections for a different user or week', () => {
+    const corrections = [
+      makeCorrection({ id: 'c1', user_id: 'u2', points: 10 }),
+      makeCorrection({ id: 'c2', week: 2, points: 10 }),
+    ];
+    const score = calcWeeklyScore('u1', 1, roster, [], gameData, DEFAULT_SCORING, [], [], corrections);
+    expect(score.correction_points).toBe(0);
+    expect(score.points).toBe(DEFAULT_SCORING.win);
+  });
+
+  it('defaults to no corrections when the param is omitted', () => {
+    const score = calcWeeklyScore('u1', 1, roster, [], gameData, DEFAULT_SCORING);
+    expect(score.correction_points).toBe(0);
   });
 });

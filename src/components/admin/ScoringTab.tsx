@@ -15,6 +15,11 @@ interface Props {
 const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const TOAST_DURATION_MS = 3000;
 
+// Statistical rankings get their own dedicated, auto-calculating editor
+// below ("Statistical Ranking Bonuses") — excluded here so a commissioner
+// isn't shown two different places to set the same point values.
+const postseasonGroups = BONUS_GROUPS.filter(g => !g.label.startsWith('Statistical Rankings'));
+
 export function ScoringTab({ league, teams, onUpdateScoring }: Props) {
   const [scoring, setScoring] = useState<ScoringSettings>(normalizeScoring(league.scoring));
   const [showSavedToast, setShowSavedToast] = useState(false);
@@ -164,10 +169,10 @@ export function ScoringTab({ league, teams, onUpdateScoring }: Props) {
       <div className="card p-5 space-y-4">
         <h3 className="font-medium text-white text-sm">Postseason Bonus Points</h3>
         <p className="text-xs text-turf-400">
-          Starting point values for manually-awarded bonuses (Admin → Bonuses). Each award can still be edited individually when given.
+          Starting point values for manually-awarded bonuses (Admin → Adjustments). Each award can still be edited individually when given.
         </p>
         <div className="space-y-4">
-          {BONUS_GROUPS.map(group => (
+          {postseasonGroups.map(group => (
             <div key={group.label} className="space-y-2">
               <p className="text-xs font-medium text-turf-300 uppercase tracking-wide">{group.label}</p>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">

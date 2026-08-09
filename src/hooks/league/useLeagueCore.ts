@@ -5,7 +5,7 @@ import { supabase } from '../../lib/supabase';
 import type {
   League, LeagueMember, DraftPick, CaptainPick,
   ManualBonus, SpreadPick, FreeAgencyMove, LeagueRole, AvatarType,
-  SeasonHistory, SeasonHistoryEntry, WaiverClaim, TrophySnapshot,
+  SeasonHistory, SeasonHistoryEntry, WaiverClaim, TrophySnapshot, ScoreCorrection,
 } from '../../types';
 import { DEFAULT_SCORING } from '../../types';
 import { currentRosters } from '../../services/roster';
@@ -29,6 +29,7 @@ export function useLeagueCore(user: User | null) {
   const [spreadPicks, setSpreadPicks]   = useState<SpreadPick[]>([]);
   const [freeAgencyMoves, setFreeAgencyMoves] = useState<FreeAgencyMove[]>([]);
   const [waiverClaims, setWaiverClaims] = useState<WaiverClaim[]>([]);
+  const [scoreCorrections, setScoreCorrections] = useState<ScoreCorrection[]>([]);
   const [seasonHistory, setSeasonHistory] = useState<SeasonHistory[]>([]);
   const [loading, setLoading]           = useState(true);
   const [error, setError]               = useState<string | null>(null);
@@ -100,7 +101,7 @@ export function useLeagueCore(user: User | null) {
   }, [user]);
 
   const loadLeagueData = useCallback(async (leagueId: string) => {
-    const [membersRes, picksRes, captainRes, bonusRes, spreadRes, faRes, waiverRes, historyRes] = await Promise.all([
+    const [membersRes, picksRes, captainRes, bonusRes, spreadRes, faRes, waiverRes, correctionRes, historyRes] = await Promise.all([
       supabase.from('league_members').select('*').eq('league_id', leagueId),
       supabase.from('draft_picks').select('*').eq('league_id', leagueId).order('pick_number'),
       supabase.from('captain_picks').select('*').eq('league_id', leagueId),
@@ -108,17 +109,19 @@ export function useLeagueCore(user: User | null) {
       supabase.from('spread_picks').select('*').eq('league_id', leagueId),
       supabase.from('free_agency_moves').select('*').eq('league_id', leagueId),
       supabase.from('waiver_claims').select('*').eq('league_id', leagueId),
+      supabase.from('score_corrections').select('*').eq('league_id', leagueId),
       supabase.from('season_history').select('*').eq('league_id', leagueId).order('archived_at', { ascending: false }),
     ]);
 
-    if (membersRes.data)  setMembers(membersRes.data);
-    if (picksRes.data)    setDraftPicks(picksRes.data);
-    if (captainRes.data)  setCaptainPicks(captainRes.data);
-    if (bonusRes.data)    setManualBonuses(bonusRes.data);
-    if (spreadRes.data)   setSpreadPicks(spreadRes.data);
-    if (faRes.data)       setFreeAgencyMoves(faRes.data);
-    if (waiverRes.data)   setWaiverClaims(waiverRes.data);
-    if (historyRes.data)  setSeasonHistory(historyRes.data);
+    if (membersRes.data)    setMembers(membersRes.data);
+    if (picksRes.data)      setDraftPicks(picksRes.data);
+    if (captainRes.data)    setCaptainPicks(captainRes.data);
+    if (bonusRes.data)      setManualBonuses(bonusRes.data);
+    if (spreadRes.data)     setSpreadPicks(spreadRes.data);
+    if (faRes.data)         setFreeAgencyMoves(faRes.data);
+    if (waiverRes.data)     setWaiverClaims(waiverRes.data);
+    if (correctionRes.data) setScoreCorrections(correctionRes.data);
+    if (historyRes.data)    setSeasonHistory(historyRes.data);
   }, []);
 
   useEffect(() => { loadAllLeagues(); }, [loadAllLeagues]);
@@ -139,6 +142,7 @@ export function useLeagueCore(user: User | null) {
     setSpreadPicks([]);
     setFreeAgencyMoves([]);
     setWaiverClaims([]);
+    setScoreCorrections([]);
     setSeasonHistory([]);
   };
 
@@ -200,6 +204,16 @@ export function useLeagueCore(user: User | null) {
       }, () => {
         supabase.from('waiver_claims').select('*').eq('league_id', league.id)
           .then(({ data }) => { if (data) setWaiverClaims(data); });
+      })
+      .on('postgres_changes', {
+        // '*' — corrections can be added and removed by the commissioner,
+        // so a full refetch (matching spread_picks/captain_picks) is simpler
+        // than free-agency's insert-only merge.
+        event: '*', schema: 'public', table: 'score_corrections',
+        filter: `league_id=eq.${league.id}`,
+      }, () => {
+        supabase.from('score_corrections').select('*').eq('league_id', league.id)
+          .then(({ data }) => { if (data) setScoreCorrections(data); });
       })
       .subscribe();
 
@@ -559,7 +573,7 @@ export function useLeagueCore(user: User | null) {
   return {
     // Public state
     league, allLeagues, allMemberships, selectedLeagueId,
-    members, draftPicks, captainPicks, manualBonuses, spreadPicks, freeAgencyMoves, waiverClaims, seasonHistory,
+    members, draftPicks, captainPicks, manualBonuses, spreadPicks, freeAgencyMoves, waiverClaims, scoreCorrections, seasonHistory,
     rosters, myMembership, isCommissioner, loading, error,
     // Public actions
     switchLeague, createLeague, sendInvite, startDraft, makeDraftPick, resetDraft, deleteLeague, endSeason,
@@ -567,7 +581,7 @@ export function useLeagueCore(user: User | null) {
     updateDisplayName, updateAvatar, updateMemberRole,
     reload: () => loadAllLeagues(true),
     // Setters + refs consumed by the domain action-factory hooks
-    setCaptainPicks, setSpreadPicks, setFreeAgencyMoves, setWaiverClaims, setManualBonuses,
+    setCaptainPicks, setSpreadPicks, setFreeAgencyMoves, setWaiverClaims, setManualBonuses, setScoreCorrections,
     leagueRef, userRef, captainPicksRef, spreadPicksRef, membersRef, draftPicksRef, freeAgencyMovesRef, waiverClaimsRef,
   };
 }

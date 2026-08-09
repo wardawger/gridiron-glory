@@ -3,14 +3,14 @@ import { Shield, UserPlus, Settings, Gift } from 'lucide-react';
 import type {
   League, LeagueMember, ManualBonus, DraftPick, SpreadPick, FreeAgencyMove,
   ScoringSettings, LeagueRole, CaptainPick, GameData, TeamSeasonStats, SeasonHistoryEntry, CfbTeam,
-  TrophySnapshot,
+  TrophySnapshot, ScoreCorrection,
 } from '../../types';
 import { buildLeaderboard } from '../../services/scoring';
 import { computeTrophies } from '../../services/trophies';
 import { useTabCrossfade } from '../../hooks/useCrossfade';
 import { MembersTab } from './MembersTab';
 import { ScoringTab } from './ScoringTab';
-import { BonusesTab } from './BonusesTab';
+import { AdjustmentsTab } from './AdjustmentsTab';
 
 interface Props {
   league: League;
@@ -20,6 +20,7 @@ interface Props {
   manualBonuses: ManualBonus[];
   spreadPicks: SpreadPick[];
   freeAgencyMoves: FreeAgencyMove[];
+  scoreCorrections: ScoreCorrection[];
   gameData: GameData;
   seasonStats: Map<string, TeamSeasonStats>;
   teams: CfbTeam[];
@@ -29,6 +30,8 @@ interface Props {
   onUpdateScoring: (s: ScoringSettings) => void;
   onAddBonus: (bonus: Omit<ManualBonus, 'id' | 'awarded_at' | 'awarded_by' | 'league_id'>) => void;
   onRemoveBonus: (id: string) => void;
+  onAddCorrection: (correction: Omit<ScoreCorrection, 'id' | 'league_id' | 'created_at' | 'created_by'>) => Promise<{ error?: string }>;
+  onRemoveCorrection: (id: string) => Promise<{ error?: string }>;
   onRemoveFromRoster: (userId: string, teamId: string) => void;
   onResetDraft: () => Promise<{ error?: string }>;
   onDeleteLeague: () => Promise<{ error?: string }>;
@@ -38,12 +41,13 @@ interface Props {
   onUpdateMemberRole: (userId: string, role: LeagueRole) => Promise<{ error?: string }>;
 }
 
-type Tab = 'members' | 'scoring' | 'bonuses';
+type Tab = 'members' | 'scoring' | 'adjustments';
 
 export function AdminPanel({
-  league, members, draftPicks, captainPicks, manualBonuses, spreadPicks, freeAgencyMoves,
+  league, members, draftPicks, captainPicks, manualBonuses, spreadPicks, freeAgencyMoves, scoreCorrections,
   gameData, seasonStats, teams, isCommissioner,
-  onSendInvite, onUpdateWeek, onUpdateScoring, onAddBonus, onRemoveBonus, onResetDraft, onDeleteLeague,
+  onSendInvite, onUpdateWeek, onUpdateScoring, onAddBonus, onRemoveBonus, onAddCorrection, onRemoveCorrection,
+  onResetDraft, onDeleteLeague,
   onEndSeason, onOverrideSpread, onClearSpreadOverride, onUpdateMemberRole,
 }: Props) {
   const { active: tab, select: selectTab, panelClass: tabPanelClass } = useTabCrossfade<Tab>('members');
@@ -56,20 +60,20 @@ export function AdminPanel({
     const board = buildLeaderboard(
       members, draftPicks, captainPicks, gameData,
       league.scoring, manualBonuses, seasonStats, true, spreadPicks,
-      freeAgencyMoves, league.current_week
+      freeAgencyMoves, scoreCorrections, league.current_week
     );
     return board.map((e, i) => ({
       user_id: e.user_id, display_name: e.display_name,
       avatar_type: e.avatar_type, avatar_value: e.avatar_value,
       total_points: e.total_points, rank: i + 1,
     }));
-  }, [members, draftPicks, captainPicks, gameData, league.scoring, manualBonuses, seasonStats, spreadPicks, freeAgencyMoves, league.current_week]);
+  }, [members, draftPicks, captainPicks, gameData, league.scoring, manualBonuses, seasonStats, spreadPicks, freeAgencyMoves, scoreCorrections, league.current_week]);
 
   // Snapshotted alongside finalStandings so End Season can freeze both at
   // once — trophies are unrecoverable once the underlying tables are wiped.
   const trophySnapshot = useMemo(
-    () => computeTrophies(members, draftPicks, captainPicks, spreadPicks, freeAgencyMoves, manualBonuses, gameData, league.scoring),
-    [members, draftPicks, captainPicks, spreadPicks, freeAgencyMoves, manualBonuses, gameData, league.scoring]
+    () => computeTrophies(members, draftPicks, captainPicks, spreadPicks, freeAgencyMoves, manualBonuses, gameData, league.scoring, scoreCorrections),
+    [members, draftPicks, captainPicks, spreadPicks, freeAgencyMoves, manualBonuses, gameData, league.scoring, scoreCorrections]
   );
 
   if (!isCommissioner) {
@@ -82,9 +86,9 @@ export function AdminPanel({
   }
 
   const tabs: { id: Tab; label: string; icon: any }[] = [
-    { id: 'members',  label: 'Members',  icon: UserPlus },
-    { id: 'scoring',  label: 'Scoring',  icon: Settings },
-    { id: 'bonuses',  label: 'Bonuses',  icon: Gift },
+    { id: 'members',     label: 'Members',     icon: UserPlus },
+    { id: 'scoring',     label: 'Scoring',     icon: Settings },
+    { id: 'adjustments', label: 'Adjustments', icon: Gift },
   ];
 
   return (
@@ -136,18 +140,21 @@ export function AdminPanel({
         <ScoringTab league={league} teams={teams} onUpdateScoring={onUpdateScoring} />
       </div>
 
-      <div className={tabPanelClass('bonuses')}>
-        <BonusesTab
+      <div className={tabPanelClass('adjustments')}>
+        <AdjustmentsTab
           league={league}
           members={members}
           draftPicks={draftPicks}
           freeAgencyMoves={freeAgencyMoves}
           manualBonuses={manualBonuses}
           spreadPicks={spreadPicks}
+          scoreCorrections={scoreCorrections}
           onAddBonus={onAddBonus}
           onRemoveBonus={onRemoveBonus}
           onOverrideSpread={onOverrideSpread}
           onClearSpreadOverride={onClearSpreadOverride}
+          onAddCorrection={onAddCorrection}
+          onRemoveCorrection={onRemoveCorrection}
         />
       </div>
     </div>

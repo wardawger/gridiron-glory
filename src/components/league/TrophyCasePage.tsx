@@ -3,7 +3,7 @@ import { Archive, Crown, Medal, TrendingUp, Target, Rocket, Trophy, ChevronDown 
 import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import type {
   League, SeasonHistory, SeasonHistoryEntry, LeagueMember, DraftPick, CaptainPick,
-  SpreadPick, FreeAgencyMove, ManualBonus, GameData, TrophyCategory,
+  SpreadPick, FreeAgencyMove, ManualBonus, GameData, TrophyCategory, ScoreCorrection,
 } from '../../types';
 import { Avatar } from '../ui/Avatar';
 import { TeamLogo } from '../ui/TeamLogo';
@@ -19,6 +19,7 @@ interface Props {
   freeAgencyMoves: FreeAgencyMove[];
   manualBonuses: ManualBonus[];
   gameData: GameData;
+  scoreCorrections: ScoreCorrection[];
 }
 
 const PODIUM_STYLES = [
@@ -340,10 +341,11 @@ function TrendsSection({ seasonHistory }: { seasonHistory: SeasonHistory[] }) {
 
 export function TrophyCasePage({
   league, seasonHistory, members, draftPicks, captainPicks, spreadPicks, freeAgencyMoves, manualBonuses, gameData,
+  scoreCorrections,
 }: Props) {
   const currentTrophies = useMemo(
-    () => computeTrophies(members, draftPicks, captainPicks, spreadPicks, freeAgencyMoves, manualBonuses, gameData, league.scoring),
-    [members, draftPicks, captainPicks, spreadPicks, freeAgencyMoves, manualBonuses, gameData, league.scoring]
+    () => computeTrophies(members, draftPicks, captainPicks, spreadPicks, freeAgencyMoves, manualBonuses, gameData, league.scoring, scoreCorrections),
+    [members, draftPicks, captainPicks, spreadPicks, freeAgencyMoves, manualBonuses, gameData, league.scoring, scoreCorrections]
   );
 
   return (

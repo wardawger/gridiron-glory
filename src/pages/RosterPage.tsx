@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { RosterView } from '../components/league/RosterView';
-import type { League, LeagueMember, DraftPick, CaptainPick, GameData, SpreadPick, SpreadData, FreeAgencyMove } from '../types';
+import type { League, LeagueMember, DraftPick, CaptainPick, GameData, SpreadPick, SpreadData, FreeAgencyMove, ScoreCorrection } from '../types';
 import { calcWeeklyScore } from '../services/scoring';
 import { rosterAtWeek } from '../services/roster';
 
@@ -14,6 +14,7 @@ interface Props {
   spreadData: Record<number, SpreadData>;
   spreadPicks: SpreadPick[];
   freeAgencyMoves: FreeAgencyMove[];
+  scoreCorrections: ScoreCorrection[];
   userId: string;
   onSetCaptain: (week: number, teamId: string) => void;
   onSetSpread: (week: number, teamId: string, lockedSpread: number) => Promise<{ error?: string }>;
@@ -23,7 +24,7 @@ interface Props {
 
 export function RosterPage({
   league, members, draftPicks, captainPicks, gameData,
-  spreadData, spreadPicks, freeAgencyMoves,
+  spreadData, spreadPicks, freeAgencyMoves, scoreCorrections,
   userId, onSetCaptain, onSetSpread, onRemoveSpread, onRefreshSpreads,
 }: Props) {
   const { userId: paramUserId } = useParams<{ userId?: string }>();
@@ -39,9 +40,9 @@ export function RosterPage({
   const weeklyScores = useMemo(() => {
     return Array.from({ length: 18 }, (_, i) => {
       const weekRoster = rosterAtWeek(targetId, i, draftPicks, freeAgencyMoves);
-      return calcWeeklyScore(targetId, i, weekRoster, captainPicks, gameData, league.scoring, spreadPicks, freeAgencyMoves);
+      return calcWeeklyScore(targetId, i, weekRoster, captainPicks, gameData, league.scoring, spreadPicks, freeAgencyMoves, scoreCorrections);
     });
-  }, [targetId, draftPicks, freeAgencyMoves, captainPicks, gameData, league.scoring, spreadPicks]);
+  }, [targetId, draftPicks, freeAgencyMoves, captainPicks, gameData, league.scoring, spreadPicks, scoreCorrections]);
 
   const captainUsage = useMemo(() => {
     const map = new Map<string, number>();
@@ -78,6 +79,7 @@ export function RosterPage({
       currentWeek={league.current_week}
       weeklyScores={weeklyScores}
       freeAgencyMoves={freeAgencyMoves}
+      scoreCorrections={scoreCorrections}
       isOwner={isOwner}
       onSetCaptain={targetId === userId ? onSetCaptain : undefined}
       captainUsage={captainUsage}

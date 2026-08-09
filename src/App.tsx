@@ -82,6 +82,7 @@ function AnimatedRoutes({ lg, league, auth, cfb }: AnimatedRoutesProps) {
               manualBonuses={league.manualBonuses}
               spreadPicks={league.spreadPicks}
               freeAgencyMoves={league.freeAgencyMoves}
+              scoreCorrections={league.scoreCorrections}
               gameData={cfb.gameData}
               seasonStats={cfb.seasonStats}
               rankings={cfb.rankings}
@@ -90,8 +91,8 @@ function AnimatedRoutes({ lg, league, auth, cfb }: AnimatedRoutesProps) {
               cfbLoading={cfb.loading}
             />
           } />
-          <Route path="/roster"         element={<RosterPage league={lg} members={league.members} draftPicks={league.draftPicks} captainPicks={league.captainPicks} gameData={cfb.gameData} spreadData={cfb.spreadData} spreadPicks={league.spreadPicks} freeAgencyMoves={league.freeAgencyMoves} userId={auth.user!.id} onSetCaptain={league.setCaptain} onSetSpread={league.setSpreadPick} onRemoveSpread={league.removeSpreadPick} onRefreshSpreads={cfb.refreshSpreads} />} />
-          <Route path="/roster/:userId" element={<RosterPage league={lg} members={league.members} draftPicks={league.draftPicks} captainPicks={league.captainPicks} gameData={cfb.gameData} spreadData={cfb.spreadData} spreadPicks={league.spreadPicks} freeAgencyMoves={league.freeAgencyMoves} userId={auth.user!.id} onSetCaptain={league.setCaptain} onSetSpread={league.setSpreadPick} onRemoveSpread={league.removeSpreadPick} onRefreshSpreads={cfb.refreshSpreads} />} />
+          <Route path="/roster"         element={<RosterPage league={lg} members={league.members} draftPicks={league.draftPicks} captainPicks={league.captainPicks} gameData={cfb.gameData} spreadData={cfb.spreadData} spreadPicks={league.spreadPicks} freeAgencyMoves={league.freeAgencyMoves} scoreCorrections={league.scoreCorrections} userId={auth.user!.id} onSetCaptain={league.setCaptain} onSetSpread={league.setSpreadPick} onRemoveSpread={league.removeSpreadPick} onRefreshSpreads={cfb.refreshSpreads} />} />
+          <Route path="/roster/:userId" element={<RosterPage league={lg} members={league.members} draftPicks={league.draftPicks} captainPicks={league.captainPicks} gameData={cfb.gameData} spreadData={cfb.spreadData} spreadPicks={league.spreadPicks} freeAgencyMoves={league.freeAgencyMoves} scoreCorrections={league.scoreCorrections} userId={auth.user!.id} onSetCaptain={league.setCaptain} onSetSpread={league.setSpreadPick} onRemoveSpread={league.removeSpreadPick} onRefreshSpreads={cfb.refreshSpreads} />} />
           <Route path="/rankings" element={<RankingsPage rankings={cfb.rankings} teams={cfb.teams} records={cfb.records} />} />
           <Route path="/account" element={
             <AccountPage
@@ -118,6 +119,7 @@ function AnimatedRoutes({ lg, league, auth, cfb }: AnimatedRoutesProps) {
               freeAgencyMoves={league.freeAgencyMoves}
               manualBonuses={league.manualBonuses}
               gameData={cfb.gameData}
+              scoreCorrections={league.scoreCorrections}
             />
           } />
           <Route path="/stat-bonuses" element={
@@ -165,6 +167,7 @@ function AnimatedRoutes({ lg, league, auth, cfb }: AnimatedRoutesProps) {
               manualBonuses={league.manualBonuses}
               spreadPicks={league.spreadPicks}
               freeAgencyMoves={league.freeAgencyMoves}
+              scoreCorrections={league.scoreCorrections}
               gameData={cfb.gameData}
               seasonStats={cfb.seasonStats}
               teams={cfb.teams}
@@ -174,6 +177,8 @@ function AnimatedRoutes({ lg, league, auth, cfb }: AnimatedRoutesProps) {
               onUpdateScoring={league.updateScoring}
               onAddBonus={league.addManualBonus}
               onRemoveBonus={league.removeManualBonus}
+              onAddCorrection={league.addScoreCorrection}
+              onRemoveCorrection={league.removeScoreCorrection}
               onRemoveFromRoster={league.removeFromRoster}
               onResetDraft={league.resetDraft}
               onDeleteLeague={league.deleteLeague}
