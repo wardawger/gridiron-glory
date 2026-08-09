@@ -18,6 +18,7 @@ function makeGame(overrides: Partial<GameResult> = {}): GameResult {
     away_score: 10,
     completed: true,
     start_date: '2026-09-05',
+    start_time_tbd: false,
     is_home: true,
     venue: null,
     tv: null,

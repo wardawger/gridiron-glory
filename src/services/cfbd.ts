@@ -200,6 +200,7 @@ export async function fetchSeasonData(teams: CfbTeam[]): Promise<GameData> {
     const homePoints     = g.home_points     ?? g.homePoints     ?? null;
     const awayPoints     = g.away_points     ?? g.awayPoints     ?? null;
     const startDate      = g.start_date      ?? g.startDate      ?? '';
+    const startTimeTbd   = g.start_time_tbd  ?? g.startTimeTBD   ?? false;
 
     // CFBD returns Week Zero games as week=1 with an August start date.
     // Reclassify: if week=1 and the game is in August, it's actually week 0.
@@ -230,6 +231,7 @@ export async function fetchSeasonData(teams: CfbTeam[]): Promise<GameData> {
         away_score:      awayPoints,
         completed,
         start_date:      startDate,
+        start_time_tbd:  startTimeTbd,
         is_home:         true,
         venue,
         tv,
@@ -255,6 +257,7 @@ export async function fetchSeasonData(teams: CfbTeam[]): Promise<GameData> {
         away_score:      awayPoints,
         completed,
         start_date:      startDate,
+        start_time_tbd:  startTimeTbd,
         is_home:         false,
         venue,
         tv,

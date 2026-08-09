@@ -451,6 +451,7 @@ export interface GameResult {
   completed: boolean;
   // Schedule detail fields
   start_date: string | null;
+  start_time_tbd: boolean; // from CFBD's own startTimeTBD — authoritative, don't re-derive from the date
   is_home: boolean;
   venue: string | null;
   tv: string | null;

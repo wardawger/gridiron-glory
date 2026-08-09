@@ -145,6 +145,7 @@ export function buildMockSeasonData(teams: CfbTeam[]): {
         away_score: awayScore,
         completed: true,
         start_date: startDate,
+        start_time_tbd: false,
         venue: `${home.name} Stadium`,
         tv,
       };

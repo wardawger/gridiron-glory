@@ -35,11 +35,11 @@ interface Props {
 const WEEKS = Array.from({ length: 16 }, (_, i) => i); // weeks 0–15
 
 // Format a startDate ISO string into readable date + time
-function formatGameDate(startDate: string | null | undefined): { date: string; time: string } {
+function formatGameDate(startDate: string | null | undefined, startTimeTbd: boolean): { date: string; time: string } {
   if (!startDate) return { date: 'TBD', time: 'TBD' };
   const d = new Date(startDate);
   const date = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-  const time = d.getMinutes() === 0 && d.getHours() === 0
+  const time = startTimeTbd
     ? 'TBD'
     : d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
   return { date, time };
@@ -327,7 +327,7 @@ function ScheduleModal({ team, gameData, captainPicks, userId, currentWeek, onCl
 
             const isCaptain = captainPicks.some(p => p.user_id === userId && p.week === w && p.team_id === team.team_id);
             const isCurrent = w === currentWeek;
-            const { date, time } = formatGameDate((game as any).start_date);
+            const { date, time } = formatGameDate((game as any).start_date, (game as any).start_time_tbd ?? false);
             const venue    = (game as any).venue    ?? null;
             const tv       = (game as any).tv       ?? null;
             const isHome   = (game as any).is_home  ?? true;
