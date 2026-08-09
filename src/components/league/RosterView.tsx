@@ -87,6 +87,7 @@ function GameScoreModal({ game, teamName, teamLogo, week, isCaptain, scoring, sp
   const oppLogo    = (game as any).opponent_logo ?? null;
   const myScore    = isHome ? game.home_score : game.away_score;
   const oppScore   = isHome ? game.away_score : game.home_score;
+  const gameDateInfo = formatGameDate(game.start_date, game.start_time_tbd);
 
   // Build individual scoring line items
   const lines: { label: string; pts: number; active: boolean; color: string }[] = [];
@@ -192,6 +193,29 @@ function GameScoreModal({ game, teamName, teamLogo, week, isCaptain, scoring, sp
         ) : (
           <div className="mx-5 mt-4 rounded-lg px-4 py-2 bg-turf-800/50 border border-turf-700">
             <p className="text-xs text-turf-400 text-center">Game not yet played</p>
+          </div>
+        )}
+
+        {/* Schedule details — date/time, venue, broadcast */}
+        {(game.start_date || game.venue || game.tv) && (
+          <div className="mx-5 mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-turf-400">
+            {game.start_date && (
+              <span className="flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
+                {gameDateInfo.date}
+                {gameDateInfo.time !== 'TBD' ? ` · ${gameDateInfo.time}` : ' · TBD'}
+              </span>
+            )}
+            {game.venue && (
+              <span className="flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 flex-shrink-0" /> {game.venue}
+              </span>
+            )}
+            {game.tv && (
+              <span className="flex items-center gap-1.5">
+                <Tv className="w-3.5 h-3.5 flex-shrink-0" /> {game.tv}
+              </span>
+            )}
           </div>
         )}
 
@@ -631,6 +655,7 @@ export function RosterView({
                 const canBeCaptain = (captainUses < 2 || isCaptain) && !captainKickedOff;
                 const oppLogo = (game as any)?.opponent_logo ?? null;
                 const isHome  = (game as any)?.is_home  ?? true;
+                const gameDateInfo = game ? formatGameDate(game.start_date, game.start_time_tbd) : null;
 
                 return (
                   <div
@@ -705,7 +730,8 @@ export function RosterView({
                               ) : (
                                 <span className="flex items-center gap-1 text-turf-500">
                                   <Minus className="w-3 h-3 flex-shrink-0" />
-                                  {isHome ? 'vs' : 'at'} {game.opponent} — TBD
+                                  {isHome ? 'vs' : 'at'} {game.opponent} — {gameDateInfo!.date}
+                                  {gameDateInfo!.time !== 'TBD' ? ` · ${gameDateInfo!.time}` : ''}
                                 </span>
                               )}
                             </div>
