@@ -192,6 +192,13 @@ export async function fetchSeasonData(teams: CfbTeam[]): Promise<GameData> {
     const away = teamMap.get(awayId);
     if (!home && !away) continue;   // neither team was drafted, skip
 
+    // venueMap/mediaMap are keyed by String(id) (built above) — stringify
+    // here too, since g.id arrives as a raw JSON number and a Map's key
+    // lookup doesn't coerce types (a number key never matches a string key).
+    const gameKey = String(g.id ?? g.gameId ?? '');
+    const venue   = venueMap.get(gameKey) ?? null;
+    const tv      = mediaMap.get(gameKey) ?? null;
+
     // Normalize field names — API returns both camelCase and snake_case
     const homeTeam       = g.home_team       ?? g.homeTeam       ?? '';
     const awayTeam       = g.away_team       ?? g.awayTeam       ?? '';
@@ -217,8 +224,6 @@ export async function fetchSeasonData(teams: CfbTeam[]): Promise<GameData> {
       const isG5Opp    = away ? away.is_g5 : !P4_CONFERENCES.has(awayConference);
       const oppLogo    = away?.logo ?? teamNameToLogo.get(awayTeam) ?? null;
       const oppId      = awayId;
-      const venue      = venueMap.get(g.id ?? g.gameId ?? '') ?? null;
-      const tv         = mediaMap.get(g.id ?? g.gameId ?? '') ?? null;
       gameData[home.id][week] = {
         week,
         opponent:        awayTeam,
@@ -243,8 +248,6 @@ export async function fetchSeasonData(teams: CfbTeam[]): Promise<GameData> {
       const isG5Opp    = home ? home.is_g5 : !P4_CONFERENCES.has(homeConference);
       const oppLogo    = home?.logo ?? teamNameToLogo.get(homeTeam) ?? null;
       const oppId      = homeId;
-      const venue      = venueMap.get(g.id ?? g.gameId ?? '') ?? null;
-      const tv         = mediaMap.get(g.id ?? g.gameId ?? '') ?? null;
       gameData[away.id][week] = {
         week,
         opponent:        homeTeam,
