@@ -85,12 +85,16 @@ export function Tooltip({ content, children, position = 'bottom', width = 'w-56'
       left = t.right + gap;
     }
 
-    // Arrow stays pointed at the trigger's center regardless of clamping.
-    const arrowLeft = t.left + t.width / 2 - left;
-    const arrowTop  = t.top + t.height / 2 - top;
-
     left = Math.min(Math.max(left, margin), window.innerWidth - c.width - margin);
     top  = Math.min(Math.max(top, margin), window.innerHeight - c.height - margin);
+
+    // Arrow offset is relative to the card's own edge, so it must be derived
+    // from the FINAL (possibly clamped) position — computing it from the
+    // pre-clamp position points it at where the card would have been, not
+    // where it actually landed. Also kept within the card's own bounds so a
+    // large clamp shift can't push the arrow off the card entirely.
+    const arrowLeft = Math.min(Math.max(t.left + t.width / 2 - left, 12), c.width - 12);
+    const arrowTop  = Math.min(Math.max(t.top + t.height / 2 - top, 12), c.height - 12);
 
     setCoords({ top, left, arrowLeft, arrowTop });
   }, [show, position]);
