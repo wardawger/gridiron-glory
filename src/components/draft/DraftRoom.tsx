@@ -7,6 +7,7 @@ import { getPickOwner, P4_CONFERENCES as P4_CONF_LIST, isP4Conference, confCateg
 import { Tooltip } from '../ui/Tooltip';
 import { TeamLogo } from '../ui/TeamLogo';
 import { TriviaCard } from '../ui/TriviaCard';
+import { WeatherBadge } from '../ui/WeatherBadge';
 import { fireDraftCompleteConfetti } from '../../lib/confetti';
 
 const WEEKS = Array.from({ length: 16 }, (_, i) => i); // weeks 0–15
@@ -877,6 +878,12 @@ function DraftTeamModal({ team, gameData, ratings, apRank, byeConflicts, isMyTur
                         {tv}
                       </span>
                     )}
+                    <WeatherBadge
+                      condition={(game as any).weather_condition ?? null}
+                      temp={(game as any).weather_temp ?? null}
+                      windSpeed={(game as any).wind_speed ?? null}
+                      indoors={(game as any).game_indoors ?? false}
+                    />
                   </div>
                 </div>
               </div>

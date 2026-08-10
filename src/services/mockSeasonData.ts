@@ -100,6 +100,7 @@ function seededRandom(seed: string): () => number {
 }
 
 const TV_NETWORKS = ['ESPN', 'ABC', 'FOX', 'CBS', 'ESPN2'];
+const MOCK_CONDITIONS = ['Clear', 'Cloudy', 'Light Rain', 'Fog', 'Fair', 'Overcast'];
 
 // Late-August/September Saturdays, roughly matching real week-0..3 dates.
 const WEEK_DATES: Record<number, string> = {
@@ -137,6 +138,8 @@ export function buildMockSeasonData(teams: CfbTeam[]): {
       const homeWon = homeScore > awayScore;
       const tv = TV_NETWORKS[Math.floor(rand() * TV_NETWORKS.length)];
       const startDate = WEEK_DATES[week] ?? WEEK_DATES[0];
+      const condition = MOCK_CONDITIONS[Math.floor(rand() * MOCK_CONDITIONS.length)];
+      const windSpeed = Math.round(rand() * 25);
 
       const base: Omit<GameResult, 'opponent' | 'opponent_id' | 'opponent_logo' | 'result' | 'is_g5_opponent' | 'is_home'> = {
         week,
@@ -148,6 +151,10 @@ export function buildMockSeasonData(teams: CfbTeam[]): {
         start_time_tbd: false,
         venue: `${home.name} Stadium`,
         tv,
+        weather_condition: condition,
+        weather_temp: 50 + Math.round(rand() * 40),
+        wind_speed: windSpeed,
+        game_indoors: false,
       };
 
       gameData[home.id][week] = {

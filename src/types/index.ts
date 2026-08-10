@@ -475,6 +475,12 @@ export interface GameResult {
   is_home: boolean;
   venue: string | null;
   tv: string | null;
+  // Weather — CFBD only has real data within roughly a week of kickoff, so
+  // all of these are null for most future games until forecasts populate.
+  weather_condition: string | null; // e.g. "Clear", "Light Rain", "Fog"
+  weather_temp: number | null;      // °F
+  wind_speed: number | null;        // mph
+  game_indoors: boolean;
 }
 
 export type GameData = Record<string, Record<number, GameResult>>;

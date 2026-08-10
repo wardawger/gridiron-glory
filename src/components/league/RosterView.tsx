@@ -7,6 +7,7 @@ import { rosterAtWeek } from '../../services/roster';
 import { useTabCrossfade } from '../../hooks/useCrossfade';
 import { Tooltip } from '../ui/Tooltip';
 import { TeamLogo } from '../ui/TeamLogo';
+import { WeatherBadge } from '../ui/WeatherBadge';
 import { Avatar } from '../ui/Avatar';
 import { TriviaCard } from '../ui/TriviaCard';
 
@@ -220,6 +221,12 @@ function GameScoreModal({ game, teamName, teamLogo, week, isCaptain, scoring, sp
                 <Tv className="w-3.5 h-3.5 flex-shrink-0" /> {game.tv}
               </span>
             )}
+            <WeatherBadge
+              condition={game.weather_condition}
+              temp={game.weather_temp}
+              windSpeed={game.wind_speed}
+              indoors={game.game_indoors}
+            />
           </div>
         )}
 

@@ -135,13 +135,17 @@ export async function fetchSeasonData(teams: CfbTeam[]): Promise<GameData> {
   // Build a name→logo map from the FBS teams list for opponent logo lookup
   const teamNameToLogo = new Map(teams.map(t => [t.name, t.logo]));
 
-  // Fetch games, media (TV), and venues in parallel
-  const [regGames, postGames, mediaRaw, venuesRaw] = await Promise.all([
+  // Fetch games, media (TV), venues, and weather in parallel
+  const [regGames, postGames, mediaRaw, venuesRaw, weatherRaw] = await Promise.all([
     fetchGames(year, 'regular'),
     fetchGames(year, 'postseason'),
     cfbdFetch('/games/media', { year, seasonType: 'regular' })
       .then(r => r.ok ? r.json() : []).catch(() => []),
     cfbdFetch('/venues', {})
+      .then(r => r.ok ? r.json() : []).catch(() => []),
+    // CFBD only has real forecasts within roughly a week of kickoff — most
+    // future games simply won't have an entry here yet, which is expected.
+    cfbdFetch('/games/weather', { year, seasonType: 'regular' })
       .then(r => r.ok ? r.json() : []).catch(() => []),
   ]);
 
@@ -152,6 +156,21 @@ export async function fetchSeasonData(teams: CfbTeam[]): Promise<GameData> {
       const id = String(m.id ?? m.gameId ?? '');
       const outlet = m.outlet ?? m.network ?? m.mediaType ?? null;
       if (id && outlet) mediaMap.set(id, outlet);
+    }
+  }
+
+  // Build gameId → weather map
+  const weatherMap = new Map<string, { condition: string | null; temp: number | null; windSpeed: number | null; indoors: boolean }>();
+  if (Array.isArray(weatherRaw)) {
+    for (const w of weatherRaw) {
+      const id = String(w.id ?? w.gameId ?? '');
+      if (!id) continue;
+      weatherMap.set(id, {
+        condition: w.weatherCondition ?? null,
+        temp: typeof w.temperature === 'number' ? w.temperature : null,
+        windSpeed: typeof w.windSpeed === 'number' ? w.windSpeed : null,
+        indoors: w.gameIndoors === true,
+      });
     }
   }
 
@@ -198,6 +217,7 @@ export async function fetchSeasonData(teams: CfbTeam[]): Promise<GameData> {
     const gameKey = String(g.id ?? g.gameId ?? '');
     const venue   = venueMap.get(gameKey) ?? null;
     const tv      = mediaMap.get(gameKey) ?? null;
+    const weather = weatherMap.get(gameKey) ?? null;
 
     // Normalize field names — API returns both camelCase and snake_case
     const homeTeam       = g.home_team       ?? g.homeTeam       ?? '';
@@ -240,6 +260,10 @@ export async function fetchSeasonData(teams: CfbTeam[]): Promise<GameData> {
         is_home:         true,
         venue,
         tv,
+        weather_condition: weather?.condition ?? null,
+        weather_temp:       weather?.temp ?? null,
+        wind_speed:         weather?.windSpeed ?? null,
+        game_indoors:       weather?.indoors ?? false,
       };
     }
 
@@ -264,6 +288,10 @@ export async function fetchSeasonData(teams: CfbTeam[]): Promise<GameData> {
         is_home:         false,
         venue,
         tv,
+        weather_condition: weather?.condition ?? null,
+        weather_temp:       weather?.temp ?? null,
+        wind_speed:         weather?.windSpeed ?? null,
+        game_indoors:       weather?.indoors ?? false,
       };
     }
   }

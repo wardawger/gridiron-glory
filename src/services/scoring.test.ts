@@ -22,6 +22,10 @@ function makeGame(overrides: Partial<GameResult> = {}): GameResult {
     is_home: true,
     venue: null,
     tv: null,
+    weather_condition: null,
+    weather_temp: null,
+    wind_speed: null,
+    game_indoors: false,
     ...overrides,
   };
 }
