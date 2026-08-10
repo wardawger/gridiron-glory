@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { X } from 'lucide-react';
 
 interface TooltipProps {
@@ -27,6 +27,8 @@ interface TooltipProps {
 export function Tooltip({ content, children, position = 'bottom', width = 'w-56', fullWidth = false, clickToOpen = false }: TooltipProps) {
   const [show, setShow] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [clampPx, setClampPx] = useState(0);
 
   // Hide on scroll or click outside
   useEffect(() => {
@@ -39,6 +41,25 @@ export function Tooltip({ content, children, position = 'bottom', width = 'w-56'
       window.removeEventListener('click', hide);
     };
   }, [show]);
+
+  // Keep the card on-screen — top/bottom center under the trigger by
+  // default, which pushes it straight off the viewport for any trigger
+  // near the left/right edge (e.g. the first column of a table). Measure
+  // after layout and nudge it back in before paint, so there's no flash.
+  useLayoutEffect(() => {
+    if (!show || (position !== 'top' && position !== 'bottom')) { setClampPx(0); return; }
+    const el = cardRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const margin = 8;
+    if (rect.left < margin) {
+      setClampPx(margin - rect.left);
+    } else if (rect.right > window.innerWidth - margin) {
+      setClampPx(window.innerWidth - margin - rect.right);
+    } else {
+      setClampPx(0);
+    }
+  }, [show, position]);
 
   const positionClasses = {
     bottom: 'top-full mt-2 left-1/2 -translate-x-1/2',
@@ -68,11 +89,18 @@ export function Tooltip({ content, children, position = 'bottom', width = 'w-56'
     >
       {children}
       {show && (
-        <div className={`absolute ${positionClasses[position]} z-50 ${width} pointer-events-none`}>
+        <div
+          className={`absolute ${positionClasses[position]} z-50 ${width} pointer-events-none`}
+          style={
+            clampPx !== 0 && (position === 'top' || position === 'bottom')
+              ? { transform: `translateX(calc(-50% + ${clampPx}px))` }
+              : undefined
+          }
+        >
           {/* Arrow */}
           <div className={`absolute w-2 h-2 bg-turf-800 ${arrowClasses[position]}`} />
           {/* Card */}
-          <div className="relative bg-turf-800 border border-turf-600 rounded-lg px-3 py-2.5 shadow-xl shadow-black/50">
+          <div ref={cardRef} className="relative bg-turf-800 border border-turf-600 rounded-lg px-3 py-2.5 shadow-xl shadow-black/50">
             {/* Close button — mobile only, since touch has no hover-to-dismiss */}
             <button
               onClick={e => { e.stopPropagation(); setShow(false); }}
