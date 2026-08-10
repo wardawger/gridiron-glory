@@ -47,15 +47,6 @@ export function AuthPage({ auth }: Props) {
       <div className="absolute inset-0 yard-lines pointer-events-none" />
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-field-500/5 rounded-full blur-3xl pointer-events-none" />
 
-      {/* Logo mark */}
-      <div className="mb-8 text-center animate-fade-in">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-field-500 mb-4 shadow-lg shadow-field-500/20">
-          <span className="font-display text-turf-950 text-4xl leading-none">G</span>
-        </div>
-        <h1 className="font-display text-5xl tracking-wider text-white">GRIDIRON GLORY</h1>
-        <p className="text-turf-400 mt-1 text-sm">College Football Fantasy League</p>
-      </div>
-
       {/* Card */}
       <div className="w-full max-w-sm card p-6 animate-slide-up">
         {mode !== 'forgot' && (
@@ -159,6 +150,17 @@ export function AuthPage({ auth }: Props) {
             </button>
           )}
         </form>
+      </div>
+
+      {/* Brand animation — opens and closes on the same logomark/wordmark
+          lockup, so it also works as the page's brand moment on its own. */}
+      <div className="w-full max-w-2xl mt-8 rounded-2xl overflow-hidden animate-fade-in" style={{ aspectRatio: '16 / 9' }}>
+        <iframe
+          src="/brand-animation/gridiron-glory-animation.dc.html"
+          title="Gridiron Glory"
+          className="w-full h-full border-0 block"
+          loading="lazy"
+        />
       </div>
 
       {/* New-user summary — condensed version of the full guide, with a link
