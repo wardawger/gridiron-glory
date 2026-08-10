@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
 interface TooltipProps {
@@ -15,9 +16,20 @@ interface TooltipProps {
   clickToOpen?: boolean;
 }
 
+interface Coords { top: number; left: number; arrowLeft: number; arrowTop: number; }
+
 /**
  * Stylized tooltip matching the Roster Analytics metric tooltips.
  * Wraps any child element — on hover shows a dark card with arrow.
+ *
+ * The floating card renders through a portal into document.body rather
+ * than as a normal absolutely-positioned child. Several call sites live
+ * inside `overflow-hidden`/`overflow-x-auto` table wrappers (e.g. the
+ * Roster Analytics table) — CSS overflow clips any descendant that pokes
+ * outside that ancestor's box regardless of its own position, so a plain
+ * absolute child gets cut off there no matter how its offsets are tuned.
+ * Escaping via a portal + real viewport pixel coordinates is the only fix
+ * that isn't a fragile per-page patch.
  *
  * Usage:
  *   <Tooltip content="Explanation text here">
@@ -28,7 +40,7 @@ export function Tooltip({ content, children, position = 'bottom', width = 'w-56'
   const [show, setShow] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
-  const [clampPx, setClampPx] = useState(0);
+  const [coords, setCoords] = useState<Coords | null>(null);
 
   // Hide on scroll or click outside
   useEffect(() => {
@@ -42,38 +54,46 @@ export function Tooltip({ content, children, position = 'bottom', width = 'w-56'
     };
   }, [show]);
 
-  // Keep the card on-screen — top/bottom center under the trigger by
-  // default, which pushes it straight off the viewport for any trigger
-  // near the left/right edge (e.g. the first column of a table). Measure
-  // after layout and nudge it back in before paint, so there's no flash.
+  // Measure the trigger and the (already-mounted, off-screen on this first
+  // pass) card, then compute real viewport coordinates clamped within an
+  // 8px margin. Runs before paint, so the off-screen starting position
+  // never actually flashes on screen.
   useLayoutEffect(() => {
-    if (!show || (position !== 'top' && position !== 'bottom')) { setClampPx(0); return; }
-    const el = cardRef.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
+    if (!show) { setCoords(null); return; }
+    const trigger = ref.current;
+    const card = cardRef.current;
+    if (!trigger || !card) return;
+
+    const t = trigger.getBoundingClientRect();
+    const c = card.getBoundingClientRect();
+    const gap = 8;
     const margin = 8;
-    if (rect.left < margin) {
-      setClampPx(margin - rect.left);
-    } else if (rect.right > window.innerWidth - margin) {
-      setClampPx(window.innerWidth - margin - rect.right);
+
+    let top = 0;
+    let left = 0;
+    if (position === 'bottom') {
+      top  = t.bottom + gap;
+      left = t.left + t.width / 2 - c.width / 2;
+    } else if (position === 'top') {
+      top  = t.top - gap - c.height;
+      left = t.left + t.width / 2 - c.width / 2;
+    } else if (position === 'left') {
+      top  = t.top + t.height / 2 - c.height / 2;
+      left = t.left - gap - c.width;
     } else {
-      setClampPx(0);
+      top  = t.top + t.height / 2 - c.height / 2;
+      left = t.right + gap;
     }
+
+    // Arrow stays pointed at the trigger's center regardless of clamping.
+    const arrowLeft = t.left + t.width / 2 - left;
+    const arrowTop  = t.top + t.height / 2 - top;
+
+    left = Math.min(Math.max(left, margin), window.innerWidth - c.width - margin);
+    top  = Math.min(Math.max(top, margin), window.innerHeight - c.height - margin);
+
+    setCoords({ top, left, arrowLeft, arrowTop });
   }, [show, position]);
-
-  const positionClasses = {
-    bottom: 'top-full mt-2 left-1/2 -translate-x-1/2',
-    top:    'bottom-full mb-2 left-1/2 -translate-x-1/2',
-    left:   'right-full mr-2 top-1/2 -translate-y-1/2',
-    right:  'left-full ml-2 top-1/2 -translate-y-1/2',
-  };
-
-  const arrowClasses = {
-    bottom: 'bottom-full left-1/2 -translate-x-1/2 mb-[-1px] border-l border-t border-turf-600 rotate-45',
-    top:    'top-full left-1/2 -translate-x-1/2 mt-[-1px] border-r border-b border-turf-600 rotate-45',
-    left:   'left-full top-1/2 -translate-y-1/2 ml-[-1px] border-r border-t border-turf-600 rotate-45',
-    right:  'right-full top-1/2 -translate-y-1/2 mr-[-1px] border-l border-b border-turf-600 rotate-45',
-  };
 
   return (
     <div
@@ -88,17 +108,28 @@ export function Tooltip({ content, children, position = 'bottom', width = 'w-56'
       onClick={clickToOpen ? e => { e.stopPropagation(); setShow(true); } : undefined}
     >
       {children}
-      {show && (
+      {show && createPortal(
         <div
-          className={`absolute ${positionClasses[position]} z-50 ${width} pointer-events-none`}
-          style={
-            clampPx !== 0 && (position === 'top' || position === 'bottom')
-              ? { transform: `translateX(calc(-50% + ${clampPx}px))` }
-              : undefined
-          }
+          className={`fixed z-50 ${width} pointer-events-none`}
+          style={{ top: coords?.top ?? -9999, left: coords?.left ?? -9999 }}
         >
           {/* Arrow */}
-          <div className={`absolute w-2 h-2 bg-turf-800 ${arrowClasses[position]}`} />
+          {coords && (position === 'top' || position === 'bottom') && (
+            <div
+              className={`absolute w-2 h-2 bg-turf-800 border-turf-600 rotate-45 ${
+                position === 'bottom' ? 'border-l border-t' : 'border-r border-b'
+              }`}
+              style={{ left: coords.arrowLeft - 4, ...(position === 'bottom' ? { top: -4 } : { bottom: -4 }) }}
+            />
+          )}
+          {coords && (position === 'left' || position === 'right') && (
+            <div
+              className={`absolute w-2 h-2 bg-turf-800 border-turf-600 rotate-45 ${
+                position === 'left' ? 'border-r border-t' : 'border-l border-b'
+              }`}
+              style={{ top: coords.arrowTop - 4, ...(position === 'left' ? { right: -4 } : { left: -4 }) }}
+            />
+          )}
           {/* Card */}
           <div ref={cardRef} className="relative bg-turf-800 border border-turf-600 rounded-lg px-3 py-2.5 shadow-xl shadow-black/50">
             {/* Close button — mobile only, since touch has no hover-to-dismiss */}
@@ -111,7 +142,8 @@ export function Tooltip({ content, children, position = 'bottom', width = 'w-56'
             </button>
             <p className="text-xs text-turf-200 leading-relaxed pr-4 sm:pr-0">{content}</p>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
