@@ -77,7 +77,7 @@ export function Header({
       ? [{ to: '/stat-bonuses', label: 'Stat Bonuses', icon: Award, description: "Who's earning bonus points" }]
       : []),
     ...(league?.scoring.free_agency_enabled
-      ? [{ to: '/free-agency', label: 'Free Agency', icon: ArrowLeftRight, description: 'Add and drop teams', badge: unseenWaiverCount }]
+      ? [{ to: '/free-agency', label: 'Portal', icon: ArrowLeftRight, description: 'Add and drop teams', badge: unseenWaiverCount }]
       : []),
     { to: '/league-settings', label: 'League Settings', icon: ClipboardList, description: 'How scoring works' },
     { to: '/league-history', label: 'Trophy Case', icon: Archive, description: 'Achievements and past seasons' },

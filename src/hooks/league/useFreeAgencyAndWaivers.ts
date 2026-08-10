@@ -71,7 +71,7 @@ export function useFreeAgencyAndWaivers(
     if (!league || !user) return { error: 'Not ready' };
 
     const settings = normalizeScoring(league.scoring);
-    if (!settings.free_agency_enabled) return { error: 'Free agency is not enabled for this league' };
+    if (!settings.free_agency_enabled) return { error: 'The portal is not enabled for this league' };
     if (settings.waiver_enabled) return { error: 'Waivers are enabled for this league — submit a claim instead' };
 
     const week = league.current_week;
@@ -134,7 +134,7 @@ export function useFreeAgencyAndWaivers(
     if (!league || !user) return { error: 'Not ready' };
 
     const settings = normalizeScoring(league.scoring);
-    if (!settings.free_agency_enabled) return { error: 'Free agency is not enabled for this league' };
+    if (!settings.free_agency_enabled) return { error: 'The portal is not enabled for this league' };
     if (!settings.waiver_enabled) return { error: 'Waivers are not enabled for this league' };
 
     const week = league.current_week;

@@ -217,7 +217,7 @@ export function MembersTab({
               <p className="font-medium text-white">End Season</p>
               <p className="text-xs text-turf-500 mt-0.5">
                 Once the national championship game is final, archive this season's standings
-                to Trophy Case and reset the league — draft, free agency, captain picks,
+                to Trophy Case and reset the league — draft, portal, captain picks,
                 bonuses, and spread picks — so it's ready for a new draft. This cannot be undone.
               </p>
             </div>
@@ -240,7 +240,7 @@ export function MembersTab({
             <div>
               <p className="font-medium text-white">Reset Draft</p>
               <p className="text-xs text-turf-500 mt-0.5">
-                Deletes all draft picks and free agency swaps, and returns the league to
+                Deletes all draft picks and portal swaps, and returns the league to
                 pre-draft status. Captain picks and bonuses are not affected.
                 This cannot be undone.
               </p>
@@ -319,7 +319,7 @@ export function MembersTab({
 
             <p className="text-sm text-turf-300">
               This archives the standings above to <span className="text-white font-medium">Trophy Case</span> and
-              resets <span className="text-white font-medium">{league.name}</span> — draft picks, free agency, captain
+              resets <span className="text-white font-medium">{league.name}</span> — draft picks, portal, captain
               picks, bonuses, and spread picks — for a new season.{' '}
               <span className="text-red-300 font-medium">There is no way to recover the current data afterward.</span>
             </p>
@@ -365,7 +365,7 @@ export function MembersTab({
               <h3 className="font-display text-xl text-white tracking-wide">Reset Draft?</h3>
             </div>
             <p className="text-sm text-turf-300">
-              This permanently deletes every draft pick and free agency swap in <span className="text-white font-medium">{league.name}</span> and
+              This permanently deletes every draft pick and portal swap in <span className="text-white font-medium">{league.name}</span> and
               returns the league to pre-draft status. Captain picks and bonuses are not affected.{' '}
               <span className="text-red-300 font-medium">There is no way to recover them.</span>
             </p>

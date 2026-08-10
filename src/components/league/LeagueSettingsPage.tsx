@@ -127,7 +127,7 @@ export function LeagueSettingsPage({ league, members }: Props) {
         <div className="card p-5 space-y-3">
           <div className="flex items-center gap-2">
             <ArrowLeftRight className="w-4 h-4 text-field-400" />
-            <h3 className="font-medium text-white text-sm">Free Agency</h3>
+            <h3 className="font-medium text-white text-sm">Portal</h3>
             <span className="badge-green text-xs ml-auto">Enabled</span>
           </div>
           <p className="text-xs text-turf-500">
@@ -155,7 +155,7 @@ export function LeagueSettingsPage({ league, members }: Props) {
             <span className="badge-green text-xs ml-auto">Enabled</span>
           </div>
           <p className="text-xs text-turf-500">
-            Free agency drops/adds don't take effect immediately — they queue as a claim and resolve on the next
+            Portal drops/adds don't take effect immediately — they queue as a claim and resolve on the next
             processing day. If more than one manager claims the same team, priority goes to whoever has the{' '}
             {PRIORITY_METRIC_LABELS[scoring.waiver_priority_metric].toLowerCase()}.
           </p>

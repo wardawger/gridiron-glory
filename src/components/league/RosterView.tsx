@@ -635,7 +635,7 @@ export function RosterView({
                     }`}
                     title={
                       ws.fa_points !== 0
-                        ? `Week ${ws.week}: ${ws.points} pts (includes ${ws.fa_points} free agency penalty)`
+                        ? `Week ${ws.week}: ${ws.points} pts (includes ${ws.fa_points} portal penalty)`
                         : `Week ${ws.week}: ${ws.points} pts`
                     }
                   >

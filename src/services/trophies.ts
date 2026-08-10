@@ -11,7 +11,7 @@ import { rosterAtWeek } from './roster';
 export const TROPHY_META: Record<TrophyCategoryId, { label: string; description: string }> = {
   undefeated_team:            { label: 'Undefeated',          description: 'Drafted a team that finished with zero losses' },
   beat_spread:                 { label: 'Beat the Spread',     description: 'Covered the spread on a pick' },
-  used_free_agency:            { label: 'Free Agent',          description: 'Made a free agency swap' },
+  used_free_agency:            { label: 'Portal Pickup',       description: 'Made a move through the portal' },
   heisman_winner:               { label: 'Heisman',             description: 'Drafted the Heisman winner' },
   p4_conf_champion:            { label: 'Conference Champion', description: 'Drafted Power 4 conference champions' },
   negative_week:                { label: 'Underwater',          description: 'Posted a negative-point week' },

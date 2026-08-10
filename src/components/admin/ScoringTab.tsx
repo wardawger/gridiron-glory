@@ -62,7 +62,7 @@ export function ScoringTab({ league, teams, onUpdateScoring }: Props) {
       {/* Roster conference limits */}
       <div className="card p-5 space-y-4">
         <h3 className="font-medium text-white text-sm">Roster Conference Limits</h3>
-        <p className="text-xs text-turf-400">Applies during the draft and to free agency/waiver moves.</p>
+        <p className="text-xs text-turf-400">Applies during the draft and to portal/waiver moves.</p>
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="label">P4 Min (per conference)</label>
@@ -114,7 +114,7 @@ export function ScoringTab({ league, teams, onUpdateScoring }: Props) {
       <div className="card p-5 space-y-3">
         <h3 className="font-medium text-white text-sm">Excluded Conferences</h3>
         <p className="text-xs text-turf-400">
-          Teams from checked conferences can't be drafted or picked up via free agency/waivers.
+          Teams from checked conferences can't be drafted or picked up via the portal/waivers.
         </p>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           {allConferences.map(conference => {
@@ -461,7 +461,7 @@ export function ScoringTab({ league, teams, onUpdateScoring }: Props) {
       <div className="card p-5 space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="font-medium text-white text-sm">Free Agency</h3>
+            <h3 className="font-medium text-white text-sm">Portal</h3>
             <p className="text-xs text-turf-400 mt-0.5">Let managers drop a rostered team and add an available one</p>
           </div>
           <label className="flex items-center gap-2 cursor-pointer">

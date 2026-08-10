@@ -198,7 +198,7 @@ export function FreeAgencyPage({
     return (
       <div className="card p-12 text-center text-turf-500">
         <ArrowLeftRight className="w-8 h-8 mx-auto mb-3 text-turf-700" />
-        <p>Free agency is not enabled for this league.</p>
+        <p>The portal is not enabled for this league.</p>
         <p className="text-xs text-turf-500 mt-1">Ask your commissioner to turn it on in Admin → Scoring.</p>
       </div>
     );
@@ -214,7 +214,7 @@ export function FreeAgencyPage({
               <ArrowLeftRight className="w-5 h-5 text-turf-950" />
             </div>
             <div>
-              <h1 className="font-display text-2xl tracking-wide text-white">Free Agency</h1>
+              <h1 className="font-display text-2xl tracking-wide text-white">Portal</h1>
               <p className="text-turf-500 text-sm">Drop a team, pick up an available one</p>
             </div>
           </div>
@@ -420,7 +420,7 @@ export function FreeAgencyPage({
           <p className="text-xs text-turf-500 uppercase tracking-wide font-medium">League Activity</p>
         </div>
         {activityLog.length === 0 ? (
-          <div className="card p-8 text-center text-turf-500 text-sm">No free agency moves yet</div>
+          <div className="card p-8 text-center text-turf-500 text-sm">No portal moves yet</div>
         ) : (
           <div className="card divide-y divide-turf-800/60 overflow-hidden">
             {activityLog.map(m => (
