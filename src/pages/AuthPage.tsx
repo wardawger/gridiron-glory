@@ -160,6 +160,25 @@ export function AuthPage({ auth }: Props) {
           )}
         </form>
       </div>
+
+      {/* New-user summary — condensed version of the full guide, with a link
+          to it, so someone can learn what the app is before creating an
+          account or joining a league. */}
+      <div className="w-full max-w-sm mt-6 text-center animate-fade-in">
+        <p className="text-turf-400 text-sm leading-relaxed">
+          Draft real college football teams with your friends, then score points every week based on how those
+          teams actually perform — wins, ranked upsets, captain picks, and more, all the way through the National
+          Championship.
+        </p>
+        <a
+          href="/gridiron-glory-guide.html"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-block mt-2 text-sm text-field-400 hover:text-field-300 transition-colors font-medium"
+        >
+          Read the full guide →
+        </a>
+      </div>
     </div>
   );
 }
