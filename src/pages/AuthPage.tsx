@@ -42,13 +42,25 @@ export function AuthPage({ auth }: Props) {
   };
 
   return (
-    <div className="min-h-dvh flex flex-col items-center justify-center p-4 relative overflow-hidden">
+    <div className="min-h-dvh flex items-center justify-center p-4 relative overflow-hidden">
       {/* Background decoration */}
       <div className="absolute inset-0 yard-lines pointer-events-none" />
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-field-500/5 rounded-full blur-3xl pointer-events-none" />
 
+      <div className="relative w-full max-w-7xl flex flex-col lg:flex-row items-center lg:items-start justify-center gap-6">
+      {/* Sign-in column — 1/3 on large screens */}
+      <div className="w-full max-w-sm lg:w-1/3 lg:max-w-none flex-shrink-0">
+      {/* Logo mark */}
+      <div className="mb-6 text-center animate-fade-in">
+        <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-field-500 mb-3 shadow-lg shadow-field-500/20">
+          <span className="font-display text-turf-950 text-3xl leading-none">G</span>
+        </div>
+        <h1 className="font-display text-4xl tracking-wider text-white">GRIDIRON GLORY</h1>
+        <p className="text-turf-400 mt-1 text-sm">College Football Fantasy League</p>
+      </div>
+
       {/* Card */}
-      <div className="w-full max-w-sm card p-6 animate-slide-up">
+      <div className="card p-6 animate-slide-up">
         {mode !== 'forgot' && (
           <div className="flex gap-1 mb-6 bg-turf-800 p-1 rounded-lg">
             {(['login', 'signup'] as Mode[]).map(m => (
@@ -152,21 +164,10 @@ export function AuthPage({ auth }: Props) {
         </form>
       </div>
 
-      {/* Brand animation — opens and closes on the same logomark/wordmark
-          lockup, so it also works as the page's brand moment on its own. */}
-      <div className="w-full max-w-2xl mt-8 rounded-2xl overflow-hidden animate-fade-in" style={{ aspectRatio: '16 / 9' }}>
-        <iframe
-          src="/brand-animation/gridiron-glory-animation.dc.html"
-          title="Gridiron Glory"
-          className="w-full h-full border-0 block"
-          loading="lazy"
-        />
-      </div>
-
       {/* New-user summary — condensed version of the full guide, with a link
           to it, so someone can learn what the app is before creating an
           account or joining a league. */}
-      <div className="w-full max-w-sm mt-6 text-center animate-fade-in">
+      <div className="mt-6 text-center animate-fade-in">
         <p className="text-turf-400 text-sm leading-relaxed">
           Draft real college football teams with your friends, then score points every week based on how those
           teams actually perform — wins, ranked upsets, captain picks, and more, all the way through the National
@@ -180,6 +181,21 @@ export function AuthPage({ auth }: Props) {
         >
           Read the full guide →
         </a>
+      </div>
+      </div>
+
+      {/* Brand animation — 2/3 of the row on large screens, in its own card
+          to match the rest of the app's containers. Opens and closes on the
+          same logomark/wordmark lockup, so it also works as the page's
+          brand moment on its own. */}
+      <div className="w-full lg:w-2/3 card p-0 overflow-hidden animate-fade-in" style={{ aspectRatio: '16 / 9' }}>
+        <iframe
+          src="/brand-animation/gridiron-glory-animation.dc.html"
+          title="Gridiron Glory"
+          className="w-full h-full border-0 block"
+          loading="lazy"
+        />
+      </div>
       </div>
     </div>
   );
