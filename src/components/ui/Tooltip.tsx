@@ -16,7 +16,8 @@ interface TooltipProps {
   clickToOpen?: boolean;
 }
 
-interface Coords { top: number; left: number; arrowLeft: number; arrowTop: number; }
+type Side = 'top' | 'bottom' | 'left' | 'right';
+interface Coords { top: number; left: number; arrowLeft: number; arrowTop: number; side: Side; }
 
 /**
  * Stylized tooltip matching the Roster Analytics metric tooltips.
@@ -69,15 +70,35 @@ export function Tooltip({ content, children, position = 'bottom', width = 'w-56'
     const gap = 8;
     const margin = 8;
 
+    // Flip to the opposite side when the preferred one doesn't actually
+    // fit — otherwise the later clamp shoves the card back on-screen while
+    // it's still visually "attached" to the wrong edge, leaving the arrow
+    // pointing at empty space instead of the trigger (e.g. a trigger near
+    // the bottom of a tall table with position="bottom" and no room below).
+    let side: Side = position;
+    if (position === 'bottom' && t.bottom + gap + c.height > window.innerHeight - margin
+        && t.top - gap - c.height >= margin) {
+      side = 'top';
+    } else if (position === 'top' && t.top - gap - c.height < margin
+        && t.bottom + gap + c.height <= window.innerHeight - margin) {
+      side = 'bottom';
+    } else if (position === 'right' && t.right + gap + c.width > window.innerWidth - margin
+        && t.left - gap - c.width >= margin) {
+      side = 'left';
+    } else if (position === 'left' && t.left - gap - c.width < margin
+        && t.right + gap + c.width <= window.innerWidth - margin) {
+      side = 'right';
+    }
+
     let top = 0;
     let left = 0;
-    if (position === 'bottom') {
+    if (side === 'bottom') {
       top  = t.bottom + gap;
       left = t.left + t.width / 2 - c.width / 2;
-    } else if (position === 'top') {
+    } else if (side === 'top') {
       top  = t.top - gap - c.height;
       left = t.left + t.width / 2 - c.width / 2;
-    } else if (position === 'left') {
+    } else if (side === 'left') {
       top  = t.top + t.height / 2 - c.height / 2;
       left = t.left - gap - c.width;
     } else {
@@ -96,7 +117,7 @@ export function Tooltip({ content, children, position = 'bottom', width = 'w-56'
     const arrowLeft = Math.min(Math.max(t.left + t.width / 2 - left, 12), c.width - 12);
     const arrowTop  = Math.min(Math.max(t.top + t.height / 2 - top, 12), c.height - 12);
 
-    setCoords({ top, left, arrowLeft, arrowTop });
+    setCoords({ top, left, arrowLeft, arrowTop, side });
   }, [show, position]);
 
   return (
@@ -117,21 +138,22 @@ export function Tooltip({ content, children, position = 'bottom', width = 'w-56'
           className={`fixed z-50 ${width} pointer-events-none`}
           style={{ top: coords?.top ?? -9999, left: coords?.left ?? -9999 }}
         >
-          {/* Arrow */}
-          {coords && (position === 'top' || position === 'bottom') && (
+          {/* Arrow — anchored to the card's resolved side, not the requested
+              position prop, since flipping (above) can make them differ */}
+          {coords && (coords.side === 'top' || coords.side === 'bottom') && (
             <div
               className={`absolute w-2 h-2 bg-turf-800 border-turf-600 rotate-45 ${
-                position === 'bottom' ? 'border-l border-t' : 'border-r border-b'
+                coords.side === 'bottom' ? 'border-l border-t' : 'border-r border-b'
               }`}
-              style={{ left: coords.arrowLeft - 4, ...(position === 'bottom' ? { top: -4 } : { bottom: -4 }) }}
+              style={{ left: coords.arrowLeft - 4, ...(coords.side === 'bottom' ? { top: -4 } : { bottom: -4 }) }}
             />
           )}
-          {coords && (position === 'left' || position === 'right') && (
+          {coords && (coords.side === 'left' || coords.side === 'right') && (
             <div
               className={`absolute w-2 h-2 bg-turf-800 border-turf-600 rotate-45 ${
-                position === 'left' ? 'border-r border-t' : 'border-l border-b'
+                coords.side === 'left' ? 'border-r border-t' : 'border-l border-b'
               }`}
-              style={{ top: coords.arrowTop - 4, ...(position === 'left' ? { right: -4 } : { left: -4 }) }}
+              style={{ top: coords.arrowTop - 4, ...(coords.side === 'left' ? { right: -4 } : { left: -4 }) }}
             />
           )}
           {/* Card */}
