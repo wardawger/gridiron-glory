@@ -70,6 +70,30 @@
     @apply bg-turf-800 border border-turf-700 rounded-lg;
   }
 
+  /* "Liquid glass" card — a CSS-only approximation (backdrop blur +
+     saturation, translucent fill, a bright top-edge highlight standing in
+     for specular reflection) of the frosted-glass material popularized by
+     libraries like OpenGlass UI, without pulling in a component library or
+     its WebGL renderer. Deliberately a separate class from `.card` — it
+     only makes sense over real background content (like the login page's
+     photo backdrop), not the solid-color surfaces `.card` sits on
+     everywhere else in the app. */
+  .glass-card {
+    @apply rounded-xl border border-white/15;
+    background: linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.06),
+      rgba(255, 255, 255, 0.015) 40%,
+      rgba(13, 17, 23, 0.18)
+    );
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.25),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+      0 20px 50px -12px rgba(0, 0, 0, 0.6);
+  }
+
   /* ── Inputs ──────────────────────────────── */
   .input {
     @apply w-full bg-turf-800 border border-turf-600 rounded-lg px-3 py-2

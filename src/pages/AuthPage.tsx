@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Loader2, Play, X } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import posthog from 'posthog-js';
 import type { useAuth } from '../hooks/useAuth';
 import { PasswordInput } from '../components/ui/PasswordInput';
@@ -70,61 +70,24 @@ function AppSummary() {
   );
 }
 
-// Poster + click-to-play, rather than autoplay — the video never loads its
-// React/Babel/unpkg runtime until someone actually asks to see it, on any
-// device. Opens a modal at a size much closer to the animation's native
-// 1920x1080 canvas than the card it lives in could ever offer at 2/3 of a
-// typical viewport width.
-function BrandVideoCard({ onPlay }: { onPlay: () => void }) {
+// Same glass-card treatment as the sign-in card — the deck's own background
+// is transparent (see gridiron-glory-slideshow.dc.html), so this wrapper's
+// blurred/tinted backdrop paints behind it and shows through. Both panels
+// share the same grid row with items-start, so their top edges already
+// align exactly; the glass border now makes that alignment visible instead
+// of the borderless iframe blending invisibly into the photo. scrolling="no"
+// suppresses any iframe scrollbar regardless of the framed document's own
+// overflow.
+function BrandSlidesPanel() {
   return (
-    <div className="card p-0 overflow-hidden animate-fade-in" style={{ aspectRatio: '16 / 9' }}>
-      <button
-        type="button"
-        onClick={onPlay}
-        aria-label="Play the Gridiron Glory brand video"
-        className="group relative block w-full h-full"
-      >
-        <img src="/brand-animation/poster.webp" alt="" className="w-full h-full object-cover" />
-        <span className="absolute inset-0 flex items-center justify-center bg-black/35 group-hover:bg-black/45 transition-colors">
-          <span className="flex items-center justify-center w-16 h-16 rounded-full bg-white/95 group-hover:bg-white shadow-lg shadow-black/40 transition-colors group-hover:scale-105 duration-200">
-            <Play className="w-6 h-6 text-turf-950 ml-1" fill="currentColor" />
-          </span>
-        </span>
-      </button>
-    </div>
-  );
-}
-
-function BrandVideoModal({ onClose }: { onClose: () => void }) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
-
-  return (
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-fade-in"
-      style={{ backgroundColor: 'rgba(0,0,0,0.85)' }}
-      onClick={onClose}
-    >
-      <div className="relative w-full" style={{ maxWidth: 'min(92vw, 1600px)' }} onClick={e => e.stopPropagation()}>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close"
-          className="absolute -top-11 right-0 rounded-lg border border-turf-700 bg-turf-900 p-2 text-turf-300 hover:border-turf-500 hover:text-white transition-colors"
-        >
-          <X className="w-4 h-4" />
-        </button>
-        <div className="rounded-xl overflow-hidden shadow-2xl shadow-black/60" style={{ aspectRatio: '16 / 9' }}>
-          <iframe
-            src="/brand-animation/gridiron-glory-animation.dc.html"
-            title="Gridiron Glory brand video — draft, captain, and Saturday scoring, plus a season overview"
-            className="w-full h-full border-0 block"
-          />
-        </div>
-      </div>
+    <div className="glass-card p-0 overflow-hidden animate-fade-in" style={{ aspectRatio: '16 / 9' }}>
+      <iframe
+        src="/brand-animation/gridiron-glory-slideshow.dc.html"
+        title="Gridiron Glory brand slide deck — draft, captain, and Saturday scoring, plus a season overview"
+        scrolling="no"
+        className="w-full h-full block border-0"
+        style={{ background: 'transparent' }}
+      />
     </div>
   );
 }
@@ -136,7 +99,6 @@ export function AuthPage({ auth }: Props) {
   const [backgroundImage] = useState(
     () => LOGIN_BACKGROUNDS[Math.floor(Math.random() * LOGIN_BACKGROUNDS.length)]
   );
-  const [videoOpen, setVideoOpen] = useState(false);
   const [mode, setMode]       = useState<Mode>('login');
   const [email, setEmail]     = useState('');
   const [password, setPassword] = useState('');
@@ -211,18 +173,25 @@ export function AuthPage({ auth }: Props) {
         </div>
       )}
 
-      {videoOpen && <BrandVideoModal onClose={() => setVideoOpen(false)} />}
-
-      {/* Explicit grid (not flex) so the sign-in and video columns share a
+      {/* Explicit grid (not flex) so the sign-in and slides columns share a
           real row/baseline instead of two independently-sized blocks that
-          merely sit near each other. */}
-      <div className="relative w-full max-w-7xl grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:items-start justify-items-center lg:justify-items-stretch gap-6">
+          merely sit near each other. The card column is a fixed 408px (its
+          established width from before the slides column existed) so
+          widening the container only grows the slides side, not the card.
+          lg:mt-16 gives the row a fixed offset from center on desktop
+          (rather than pure vertical centering) so it can't drift up into
+          the top-left logo lockup on shorter viewports — mobile has no
+          such lockup to clear, so it keeps the plain centered layout.
+          gap-10 (wider than the usual gap-6) keeps clear separation now
+          that the slides panel is narrower. */}
+      <div className="relative w-full max-w-[1500px] lg:mt-16 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_408px] lg:items-start justify-items-center lg:justify-items-stretch gap-10">
         {/* Sign-in column — ordered after the video column on desktop so the
             card sits on the right (mobile keeps document order, unaffected
             since lg:order only applies at the lg breakpoint). */}
         <div className="w-full max-w-sm lg:max-w-none flex flex-col gap-6 lg:order-2">
-          {/* Card */}
-          <div className="card p-6 animate-slide-up">
+          {/* Card — glass-card, not the app's usual solid .card, so the photo
+              backdrop shows through with a frosted-glass treatment. */}
+          <div className="glass-card p-6 animate-slide-up">
             {/* Logo mark — mobile only; desktop shows the brand lockup in
                 the page corner instead (see above), outside the card. */}
             {!isDesktop && (
@@ -385,10 +354,17 @@ export function AuthPage({ auth }: Props) {
           {!isDesktop && <AppSummary />}
         </div>
 
-        {/* Brand video column — desktop only */}
+        {/* Brand slides column — desktop only. The panel itself is capped
+            narrower than the full column and centered, rather than
+            stretching edge-to-edge, since the deck's own fixed 1920px
+            canvas has a lot of empty margin around its centered content —
+            letting the glass background run the full column width just
+            made that empty margin more visually prominent, not less. */}
         {isDesktop && (
           <div className="w-full flex flex-col gap-6 lg:order-1">
-            <BrandVideoCard onPlay={() => setVideoOpen(true)} />
+            <div className="w-full max-w-[1000px] mx-auto">
+              <BrandSlidesPanel />
+            </div>
             <AppSummary />
           </div>
         )}

@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  html, body { margin: 0; padding: 0; background: transparent; }
+  a { color: #22c55e; text-decoration: none; }
+  a:hover { color: #4ade80; }
+</style>
+</helmet>
+<div ref="{{ frameRef }}" style="position:relative; width:100%; aspect-ratio:16/9; background:transparent; overflow:hidden; user-select:none;">
+  <div ref="{{ stageRef }}" style="position:absolute; left:0; top:0; width:1920px; height:1080px; transform-origin:0 0;">
+
+    <!-- 1 · TITLE -->
+    <div data-screen-label="01 Title" style="position:absolute; inset:0; transition:opacity 380ms ease; opacity:{{ s0 }};">
+      <div style="position:absolute; inset:0; overflow:hidden; opacity:0.5;">
+        <div style="position:absolute; left:50%; top:40%; width:2600px; height:1500px; transform:translate(-50%,0) perspective(700px) rotateX(62deg); background-image:linear-gradient(90deg, rgba(34,197,94,0.5) 1px, transparent 1px), linear-gradient(0deg, rgba(34,197,94,0.5) 1px, transparent 1px); background-size:90px 90px; -webkit-mask-image:radial-gradient(circle at 50% 0%, black 0%, transparent 72%); mask-image:radial-gradient(circle at 50% 0%, black 0%, transparent 72%);"></div>
+      </div>
+      <div style="position:absolute; left:50%; top:300px; width:200px; height:200px; transform:translate(-50%,0); background:#22c55e; border-radius:44px; display:flex; align-items:center; justify-content:center; box-shadow:0 0 60px rgba(34,197,94,0.35);">
+        <span style="font-family:'Bebas Neue', sans-serif; font-size:124px; color:#05070a; line-height:1; transform:translateY(4%);">G</span>
+      </div>
+      <div style="position:absolute; left:0; right:0; top:548px; text-align:center; font-family:'Bebas Neue', sans-serif; font-size:108px; letter-spacing:4px; color:#f5f6f7; line-height:1;">GRIDIRON GLORY</div>
+      <div style="position:absolute; left:0; right:0; top:664px; text-align:center; font-family:'DM Sans', sans-serif; font-weight:500; font-size:30px; color:#f5f6f7;">Real games. One champion.</div>
+      <div style="position:absolute; left:0; right:0; top:726px; text-align:center; font-family:'JetBrains Mono', monospace; font-weight:500; font-size:15px; letter-spacing:3px; color:#8b96a3; text-transform:uppercase;">College Football Fantasy League</div>
+    </div>
+
+    <!-- 2 · DRAFT -->
+    <div data-screen-label="02 Draft" style="position:absolute; inset:0; transition:opacity 380ms ease; opacity:{{ s1 }};">
+      <div style="position:absolute; left:0; right:0; top:168px; text-align:center; font-family:'Bebas Neue', sans-serif; font-size:100px; line-height:0.92; color:#f5f6f7;">A DRAFT.</div>
+      <div style="position:absolute; left:50%; top:300px; width:1500px; transform:translate(-50%,0); text-align:center; font-family:'DM Sans', sans-serif; font-size:32px; color:#8b96a3; line-height:1.4;">Real college football teams, picked live with your league.</div>
+      <div style="position:absolute; left:50%; top:420px; transform:translate(-50%,0); width:1600px; background:#0b0e14; border:1px solid rgba(139,150,163,0.25); border-radius:16px; padding:32px; display:flex; gap:24px;">
+        <div style="flex:1.4; display:flex; flex-direction:column; gap:16px;">
+          <div style="display:flex; align-items:center; gap:16px; background:rgba(34,197,94,0.08); border:1px solid rgba(34,197,94,0.3); border-radius:12px; padding:14px 20px;">
+            <div style="width:40px; height:40px; border-radius:20px; border:2px solid #22c55e; position:relative; flex-shrink:0; box-shadow:0 0 14px rgba(34,197,94,0.5);">
+              <div style="position:absolute; left:50%; top:50%; width:2px; height:11px; background:#22c55e; transform:translate(-50%,-100%) rotate(20deg); transform-origin:bottom;"></div>
+              <div style="position:absolute; left:50%; top:50%; width:9px; height:2px; background:#22c55e; transform:translate(0,-50%) rotate(80deg); transform-origin:left;"></div>
+            </div>
+            <div>
+              <div style="font-family:'DM Sans', sans-serif; font-weight:700; font-size:20px; color:#f5f6f7;">Brent is on the clock</div>
+              <div style="font-family:'DM Sans', sans-serif; font-size:15px; color:#8b96a3;">Pick 18 of 50</div>
+            </div>
+          </div>
+          <div style="display:flex; gap:14px;">
+            <div style="flex:1; background:rgba(255,255,255,0.03); border:1px solid rgba(139,150,163,0.25); border-radius:10px; padding:12px 16px; font-family:'DM Sans', sans-serif; font-size:16px; color:#8b96a3;">Search teams&hellip;</div>
+            <div style="font-family:'JetBrains Mono', monospace; font-size:15px; font-weight:700; color:#22c55e; border:1px solid rgba(34,197,94,0.5); border-radius:10px; padding:12px 20px;">P4</div>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+            <sc-for list="{{ teams }}" as="t" hint-placeholder-count="4">
+              <div style="display:flex; align-items:center; gap:16px; background:rgba(255,255,255,0.03); border:1px solid rgba(139,150,163,0.2); border-radius:12px; padding:14px 18px;">
+                <div style="width:46px; height:46px; border-radius:11px; background:rgba(139,150,163,0.15); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                  <span style="font-family:'JetBrains Mono', monospace; font-size:14px; font-weight:700; color:#8b96a3;">{{ t.abbr }}</span>
+                </div>
+                <div style="flex:1; min-width:0;">
+                  <div style="font-family:'DM Sans', sans-serif; font-weight:700; font-size:19px; color:#f5f6f7;">{{ t.name }}</div>
+                  <div style="font-family:'DM Sans', sans-serif; font-size:14px; color:#8b96a3;">{{ t.conf }}</div>
+                </div>
+                <span style="font-family:'JetBrains Mono', monospace; font-size:13px; font-weight:700; color:#22c55e; background:rgba(34,197,94,0.12); border:1px solid rgba(34,197,94,0.35); border-radius:6px; padding:4px 8px; flex-shrink:0;">FPI #{{ t.fpi }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        <div style="flex:1; display:flex; flex-direction:column; gap:10px;">
+          <div style="font-family:'JetBrains Mono', monospace; font-size:15px; letter-spacing:2px; color:#8b96a3; margin-bottom:4px;">DRAFT BOARD</div>
+          <sc-for list="{{ picks }}" as="p" hint-placeholder-count="7">
+            <div style="display:flex; align-items:center; gap:14px; border-radius:8px; padding:9px 14px; background:{{ p.bg }}; border:{{ p.border }};">
+              <span style="font-family:'JetBrains Mono', monospace; font-size:15px; width:22px; color:{{ p.tint }};">{{ p.n }}</span>
+              <span style="font-family:'DM Sans', sans-serif; font-weight:600; font-size:16px; color:#f5f6f7; flex:1;">{{ p.who }}</span>
+              <span style="font-family:'JetBrains Mono', monospace; font-size:14px; color:{{ p.tint }}; font-weight:{{ p.weight }};">{{ p.team }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3 · CAPTAIN -->
+    <div data-screen-label="03 Captain" style="position:absolute; inset:0; transition:opacity 380ms ease; opacity:{{ s2 }};">
+      <div style="position:absolute; left:0; right:0; top:168px; text-align:center; font-family:'Bebas Neue', sans-serif; font-size:100px; line-height:0.92; color:#f5f6f7;">A CAPTAIN.</div>
+      <div style="position:absolute; left:50%; top:300px; width:1500px; transform:translate(-50%,0); text-align:center; font-family:'DM Sans', sans-serif; font-size:32px; color:#8b96a3; line-height:1.4;">Name a captain before kickoff and their points double.</div>
+      <div style="position:absolute; left:50%; top:440px; transform:translate(-50%,0); width:1600px; background:#0b0e14; border:1px solid rgba(139,150,163,0.25); border-radius:16px; padding:32px;">
+        <div style="display:flex; gap:24px;">
+          <div style="flex:1; background:rgba(255,255,255,0.03); border:1px solid rgba(139,150,163,0.25); border-radius:16px; padding:28px;">
+            <div style="display:flex; align-items:center; gap:14px;">
+              <div style="width:48px; height:48px; border-radius:12px; background:rgba(139,150,163,0.15); display:flex; align-items:center; justify-content:center;">
+                <span style="font-family:'JetBrains Mono', monospace; font-size:15px; font-weight:700; color:#8b96a3;">OSU</span>
+              </div>
+              <div>
+                <div style="font-family:'DM Sans', sans-serif; font-weight:700; font-size:24px; color:#f5f6f7;">Ohio State</div>
+                <div style="font-family:'DM Sans', sans-serif; font-size:16px; color:#8b96a3;">Big Ten &middot; 1/2 captain uses</div>
+              </div>
+            </div>
+            <div style="margin-top:18px; background:rgba(139,150,163,0.1); border-radius:10px; padding:12px 16px; font-family:'DM Sans', sans-serif; font-size:17px; color:#8b96a3;">vs #8 Penn State &middot; TBD</div>
+            <div style="margin-top:18px; display:flex; align-items:center; justify-content:space-between;">
+              <div>
+                <div style="font-family:'DM Sans', sans-serif; font-weight:600; font-size:17px; color:#f5f6f7;">&#9733; Captain</div>
+                <div style="font-family:'DM Sans', sans-serif; font-size:15px; color:#8b96a3;">1 use left</div>
+              </div>
+              <div style="width:48px; height:26px; border-radius:999px; position:relative; flex-shrink:0; background:rgba(139,150,163,0.25); border:1px solid rgba(139,150,163,0.4);">
+                <div style="position:absolute; top:2px; left:2px; width:20px; height:20px; border-radius:10px; background:#fff;"></div>
+              </div>
+            </div>
+          </div>
+          <div style="flex:1.15; background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.45); border-radius:16px; padding:28px;">
+            <div style="display:flex; align-items:center; justify-content:space-between;">
+              <div style="display:flex; align-items:center; gap:14px;">
+                <div style="width:48px; height:48px; border-radius:12px; background:rgba(139,150,163,0.15); display:flex; align-items:center; justify-content:center;">
+                  <span style="font-family:'JetBrains Mono', monospace; font-size:15px; font-weight:700; color:#f5f6f7;">GA</span>
+                </div>
+                <div>
+                  <div style="font-family:'DM Sans', sans-serif; font-weight:700; font-size:24px; color:#f5f6f7;">Georgia</div>
+                  <div style="font-family:'DM Sans', sans-serif; font-size:16px; color:#8b96a3;">SEC &middot; 0/2 captain uses</div>
+                </div>
+              </div>
+              <div style="font-family:'DM Sans', sans-serif; font-weight:700; font-size:16px; color:#05070a; background:#f59e0b; border-radius:999px; padding:7px 16px; white-space:nowrap;">&#9733; Captain</div>
+            </div>
+            <div style="margin-top:18px; background:rgba(34,197,94,0.12); border:1px solid rgba(34,197,94,0.3); border-radius:10px; padding:12px 16px; font-family:'DM Sans', sans-serif; font-size:17px; color:#f5f6f7;"><span style="color:#22c55e; font-weight:700;">W</span> vs #14 Ole Miss &middot; 34&ndash;17</div>
+            <div style="margin-top:16px; display:flex; gap:28px; font-family:'DM Sans', sans-serif; font-size:16px;">
+              <span style="color:#8b96a3;">Base: <span style="color:#22c55e; font-weight:700;">+3 pts</span></span>
+              <span style="color:#8b96a3;">Captain: <span style="color:#f59e0b; font-weight:700;">+6 pts &times;2</span></span>
+            </div>
+            <div style="margin-top:18px; display:flex; align-items:center; justify-content:space-between;">
+              <div>
+                <div style="font-family:'DM Sans', sans-serif; font-weight:600; font-size:17px; color:#f59e0b;">&#9733; Captain &times;2</div>
+                <div style="font-family:'DM Sans', sans-serif; font-size:15px; color:#8b96a3;">Doubles points this week</div>
+              </div>
+              <div style="width:48px; height:26px; border-radius:999px; position:relative; flex-shrink:0; background:rgba(245,158,11,1); border:1px solid #f59e0b;">
+                <div style="position:absolute; top:2px; left:24px; width:20px; height:20px; border-radius:10px; background:#fff;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:20px; display:flex; gap:16px; align-items:flex-start; background:rgba(255,255,255,0.03); border:1px solid rgba(139,150,163,0.2); border-radius:14px; padding:18px 22px;">
+          <div style="width:28px; height:28px; border-radius:6px; border:1px solid #8b96a3; flex-shrink:0;"></div>
+          <div style="font-family:'DM Sans', sans-serif; font-size:16px; color:#8b96a3; line-height:1.5;"><span style="color:#f5f6f7; font-weight:700;">Browse any week, not just the current one.</span> Jump to any week of the season to review results or set captains ahead of time.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4 · SATURDAY -->
+    <div data-screen-label="04 Saturday" style="position:absolute; inset:0; transition:opacity 380ms ease; opacity:{{ s3 }};">
+      <div style="position:absolute; left:0; right:0; top:168px; text-align:center; font-family:'Bebas Neue', sans-serif; font-size:100px; line-height:0.92; color:#f5f6f7;">A SATURDAY.</div>
+      <div style="position:absolute; left:50%; top:300px; width:1500px; transform:translate(-50%,0); text-align:center; font-family:'DM Sans', sans-serif; font-size:32px; color:#8b96a3; line-height:1.4;">Real games decide it &mdash; scores update live, all day.</div>
+      <div style="position:absolute; left:50%; top:388px; transform:translate(-50%,0); width:1300px; border:1px solid rgba(139,150,163,0.25); border-radius:16px; overflow:hidden; background:#0b0e14;">
+        <div style="display:flex; align-items:center; gap:10px; padding:10px 16px; background:rgba(255,255,255,0.03); border-bottom:1px solid rgba(139,150,163,0.15);">
+          <div style="display:flex; gap:6px;">
+            <div style="width:9px; height:9px; border-radius:9px; background:#ef4444;"></div>
+            <div style="width:9px; height:9px; border-radius:9px; background:#f59e0b;"></div>
+            <div style="width:9px; height:9px; border-radius:9px; background:#22c55e;"></div>
+          </div>
+          <div style="font-family:'JetBrains Mono', monospace; font-size:12px; color:#8b96a3; background:rgba(139,150,163,0.1); border-radius:6px; padding:3px 10px;">cfb-fantasy.app</div>
+        </div>
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 18px; border-bottom:1px solid rgba(139,150,163,0.15);">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <div style="width:22px; height:22px; border-radius:6px; background:#22c55e; display:flex; align-items:center; justify-content:center;">
+              <span style="font-family:'Bebas Neue', sans-serif; font-size:13px; color:#05070a;">G</span>
+            </div>
+            <span style="font-family:'JetBrains Mono', monospace; font-weight:700; font-size:12px; letter-spacing:1.5px; color:#f5f6f7;">GRIDIRON GLORY</span>
+          </div>
+          <div style="display:flex; gap:18px; font-family:'DM Sans', sans-serif; font-size:13px; color:#8b96a3;">
+            <span style="color:#22c55e; font-weight:700;">Standings</span>
+            <span>My Roster</span>
+            <span>Draft Room</span>
+          </div>
+        </div>
+        <div style="padding:16px 18px 4px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+            <span style="font-family:'Bebas Neue', sans-serif; font-size:23px; color:#f5f6f7;">SEASON STANDINGS</span>
+            <span style="font-family:'JetBrains Mono', monospace; font-size:11px; color:#8b96a3; background:rgba(139,150,163,0.15); border-radius:999px; padding:3px 10px;">Week 8</span>
+          </div>
+          <sc-for list="{{ standings }}" as="r" hint-placeholder-count="4">
+            <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px;">
+              <span style="font-family:'DM Sans', sans-serif; font-size:13px; color:#8b96a3; width:54px;">{{ r.name }}</span>
+              <div style="flex:1; height:18px; border-radius:5px; background:rgba(139,150,163,0.1); overflow:hidden; position:relative;">
+                <div style="height:100%; display:flex; align-items:center; justify-content:flex-end; padding-right:8px; width:{{ r.barWidth }}; background:{{ r.color }};">
+                  <span style="font-family:'DM Sans', sans-serif; font-weight:700; font-size:12px; color:#05070a;">{{ r.score }}</span>
+                </div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="border-top:1px solid rgba(139,150,163,0.15);">
+          <sc-for list="{{ standings }}" as="r" hint-placeholder-count="4">
+            <div style="display:flex; align-items:center; gap:14px; padding:12px 18px; border-bottom:1px solid rgba(139,150,163,0.1);">
+              <span style="font-family:'JetBrains Mono', monospace; font-size:14px; width:16px; color:{{ r.rankColor }};">{{ r.rank }}</span>
+              <div style="width:30px; height:30px; border-radius:15px; display:flex; align-items:center; justify-content:center; flex-shrink:0; background:{{ r.color }};">
+                <span style="font-family:'DM Sans', sans-serif; font-weight:700; font-size:13px; color:#05070a;">{{ r.initial }}</span>
+              </div>
+              <div style="flex:1; min-width:0;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <span style="font-family:'DM Sans', sans-serif; font-weight:700; font-size:17px; color:#f5f6f7;">{{ r.name }}</span>
+                  <sc-if value="{{ r.you }}" hint-placeholder-val="{{ false }}">
+                    <span style="font-family:'JetBrains Mono', monospace; font-size:10px; font-weight:700; color:#22c55e; border:1px solid #22c55e; border-radius:999px; padding:1px 7px;">YOU</span>
+                  </sc-if>
+                </div>
+                <div style="font-family:'DM Sans', sans-serif; font-size:12px; color:#8b96a3;">{{ r.stats }}</div>
+              </div>
+              <div style="text-align:right;">
+                <div style="font-family:'DM Sans', sans-serif; font-weight:700; font-size:21px; color:#f5f6f7;">{{ r.score }}</div>
+                <div style="font-family:'DM Sans', sans-serif; font-size:11px; color:#8b96a3;">{{ r.delta }}</div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5 · SEASON -->
+    <div data-screen-label="05 Season" style="position:absolute; inset:0; transition:opacity 380ms ease; opacity:{{ s4 }};">
+      <div style="position:absolute; left:0; right:0; top:168px; text-align:center; font-family:'Bebas Neue', sans-serif; font-size:100px; line-height:0.92; color:#f5f6f7;">A SEASON.</div>
+      <div style="position:absolute; left:50%; top:300px; width:1500px; transform:translate(-50%,0); display:flex; flex-direction:column;">
+        <sc-for list="{{ flow }}" as="f" hint-placeholder-count="6">
+          <div style="display:flex; gap:28px;">
+            <div style="width:22px; display:flex; flex-direction:column; align-items:center; align-self:stretch;">
+              <div style="width:18px; height:18px; border-radius:9px; flex-shrink:0; margin-top:5px; position:relative; border:{{ f.dotBorder }}; box-shadow:{{ f.dotGlow }};">
+                <div style="position:absolute; inset:2px; border-radius:7px; background:{{ f.color }};"></div>
+              </div>
+              <div style="flex:1; width:2px; margin-top:7px; background:{{ f.lineColor }};"></div>
+            </div>
+            <div style="flex:1; padding-bottom:16px;">
+              <div style="font-family:'JetBrains Mono', monospace; font-size:15px; letter-spacing:2px; margin-bottom:6px; color:{{ f.color }};">{{ f.period }}</div>
+              <div style="font-family:'DM Sans', sans-serif; font-weight:700; font-size:27px; color:#f5f6f7; margin-bottom:6px;">{{ f.title }}</div>
+              <div style="font-family:'DM Sans', sans-serif; font-size:21px; line-height:1.4; color:#8b96a3;">{{ f.desc }}</div>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+
+  <button type="button" aria-label="Previous slide" onClick="{{ prev }}" style="position:absolute; left:20px; top:50%; transform:translateY(-50%); width:44px; height:44px; border:none; background:transparent; display:flex; align-items:center; justify-content:center; cursor:pointer; padding:0; opacity:0.7; transition:opacity 200ms ease;" style-hover="{{ navHover }}">
+    <span style="display:block; width:16px; height:16px; border-left:3px solid #f5f6f7; border-bottom:3px solid #f5f6f7; transform:rotate(45deg) translate(3px, -3px);"></span>
+  </button>
+  <button type="button" aria-label="Next slide" onClick="{{ next }}" style="position:absolute; right:20px; top:50%; transform:translateY(-50%); width:44px; height:44px; border:none; background:transparent; display:flex; align-items:center; justify-content:center; cursor:pointer; padding:0; opacity:0.7; transition:opacity 200ms ease;" style-hover="{{ navHover }}">
+    <span style="display:block; width:16px; height:16px; border-right:3px solid #f5f6f7; border-top:3px solid #f5f6f7; transform:rotate(45deg) translate(-3px, 3px);"></span>
+  </button>
+
+  <sc-if value="{{ showDots }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute; left:50%; bottom:26px; transform:translateX(-50%); display:flex; gap:10px;">
+      <sc-for list="{{ dots }}" as="d" hint-placeholder-count="5">
+        <button type="button" aria-label="Go to slide" onClick="{{ d.go }}" style="width:9px; height:9px; border-radius:999px; border:none; padding:0; cursor:pointer; transition:background 200ms ease; background:{{ d.bg }};"></button>
+      </sc-for>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;wrapAround&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;},&quot;showDots&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;}}">
+class Component extends DCLogic {
+  state = { i: 0 };
+  frameRef = React.createRef();
+  stageRef = React.createRef();
+
+  fit = () => {
+    const f = this.frameRef.current, s = this.stageRef.current;
+    if (!f || !s) return;
+    s.style.transform = 'scale(' + (f.clientWidth / 1920) + ')';
+  };
+
+  onKey = (e) => {
+    if (e.key === 'ArrowRight') this.go(this.state.i + 1);
+    else if (e.key === 'ArrowLeft') this.go(this.state.i - 1);
+  };
+
+  componentDidMount() {
+    this.fit();
+    if (window.ResizeObserver && this.frameRef.current) {
+      this.ro = new ResizeObserver(this.fit);
+      this.ro.observe(this.frameRef.current);
+    }
+    window.addEventListener('resize', this.fit);
+    window.addEventListener('keydown', this.onKey);
+  }
+  componentWillUnmount() {
+    if (this.ro) this.ro.disconnect();
+    window.removeEventListener('resize', this.fit);
+    window.removeEventListener('keydown', this.onKey);
+  }
+
+  get count() { return 5; }
+
+  go(n) {
+    const c = this.count;
+    const wrap = this.props.wrapAround ?? true;
+    const i = wrap ? (n + c) % c : Math.max(0, Math.min(c - 1, n));
+    this.setState({ i });
+  }
+
+  renderVals() {
+    const i = this.state.i;
+    const GREEN = '#22c55e', GOLD = '#f59e0b', MUTED = '#8b96a3';
+    const picks = [
+      { n: 15, who: 'A. Diaz', team: 'Washington' },
+      { n: 16, who: 'T. Brooks', team: 'Louisville' },
+      { n: 17, who: 'M. Chen', team: 'Alabama' },
+      { n: 18, who: 'Brent', team: 'ON THE CLOCK', active: true },
+      { n: 19, who: 'J. Rivera', team: '\u2014' },
+      { n: 20, who: 'A. Diaz', team: '\u2014' },
+      { n: 21, who: 'T. Brooks', team: '\u2014' },
+    ].map((p) => ({
+      ...p,
+      bg: p.active ? 'rgba(34,197,94,0.18)' : 'rgba(255,255,255,0.02)',
+      border: '1px solid ' + (p.active ? GREEN : 'rgba(139,150,163,0.15)'),
+      tint: p.active ? GREEN : MUTED,
+      weight: p.active ? 700 : 400,
+    }));
+
+    const raw = [
+      { name: 'Warren', color: GOLD, score: 87, delta: '+9 wk', stats: '10 teams \u00b7 +12 bonus \u00b7 +6 wk7', you: true },
+      { name: 'Brent', color: '#3b82f6', score: 73, delta: '+7 wk', stats: '10 teams \u00b7 +8 bonus' },
+      { name: 'Jaws', color: '#a78bfa', score: 64, delta: '+4 wk', stats: '10 teams \u00b7 +5 stats' },
+      { name: 'Evan', color: GREEN, score: 58, delta: '+3 wk', stats: '10 teams' },
+    ];
+    const standings = raw.map((r, k) => ({
+      ...r,
+      you: !!r.you,
+      rank: k + 1,
+      initial: r.name[0],
+      rankColor: k === 0 ? GOLD : MUTED,
+      barWidth: (r.score / 87) * 100 + '%',
+    }));
+
+    const flow = [
+      { period: 'JULY\u2013AUGUST', title: 'League Setup & Draft', desc: 'Commissioner creates the league and schedules a live snake draft.', color: GREEN },
+      { period: 'LATE AUGUST \u2013 NOVEMBER', title: 'Regular Season', desc: 'Scores update automatically every 30 minutes as you set weekly Captain and Spread picks.', color: GREEN },
+      { period: 'EARLY DECEMBER', title: 'Conference Championship Week', desc: "Conference title games are scored automatically, locking in the season's statistical bonuses.", color: GOLD },
+      { period: 'DECEMBER \u2013 JANUARY', title: 'Bowl Season & CFP', desc: 'Bowl results, Heisman bonuses, and CFP milestones are awarded as they happen.', color: GOLD },
+      { period: 'MID JANUARY', title: 'National Championship & Final Standings', desc: 'Final standings lock in and the season champion is crowned.', color: '#3b82f6' },
+      { period: 'FEBRUARY \u2013 JULY', title: 'Offseason', desc: 'Player accounts and league history carry over automatically into the next draft.', color: MUTED },
+    ].map((f, k, arr) => ({
+      ...f,
+      dotBorder: '2px solid ' + f.color,
+      dotGlow: '0 0 12px ' + f.color + '66',
+      lineColor: k === arr.length - 1 ? 'transparent' : f.color,
+    }));
+
+    const showDots = this.props.showDots ?? false;
+    const dots = [0, 1, 2, 3, 4].map((k) => ({
+      bg: k === i ? '#22c55e' : 'rgba(245,246,247,0.25)',
+      go: () => this.go(k),
+    }));
+
+    return {
+      frameRef: this.frameRef,
+      stageRef: this.stageRef,
+      s0: i === 0 ? 1 : 0,
+      s1: i === 1 ? 1 : 0,
+      s2: i === 2 ? 1 : 0,
+      s3: i === 3 ? 1 : 0,
+      s4: i === 4 ? 1 : 0,
+      prev: () => this.go(i - 1),
+      next: () => this.go(i + 1),
+      navHover: { opacity: 1 },
+      teams: [
+        { abbr: 'ARIZ', name: 'Arizona', conf: 'Big 12', fpi: 34 },
+        { abbr: 'AUB', name: 'Auburn', conf: 'SEC', fpi: 22 },
+        { abbr: 'CLEM', name: 'Clemson', conf: 'ACC', fpi: 19 },
+        { abbr: 'COLO', name: 'Colorado', conf: 'Big 12', fpi: 45 },
+      ],
+      picks, standings, flow, showDots, dots,
+    };
+  }
+}
+</script>
+</body>
+</html>
