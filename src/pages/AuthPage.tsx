@@ -10,6 +10,18 @@ interface Props {
   auth: ReturnType<typeof useAuth>;
 }
 
+// Rotation pool for the full-page login backdrop — one is chosen at random
+// per page load (see the lazy useState below) and held for the component's
+// lifetime, so switching between Sign In/Sign Up/Forgot never reshuffles it.
+const LOGIN_BACKGROUNDS = [
+  '/login-backgrounds/florida-south-carolina-block.webp',
+  '/login-backgrounds/texas-bevo.webp',
+  '/login-backgrounds/south-carolina-stadium.webp',
+  '/login-backgrounds/fsu-flags.webp',
+  '/login-backgrounds/florida-marching-band.webp',
+  '/login-backgrounds/tennessee-neyland.webp',
+];
+
 // Google's official four-color "G" mark — kept as its own inline SVG (not a
 // lucide icon) since brand marks like this need their exact fixed colors,
 // not a currentColor icon that would inherit the button's theme color.
@@ -119,6 +131,11 @@ function BrandVideoModal({ onClose }: { onClose: () => void }) {
 
 export function AuthPage({ auth }: Props) {
   const isDesktop = useIsDesktop();
+  // Lazy initializer runs once on mount, not on every render, so the photo
+  // stays fixed for this visit and only reshuffles on an actual page reload.
+  const [backgroundImage] = useState(
+    () => LOGIN_BACKGROUNDS[Math.floor(Math.random() * LOGIN_BACKGROUNDS.length)]
+  );
   const [videoOpen, setVideoOpen] = useState(false);
   const [mode, setMode]       = useState<Mode>('login');
   const [email, setEmail]     = useState('');
@@ -163,6 +180,17 @@ export function AuthPage({ auth }: Props) {
 
   return (
     <div className="min-h-dvh flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Full-page photo backdrop, one of LOGIN_BACKGROUNDS chosen at random
+          per visit. The scrim beneath the existing yard-lines/glow layers
+          keeps every layer's contrast identical to before this photo was
+          added — text and controls read exactly as legibly as on the old
+          flat background. */}
+      <div
+        className="absolute inset-0 bg-cover bg-center pointer-events-none"
+        style={{ backgroundImage: `url(${backgroundImage})` }}
+      />
+      <div className="absolute inset-0 bg-gradient-to-b from-turf-950/85 via-turf-950/60 to-turf-950/90 pointer-events-none" />
+
       {/* Background decoration */}
       <div className="absolute inset-0 yard-lines pointer-events-none" />
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-field-500/5 rounded-full blur-3xl pointer-events-none" />
