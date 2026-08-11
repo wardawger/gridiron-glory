@@ -52,6 +52,7 @@ export function useLeague(user: User | null) {
     updateWeek: core.updateWeek, updateScoring: core.updateScoring, removeFromRoster: core.removeFromRoster,
     makeFreeAgencyMove, submitWaiverClaim,
     updateDisplayName: core.updateDisplayName, updateAvatar: core.updateAvatar, updateMemberRole: core.updateMemberRole,
+    removeMember: core.removeMember,
     reload: core.reload,
   };
 }

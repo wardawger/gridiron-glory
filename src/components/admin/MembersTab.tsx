@@ -6,23 +6,27 @@ import { Toggle } from '../ui/Toggle';
 
 interface Props {
   league: League;
+  currentUserId: string;
   members: LeagueMember[];
   finalStandings: SeasonHistoryEntry[];
   trophySnapshot: TrophySnapshot;
-  onSendInvite: (email: string) => Promise<{ token?: string; error?: string }>;
+  onSendInvite: (email: string) => Promise<{ token?: string; emailSent?: boolean; error?: string }>;
   onUpdateWeek: (week: number) => void;
   onUpdateMemberRole: (userId: string, role: LeagueRole) => Promise<{ error?: string }>;
+  onRemoveMember: (userId: string) => Promise<{ error?: string }>;
   onResetDraft: () => Promise<{ error?: string }>;
   onDeleteLeague: () => Promise<{ error?: string }>;
   onEndSeason: (seasonLabel: string, standings: SeasonHistoryEntry[], trophies: TrophySnapshot) => Promise<{ error?: string }>;
 }
 
 export function MembersTab({
-  league, members, finalStandings, trophySnapshot,
-  onSendInvite, onUpdateWeek, onUpdateMemberRole, onResetDraft, onDeleteLeague, onEndSeason,
+  league, currentUserId, members, finalStandings, trophySnapshot,
+  onSendInvite, onUpdateWeek, onUpdateMemberRole, onRemoveMember, onResetDraft, onDeleteLeague, onEndSeason,
 }: Props) {
   const [inviteEmail, setEmail] = useState('');
   const [inviteLink, setLink]   = useState('');
+  const [invitedTo, setInvitedTo] = useState('');
+  const [emailSent, setEmailSent] = useState(false);
   const [copied, setCopied]     = useState(false);
   const [inviting, setInviting] = useState(false);
   const [resetting, setResetting] = useState(false);
@@ -33,6 +37,9 @@ export function MembersTab({
   const [deleteError, setDeleteError] = useState('');
   const [roleUpdatingId, setRoleUpdatingId] = useState<string | null>(null);
   const [roleError, setRoleError] = useState('');
+  const [memberToRemove, setMemberToRemove] = useState<LeagueMember | null>(null);
+  const [removingMember, setRemovingMember] = useState(false);
+  const [removeMemberError, setRemoveMemberError] = useState('');
   const commissionerCount = members.filter(m => m.role === 'commissioner').length;
 
   // Default season label: the year the season started (games run Aug of one
@@ -64,14 +71,31 @@ export function MembersTab({
     setRoleUpdatingId(null);
   };
 
+  const handleConfirmRemoveMember = async () => {
+    if (!memberToRemove) return;
+    setRemovingMember(true);
+    setRemoveMemberError('');
+    const result = await onRemoveMember(memberToRemove.user_id);
+    if (result?.error) {
+      setRemoveMemberError(result.error);
+      setRemovingMember(false);
+      return;
+    }
+    setMemberToRemove(null);
+    setRemovingMember(false);
+  };
+
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inviteEmail.trim()) return;
+    const sentTo = inviteEmail.trim();
     setInviting(true);
-    const result = await onSendInvite(inviteEmail.trim());
+    const result = await onSendInvite(sentTo);
     if (result.token) {
       const link = `${window.location.origin}/join/${result.token}`;
       setLink(link);
+      setInvitedTo(sentTo);
+      setEmailSent(!!result.emailSent);
       setEmail('');
     }
     setInviting(false);
@@ -111,42 +135,51 @@ export function MembersTab({
 
   return (
     <div className="space-y-4">
-      {/* Invite form */}
-      <div className="card p-5 space-y-4">
-        <div className="flex items-center gap-2 mb-1">
-          <Mail className="w-4 h-4 text-field-400" />
-          <h3 className="font-medium text-white">Invite Player</h3>
-        </div>
-        <form onSubmit={handleInvite} className="flex gap-2">
-          <input
-            className="input flex-1"
-            type="email"
-            placeholder="player@email.com"
-            value={inviteEmail}
-            onChange={e => setEmail(e.target.value)}
-            required
-          />
-          <button type="submit" disabled={inviting} className="btn-primary">
-            <UserPlus className="w-4 h-4" />
-            {inviting ? 'Sending…' : 'Invite'}
-          </button>
-        </form>
-
-        {inviteLink && (
-          <div className="space-y-2">
-            <p className="text-xs text-turf-400">Share this link with the player:</p>
-            <div className="flex gap-2 items-center">
-              <code className="flex-1 text-xs bg-turf-800 border border-turf-600 rounded-lg px-3 py-2 text-field-300 break-all">
-                {inviteLink}
-              </code>
-              <button onClick={copyLink} className="btn-secondary btn-sm flex-shrink-0">
-                {copied ? <Check className="w-4 h-4 text-field-400" /> : <Copy className="w-4 h-4" />}
-                {copied ? 'Copied!' : 'Copy'}
-              </button>
-            </div>
+      {/* Invite form — only while the league hasn't started drafting yet;
+          once drafting begins there's nothing left for a new player to draft,
+          and draft_status only returns to 'pending' via a deliberate reset
+          or new season, so this naturally stays hidden all season. */}
+      {league.draft_status === 'pending' && (
+        <div className="card p-5 space-y-4">
+          <div className="flex items-center gap-2 mb-1">
+            <Mail className="w-4 h-4 text-field-400" />
+            <h3 className="font-medium text-white">Invite Player</h3>
           </div>
-        )}
-      </div>
+          <form onSubmit={handleInvite} className="flex gap-2">
+            <input
+              className="input flex-1"
+              type="email"
+              placeholder="player@email.com"
+              value={inviteEmail}
+              onChange={e => setEmail(e.target.value)}
+              required
+            />
+            <button type="submit" disabled={inviting} className="btn-primary">
+              <UserPlus className="w-4 h-4" />
+              {inviting ? 'Sending…' : 'Invite'}
+            </button>
+          </form>
+
+          {inviteLink && (
+            <div className="space-y-2">
+              <p className="text-xs text-turf-400">
+                {emailSent
+                  ? `Invite email sent to ${invitedTo}. You can also share this link directly:`
+                  : "Couldn't send the email automatically — share this link with the player:"}
+              </p>
+              <div className="flex gap-2 items-center">
+                <code className="flex-1 text-xs bg-turf-800 border border-turf-600 rounded-lg px-3 py-2 text-field-300 break-all">
+                  {inviteLink}
+                </code>
+                <button onClick={copyLink} className="btn-secondary btn-sm flex-shrink-0">
+                  {copied ? <Check className="w-4 h-4 text-field-400" /> : <Copy className="w-4 h-4" />}
+                  {copied ? 'Copied!' : 'Copy'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Member list */}
       <div className="card divide-y divide-turf-800">
@@ -185,6 +218,15 @@ export function MembersTab({
                     disabled={isLastCommissioner}
                     label={`${m.role === 'commissioner' ? 'Remove' : 'Make'} ${m.display_name} co-commissioner`}
                   />
+                )}
+                {league.draft_status === 'complete' && m.role !== 'commissioner' && m.user_id !== currentUserId && (
+                  <button
+                    onClick={() => { setRemoveMemberError(''); setMemberToRemove(m); }}
+                    className="btn-secondary btn-sm text-red-300 hover:text-red-200 hover:border-red-800"
+                    title={`Remove ${m.display_name} from the league`}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 )}
               </div>
             </div>
@@ -387,6 +429,53 @@ export function MembersTab({
               >
                 {resetting && <Loader2 className="w-4 h-4 animate-spin" />}
                 {resetting ? 'Resetting…' : 'Yes, Reset Draft'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Remove Member confirmation modal */}
+      {memberToRemove && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4"
+          style={{ backgroundColor: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)' }}
+          onClick={() => !removingMember && setMemberToRemove(null)}
+        >
+          <div
+            className="relative w-full max-w-sm rounded-2xl border border-red-900/50 bg-turf-950 shadow-2xl p-6 space-y-4"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-900/40 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="w-5 h-5 text-red-300" />
+              </div>
+              <h3 className="font-display text-xl text-white tracking-wide">Remove Member?</h3>
+            </div>
+            <p className="text-sm text-turf-300">
+              This permanently removes <span className="text-white font-medium">{memberToRemove.display_name}</span> from{' '}
+              <span className="text-white font-medium">{league.name}</span>. Their drafted teams return to the
+              available pool and their results are excluded from standings and trophies.{' '}
+              <span className="text-red-300 font-medium">There is no way to recover this.</span>
+            </p>
+            {removeMemberError && (
+              <p className="text-xs text-red-300">{removeMemberError}</p>
+            )}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setMemberToRemove(null)}
+                disabled={removingMember}
+                className="btn-secondary flex-1"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmRemoveMember}
+                disabled={removingMember}
+                className="btn-danger flex-1"
+              >
+                {removingMember && <Loader2 className="w-4 h-4 animate-spin" />}
+                {removingMember ? 'Removing…' : 'Yes, Remove Member'}
               </button>
             </div>
           </div>

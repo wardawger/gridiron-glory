@@ -14,6 +14,7 @@ import { AdjustmentsTab } from './AdjustmentsTab';
 
 interface Props {
   league: League;
+  currentUserId: string;
   members: LeagueMember[];
   draftPicks: DraftPick[];
   captainPicks: CaptainPick[];
@@ -25,7 +26,7 @@ interface Props {
   seasonStats: Map<string, TeamSeasonStats>;
   teams: CfbTeam[];
   isCommissioner: boolean;
-  onSendInvite: (email: string) => Promise<{ token?: string; error?: string }>;
+  onSendInvite: (email: string) => Promise<{ token?: string; emailSent?: boolean; error?: string }>;
   onUpdateWeek: (week: number) => void;
   onUpdateScoring: (s: ScoringSettings) => void;
   onAddBonus: (bonus: Omit<ManualBonus, 'id' | 'awarded_at' | 'awarded_by' | 'league_id'>) => void;
@@ -39,16 +40,17 @@ interface Props {
   onOverrideSpread: (pickId: string, result: 'covered' | 'missed', points: number) => Promise<{ error?: string }>;
   onClearSpreadOverride: (pickId: string) => Promise<{ error?: string }>;
   onUpdateMemberRole: (userId: string, role: LeagueRole) => Promise<{ error?: string }>;
+  onRemoveMember: (userId: string) => Promise<{ error?: string }>;
 }
 
 type Tab = 'members' | 'scoring' | 'adjustments';
 
 export function AdminPanel({
-  league, members, draftPicks, captainPicks, manualBonuses, spreadPicks, freeAgencyMoves, scoreCorrections,
+  league, currentUserId, members, draftPicks, captainPicks, manualBonuses, spreadPicks, freeAgencyMoves, scoreCorrections,
   gameData, seasonStats, teams, isCommissioner,
   onSendInvite, onUpdateWeek, onUpdateScoring, onAddBonus, onRemoveBonus, onAddCorrection, onRemoveCorrection,
   onResetDraft, onDeleteLeague,
-  onEndSeason, onOverrideSpread, onClearSpreadOverride, onUpdateMemberRole,
+  onEndSeason, onOverrideSpread, onClearSpreadOverride, onUpdateMemberRole, onRemoveMember,
 }: Props) {
   const { active: tab, select: selectTab, panelClass: tabPanelClass } = useTabCrossfade<Tab>('members');
 
@@ -124,12 +126,14 @@ export function AdminPanel({
       <div className={tabPanelClass('members')}>
         <MembersTab
           league={league}
+          currentUserId={currentUserId}
           members={members}
           finalStandings={finalStandings}
           trophySnapshot={trophySnapshot}
           onSendInvite={onSendInvite}
           onUpdateWeek={onUpdateWeek}
           onUpdateMemberRole={onUpdateMemberRole}
+          onRemoveMember={onRemoveMember}
           onResetDraft={onResetDraft}
           onDeleteLeague={onDeleteLeague}
           onEndSeason={onEndSeason}

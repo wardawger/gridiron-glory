@@ -161,6 +161,7 @@ function AnimatedRoutes({ lg, league, auth, cfb }: AnimatedRoutesProps) {
           <Route path="/admin"          element={
             <AdminPanel
               league={lg}
+              currentUserId={auth.user!.id}
               members={league.members}
               draftPicks={league.draftPicks}
               captainPicks={league.captainPicks}
@@ -184,6 +185,7 @@ function AnimatedRoutes({ lg, league, auth, cfb }: AnimatedRoutesProps) {
               onDeleteLeague={league.deleteLeague}
               onEndSeason={league.endSeason}
               onUpdateMemberRole={league.updateMemberRole}
+              onRemoveMember={league.removeMember}
               onOverrideSpread={league.overrideSpreadResult}
               onClearSpreadOverride={league.clearSpreadOverride}
             />

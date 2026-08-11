@@ -293,7 +293,23 @@ export function useLeagueCore(user: User | null) {
       .single();
     if (error) return { error: error.message };
     posthog.capture('league_invite_created');
-    return { token: data.token };
+
+    // Best-effort — the invite row (and its shareable /join/:token link)
+    // already exists regardless of whether the email actually sends, so a
+    // failure here never blocks or invalidates the invite itself.
+    let emailSent = false;
+    try {
+      const res = await fetch('/.netlify/functions/send-invite-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ inviteId: data.id, inviterName: myMembership?.display_name ?? 'Someone' }),
+      });
+      emailSent = res.ok;
+    } catch {
+      emailSent = false;
+    }
+
+    return { token: data.token, emailSent };
   };
 
   const startDraft = async (orderedUserIds: string[]) => {
@@ -570,6 +586,53 @@ export function useLeagueCore(user: User | null) {
     return {};
   };
 
+  // Remove a member from the league entirely — only once the draft is
+  // complete. Deletes their draft picks (and every other per-user table)
+  // rather than just the membership row, since DraftRoom reads raw
+  // draft_picks directly (not filtered by members), so this is what
+  // actually frees their teams back into the available pool.
+  const removeMember = async (targetUserId: string): Promise<{ error?: string }> => {
+    if (!league || !user || !isCommissioner) return { error: 'Not authorized' };
+    if (league.draft_status !== 'complete') return { error: 'Members can only be removed once the draft is complete' };
+    if (targetUserId === user.id) return { error: "You can't remove yourself" };
+
+    const target = members.find(m => m.user_id === targetUserId);
+    if (target?.role === 'commissioner') return { error: 'Demote this member to a regular member before removing them' };
+
+    const deletes = await Promise.all([
+      supabase.from('draft_picks').delete().eq('league_id', league.id).eq('user_id', targetUserId),
+      supabase.from('captain_picks').delete().eq('league_id', league.id).eq('user_id', targetUserId),
+      supabase.from('spread_picks').delete().eq('league_id', league.id).eq('user_id', targetUserId),
+      supabase.from('free_agency_moves').delete().eq('league_id', league.id).eq('user_id', targetUserId),
+      supabase.from('manual_bonuses').delete().eq('league_id', league.id).eq('user_id', targetUserId),
+      supabase.from('score_corrections').delete().eq('league_id', league.id).eq('user_id', targetUserId),
+    ]);
+    const deleteErr = deletes.find(d => d.error)?.error;
+    if (deleteErr) return { error: deleteErr.message };
+
+    // Best-effort — waiver_claims may not exist yet for leagues that
+    // predate the migration, and that must never block a removal.
+    await supabase.from('waiver_claims').delete().eq('league_id', league.id).eq('user_id', targetUserId);
+
+    const { error: memberErr } = await supabase
+      .from('league_members')
+      .delete()
+      .eq('league_id', league.id)
+      .eq('user_id', targetUserId);
+    if (memberErr) return { error: memberErr.message };
+
+    setDraftPicks(prev => prev.filter(p => p.user_id !== targetUserId));
+    setCaptainPicks(prev => prev.filter(p => p.user_id !== targetUserId));
+    setSpreadPicks(prev => prev.filter(p => p.user_id !== targetUserId));
+    setFreeAgencyMoves(prev => prev.filter(m => m.user_id !== targetUserId));
+    setManualBonuses(prev => prev.filter(b => b.user_id !== targetUserId));
+    setScoreCorrections(prev => prev.filter(c => c.user_id !== targetUserId));
+    setWaiverClaims(prev => prev.filter(w => w.user_id !== targetUserId));
+    setMembers(prev => prev.filter(m => m.user_id !== targetUserId));
+
+    return {};
+  };
+
   return {
     // Public state
     league, allLeagues, allMemberships, selectedLeagueId,
@@ -578,7 +641,7 @@ export function useLeagueCore(user: User | null) {
     // Public actions
     switchLeague, createLeague, sendInvite, startDraft, makeDraftPick, resetDraft, deleteLeague, endSeason,
     updateWeek, updateScoring, removeFromRoster,
-    updateDisplayName, updateAvatar, updateMemberRole,
+    updateDisplayName, updateAvatar, updateMemberRole, removeMember,
     reload: () => loadAllLeagues(true),
     // Setters + refs consumed by the domain action-factory hooks
     setCaptainPicks, setSpreadPicks, setFreeAgencyMoves, setWaiverClaims, setManualBonuses, setScoreCorrections,
