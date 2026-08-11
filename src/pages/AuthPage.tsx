@@ -10,6 +10,20 @@ interface Props {
   auth: ReturnType<typeof useAuth>;
 }
 
+// Google's official four-color "G" mark — kept as its own inline SVG (not a
+// lucide icon) since brand marks like this need their exact fixed colors,
+// not a currentColor icon that would inherit the button's theme color.
+function GoogleIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/>
+      <path fill="#FF3D00" d="m6.306 14.691 6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/>
+      <path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/>
+      <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/>
+    </svg>
+  );
+}
+
 // Matches Tailwind's `lg` breakpoint. The brand animation column is
 // desktop-only — on mobile it's skipped entirely (not just hidden) so a
 // phone never pays for it.
@@ -112,6 +126,17 @@ export function AuthPage({ auth }: Props) {
   const [name, setName]       = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg]         = useState<{ type: 'error' | 'success'; text: string } | null>(null);
+  const [googleSubmitting, setGoogleSubmitting] = useState(false);
+
+  const handleGoogle = async () => {
+    setGoogleSubmitting(true);
+    setMsg(null);
+    const err = await auth.signInWithGoogle();
+    // On success the page navigates away to Google immediately, so there's
+    // nothing left to reset here — only an immediate rejection (e.g.
+    // network failure before the redirect fires) lands in this branch.
+    if (err) { setMsg({ type: 'error', text: err.message }); setGoogleSubmitting(false); }
+  };
 
   const handle = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -162,20 +187,34 @@ export function AuthPage({ auth }: Props) {
             </div>
 
             {mode !== 'forgot' && (
-              <div className="flex gap-1 mb-6 bg-turf-800 p-1 rounded-lg">
-                {(['login', 'signup'] as Mode[]).map(m => (
-                  <button
-                    key={m}
-                    onClick={() => { setMode(m); setMsg(null); }}
-                    className={`flex-1 py-1.5 rounded-md text-sm font-medium transition-all ${
-                      mode === m
-                        ? 'bg-field-500 text-turf-950'
-                        : 'text-turf-400 hover:text-white'
-                    }`}
-                  >
-                    {m === 'login' ? 'Sign In' : 'Sign Up'}
-                  </button>
-                ))}
+              <h2 className="text-lg font-semibold text-white text-center mb-6">
+                {mode === 'login' ? 'Sign In' : 'Sign Up'}
+              </h2>
+            )}
+
+            {mode !== 'forgot' && (
+              <div className="mb-6 space-y-4">
+                <button
+                  type="button"
+                  onClick={handleGoogle}
+                  disabled={googleSubmitting}
+                  className="btn-secondary w-full btn-lg"
+                >
+                  {googleSubmitting ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <GoogleIcon className="w-4 h-4" />
+                  )}
+                  Continue with Google
+                </button>
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 h-px bg-turf-800" />
+                  <span className="text-xs text-turf-500 uppercase tracking-wide">or</span>
+                  <div className="flex-1 h-px bg-turf-800" />
+                </div>
+                <p className="text-xs text-turf-500 text-center">
+                  {mode === 'login' ? 'Sign in' : 'Sign up'} using email address
+                </p>
               </div>
             )}
 
@@ -231,7 +270,7 @@ export function AuthPage({ auth }: Props) {
                 <button
                   type="button"
                   onClick={() => { setMode('forgot'); setMsg(null); }}
-                  className="text-sm text-turf-400 hover:text-field-400 transition-colors -mt-2"
+                  className="text-sm text-turf-400 hover:text-field-400 transition-colors -mt-2 self-end"
                 >
                   Forgot password?
                 </button>
@@ -262,6 +301,34 @@ export function AuthPage({ auth }: Props) {
                 </button>
               )}
             </form>
+
+            {mode !== 'forgot' && (
+              <p className="text-sm text-turf-400 text-center mt-6">
+                {mode === 'login' ? (
+                  <>
+                    Need to create an account?{' '}
+                    <button
+                      type="button"
+                      onClick={() => { setMode('signup'); setMsg(null); }}
+                      className="text-field-400 hover:text-field-300 font-medium transition-colors"
+                    >
+                      Sign Up
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    Already have an account?{' '}
+                    <button
+                      type="button"
+                      onClick={() => { setMode('login'); setMsg(null); }}
+                      className="text-field-400 hover:text-field-300 font-medium transition-colors"
+                    >
+                      Sign In
+                    </button>
+                  </>
+                )}
+              </p>
+            )}
           </div>
 
           {/* On mobile there's no video column, so the summary lives right
