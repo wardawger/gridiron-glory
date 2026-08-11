@@ -167,6 +167,22 @@ export function AuthPage({ auth }: Props) {
       <div className="absolute inset-0 yard-lines pointer-events-none" />
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-field-500/5 rounded-full blur-3xl pointer-events-none" />
 
+      {/* Desktop-only brand lockup, page corner rather than inside the card —
+          mirrors a reference login layout with the wordmark up top-left.
+          Mobile keeps the logo inside the card (no room for a corner lockup
+          on a narrow viewport), so this only renders once isDesktop is true. */}
+      {isDesktop && (
+        <div className="absolute top-8 left-8 z-10 flex items-center gap-3">
+          <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-field-500 shadow-lg shadow-field-500/20 flex-shrink-0">
+            <span className="font-display text-turf-950 text-xl leading-none">G</span>
+          </div>
+          {/* text-[40px] intentionally matches the square's 40px (w-10/h-10)
+              height exactly, rather than a Tailwind step near it — leading-none
+              keeps the line-box from adding vertical slack around the glyphs. */}
+          <span className="font-display text-[40px] leading-none tracking-wider text-white">GRIDIRON GLORY</span>
+        </div>
+      )}
+
       {videoOpen && <BrandVideoModal onClose={() => setVideoOpen(false)} />}
 
       {/* Explicit grid (not flex) so the sign-in and video columns share a
@@ -177,14 +193,17 @@ export function AuthPage({ auth }: Props) {
         <div className="w-full max-w-sm lg:max-w-none flex flex-col gap-6">
           {/* Card */}
           <div className="card p-6 animate-slide-up">
-            {/* Logo mark */}
-            <div className="mb-6 text-center">
-              <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-field-500 mb-3 shadow-lg shadow-field-500/20">
-                <span className="font-display text-turf-950 text-3xl leading-none">G</span>
+            {/* Logo mark — mobile only; desktop shows the brand lockup in
+                the page corner instead (see above), outside the card. */}
+            {!isDesktop && (
+              <div className="mb-6 text-center">
+                <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-field-500 mb-3 shadow-lg shadow-field-500/20">
+                  <span className="font-display text-turf-950 text-3xl leading-none">G</span>
+                </div>
+                <h1 className="font-display text-4xl tracking-wider text-white">GRIDIRON GLORY</h1>
+                <p className="text-turf-400 mt-1 text-sm">College Football Fantasy League</p>
               </div>
-              <h1 className="font-display text-4xl tracking-wider text-white">GRIDIRON GLORY</h1>
-              <p className="text-turf-400 mt-1 text-sm">College Football Fantasy League</p>
-            </div>
+            )}
 
             {mode !== 'forgot' && (
               <h2 className="text-lg font-semibold text-white text-center mb-6">
