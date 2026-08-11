@@ -188,9 +188,11 @@ export function AuthPage({ auth }: Props) {
       {/* Explicit grid (not flex) so the sign-in and video columns share a
           real row/baseline instead of two independently-sized blocks that
           merely sit near each other. */}
-      <div className="relative w-full max-w-7xl grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] lg:items-start justify-items-center lg:justify-items-stretch gap-6">
-        {/* Sign-in column */}
-        <div className="w-full max-w-sm lg:max-w-none flex flex-col gap-6">
+      <div className="relative w-full max-w-7xl grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:items-start justify-items-center lg:justify-items-stretch gap-6">
+        {/* Sign-in column — ordered after the video column on desktop so the
+            card sits on the right (mobile keeps document order, unaffected
+            since lg:order only applies at the lg breakpoint). */}
+        <div className="w-full max-w-sm lg:max-w-none flex flex-col gap-6 lg:order-2">
           {/* Card */}
           <div className="card p-6 animate-slide-up">
             {/* Logo mark — mobile only; desktop shows the brand lockup in
@@ -206,7 +208,7 @@ export function AuthPage({ auth }: Props) {
             )}
 
             {mode !== 'forgot' && (
-              <h2 className="text-lg font-semibold text-white text-center mb-6">
+              <h2 className="font-display text-3xl tracking-wider text-white text-center mb-6">
                 {mode === 'login' ? 'Sign In' : 'Sign Up'}
               </h2>
             )}
@@ -357,7 +359,7 @@ export function AuthPage({ auth }: Props) {
 
         {/* Brand video column — desktop only */}
         {isDesktop && (
-          <div className="w-full flex flex-col gap-6">
+          <div className="w-full flex flex-col gap-6 lg:order-1">
             <BrandVideoCard onPlay={() => setVideoOpen(true)} />
             <AppSummary />
           </div>
