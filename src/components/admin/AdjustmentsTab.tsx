@@ -37,7 +37,7 @@ interface Props {
   scoreCorrections: ScoreCorrection[];
   onAddBonus: (bonus: Omit<ManualBonus, 'id' | 'awarded_at' | 'awarded_by' | 'league_id'>) => void;
   onRemoveBonus: (id: string) => void;
-  onOverrideSpread: (pickId: string, result: 'covered' | 'missed', points: number) => Promise<{ error?: string }>;
+  onOverrideSpread: (pickId: string, result: 'covered' | 'missed' | 'push', points: number) => Promise<{ error?: string }>;
   onClearSpreadOverride: (pickId: string) => Promise<{ error?: string }>;
   onAddCorrection: (correction: Omit<ScoreCorrection, 'id' | 'league_id' | 'created_at' | 'created_by'>) => Promise<{ error?: string }>;
   onRemoveCorrection: (id: string) => Promise<{ error?: string }>;
@@ -277,6 +277,9 @@ export function AdjustmentsTab({
                 const spreadLabel = pick.locked_spread > 0
                   ? `+${pick.locked_spread} (underdog)`
                   : `${pick.locked_spread} (favored)`;
+                const pickWon = !pick.result || pick.result === 'push'
+                  ? null
+                  : (pick.side === 'cover' ? pick.result === 'covered' : pick.result === 'missed');
                 return (
                   <div key={pick.id} className="px-4 py-3 flex items-center gap-3 flex-wrap">
                     <div className="flex-1 min-w-0">
@@ -286,14 +289,15 @@ export function AdjustmentsTab({
                         <span className="text-turf-300 text-xs">{team?.team_name ?? pick.team_id}</span>
                         <span className="text-turf-500 text-xs">Wk {pick.week}</span>
                         <span className="font-mono text-xs text-turf-500">{spreadLabel}</span>
+                        <span className="text-xs text-turf-500">{pick.side === 'against' ? 'Against' : 'Cover'}</span>
                         {pick.commissioner_override && (
                           <span className="badge-gold text-xs">Override</span>
                         )}
                       </div>
                       <div className="text-xs text-turf-500 mt-0.5">
                         {pick.result
-                          ? <span className={pick.result === 'covered' ? 'text-field-400' : 'text-red-300'}>
-                              {pick.result === 'covered' ? '✓ Covered' : '✗ Missed'}
+                          ? <span className={pick.result === 'push' ? 'text-turf-400' : pickWon ? 'text-field-400' : 'text-red-300'}>
+                              {pick.result === 'push' ? '= Push' : pick.result === 'covered' ? (pickWon ? '✓ Covered' : '✗ Covered') : (pickWon ? '✓ Missed' : '✗ Missed')}
                               {pick.points !== null ? ` · ${pick.points > 0 ? '+' : ''}${pick.points} pts` : ''}
                             </span>
                           : <span className="text-turf-500">Pending</span>
@@ -302,16 +306,22 @@ export function AdjustmentsTab({
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <button
-                        onClick={() => onOverrideSpread(pick.id, 'covered', league.scoring.spread_points)}
+                        onClick={() => onOverrideSpread(pick.id, 'covered', pick.side === 'cover' ? league.scoring.spread_points : -league.scoring.spread_points)}
                         className="text-xs border border-field-700 text-field-400 hover:bg-field-900/30 rounded px-2 py-1 transition-colors"
                       >
                         ✓ Covered
                       </button>
                       <button
-                        onClick={() => onOverrideSpread(pick.id, 'missed', -league.scoring.spread_points)}
+                        onClick={() => onOverrideSpread(pick.id, 'missed', pick.side === 'against' ? league.scoring.spread_points : -league.scoring.spread_points)}
                         className="text-xs border border-red-800 text-red-300 hover:bg-red-900/20 rounded px-2 py-1 transition-colors"
                       >
                         ✗ Missed
+                      </button>
+                      <button
+                        onClick={() => onOverrideSpread(pick.id, 'push', 0)}
+                        className="text-xs border border-turf-600 text-turf-300 hover:bg-turf-800/40 rounded px-2 py-1 transition-colors"
+                      >
+                        = Push
                       </button>
                       {pick.commissioner_override && (
                         <button

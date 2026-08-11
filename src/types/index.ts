@@ -88,6 +88,7 @@ export interface ScoringSettings {
   spread_max_per_week: number;    // max spread picks per user per week
   spread_max_per_team: number;    // max times one team can be spread-picked all season
   spread_allow_captain_stack: boolean; // allow spread + captain on same team same week
+  spread_allow_against_pick: boolean; // let users pick a team to NOT cover, not just to cover
   spread_miss_penalty_enabled: boolean; // override the miss penalty below instead of using the negated cover reward
   spread_miss_penalty_points: number;   // flat points subtracted on a miss when the override above is on (entered as a positive number)
   // Free agency settings
@@ -129,6 +130,7 @@ export const DEFAULT_SCORING: ScoringSettings = {
   spread_max_per_week: 2,
   spread_max_per_team: 3,
   spread_allow_captain_stack: false,
+  spread_allow_against_pick: false,
   spread_miss_penalty_enabled: false,
   spread_miss_penalty_points: 2,
   // Free agency defaults — off until commissioner enables
@@ -494,8 +496,9 @@ export interface SpreadPick {
   team_id: string;
   week: number;
   locked_spread: number;   // negative = team is favored, positive = underdog
+  side: 'cover' | 'against'; // which side of the line the pick is betting on
   picked_at: string;
-  result: 'covered' | 'missed' | null;
+  result: 'covered' | 'missed' | 'push' | null;
   points: number | null;
   commissioner_override: boolean;
 }

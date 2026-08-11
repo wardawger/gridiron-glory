@@ -37,7 +37,7 @@ interface Props {
   onResetDraft: () => Promise<{ error?: string }>;
   onDeleteLeague: () => Promise<{ error?: string }>;
   onEndSeason: (seasonLabel: string, standings: SeasonHistoryEntry[], trophies: TrophySnapshot) => Promise<{ error?: string }>;
-  onOverrideSpread: (pickId: string, result: 'covered' | 'missed', points: number) => Promise<{ error?: string }>;
+  onOverrideSpread: (pickId: string, result: 'covered' | 'missed' | 'push', points: number) => Promise<{ error?: string }>;
   onClearSpreadOverride: (pickId: string) => Promise<{ error?: string }>;
   onUpdateMemberRole: (userId: string, role: LeagueRole) => Promise<{ error?: string }>;
   onRemoveMember: (userId: string) => Promise<{ error?: string }>;

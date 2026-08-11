@@ -17,7 +17,7 @@ interface Props {
   scoreCorrections: ScoreCorrection[];
   userId: string;
   onSetCaptain: (week: number, teamId: string) => void;
-  onSetSpread: (week: number, teamId: string, lockedSpread: number) => Promise<{ error?: string }>;
+  onSetSpread: (week: number, teamId: string, lockedSpread: number, side?: 'cover' | 'against') => Promise<{ error?: string }>;
   onRemoveSpread: (week: number, teamId: string) => Promise<{ error?: string }>;
   onRefreshSpreads: (week: number) => Promise<void>;
 }

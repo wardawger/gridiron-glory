@@ -423,6 +423,22 @@ export function ScoringTab({ league, teams, onUpdateScoring }: Props) {
 
             <div className="flex items-center justify-between">
               <div>
+                <p className="text-sm text-white">Against-the-Spread Picks</p>
+                <p className="text-xs text-turf-500 mt-0.5">Let users pick a team to NOT cover the spread, not just to cover it. A push (exact tie against the line) always awards zero points either way.</p>
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <span className="text-xs text-turf-400">{scoring.spread_allow_against_pick ? 'Allowed' : 'Cover only'}</span>
+                <button
+                  onClick={() => setScoring(prev => ({ ...prev, spread_allow_against_pick: !prev.spread_allow_against_pick }))}
+                  className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${scoring.spread_allow_against_pick ? 'bg-field-500' : 'bg-turf-700'}`}
+                >
+                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${scoring.spread_allow_against_pick ? 'left-5' : 'left-0.5'}`} />
+                </button>
+              </label>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div>
                 <p className="text-sm text-white">Miss Penalty</p>
                 <p className="text-xs text-turf-500 mt-0.5">Override the points lost when a spread pick misses (defaults to the same amount as covering)</p>
               </div>

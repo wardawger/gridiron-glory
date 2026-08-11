@@ -93,8 +93,9 @@ export function LeagueSettingsPage({ league, members }: Props) {
             <span className="badge-green text-xs ml-auto">Enabled</span>
           </div>
           <p className="text-xs text-turf-500">
-            Each week, pick a rostered team you think will cover the point spread. The line locks in the moment you pick it,
-            and the pick locks entirely once that game kicks off.
+            Each week, pick a rostered team you think will {scoring.spread_allow_against_pick ? 'cover — or not cover — ' : 'cover '}
+            the point spread. The line locks in the moment you pick it, and the pick locks entirely once that game kicks off.
+            A push (an exact tie against the line) always scores zero points either way.
           </p>
           <div className="grid grid-cols-2 gap-2 text-sm">
             <div className="card-inner px-3 py-2 flex items-center justify-between">

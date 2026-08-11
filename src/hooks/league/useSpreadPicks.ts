@@ -18,6 +18,7 @@ export function useSpreadPicks(
     week: number,
     teamId: string,
     lockedSpread: number,
+    side: 'cover' | 'against' = 'cover',
   ): Promise<{ error?: string }> => {
     const league = leagueRef.current;
     const user   = userRef.current;
@@ -59,6 +60,7 @@ export function useSpreadPicks(
       team_id:      teamId,
       week,
       locked_spread: lockedSpread,
+      side,
       picked_at:    new Date().toISOString(),
       result:       null,
       points:       null,
@@ -110,7 +112,7 @@ export function useSpreadPicks(
   // Commissioner: override spread result
   const overrideSpreadResult = async (
     pickId: string,
-    result: 'covered' | 'missed',
+    result: 'covered' | 'missed' | 'push',
     points: number,
   ): Promise<{ error?: string }> => {
     if (!league || !isCommissioner) return { error: 'Not authorized' };

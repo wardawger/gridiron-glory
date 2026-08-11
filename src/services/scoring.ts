@@ -45,25 +45,26 @@ export function scoreGame(
 }
 
 // ── Spread scoring ────────────────────────────────────────────────────────
-// Determines if a team covered the spread given the final score.
-// lockedSpread: negative = team is favored (must win by more than |spread|)
-//               positive = team is underdog (can lose by less than spread or win)
-// Returns true if covered, false if missed, null if game not complete.
+// Determines whether the team covered, missed, or pushed the spread given
+// the final score. lockedSpread: negative = team is favored (must win by
+// more than |spread|); positive = team is underdog (can lose by less than
+// spread or win). Returns null if the game isn't complete yet.
 
-export function didCoverSpread(
+export function getSpreadOutcome(
   game: GameResult,
   lockedSpread: number,
   isHome: boolean,
-): boolean | null {
+): 'covered' | 'missed' | 'push' | null {
   if (!game.completed || game.home_score == null || game.away_score == null) return null;
 
   const homeMargin = game.home_score - game.away_score;
   const teamMargin = isHome ? homeMargin : -homeMargin;
 
-  // Team covers if: actual margin > -lockedSpread
-  // e.g. spread = -7 (favored by 7): must win by more than 7 → margin > 7
-  // e.g. spread = +3 (underdog by 3): can lose by less than 3 → margin > -3
-  return teamMargin > -lockedSpread;
+  // A push is an exact tie against the line (only possible with an integer
+  // spread) — actual margin equals -lockedSpread precisely.
+  // e.g. spread = -7 (favored by 7): margin > 7 covers, margin === 7 pushes.
+  if (teamMargin === -lockedSpread) return 'push';
+  return teamMargin > -lockedSpread ? 'covered' : 'missed';
 }
 
 export function scoreSpread(
@@ -72,24 +73,30 @@ export function scoreSpread(
   lockedSpread: number,
   isHome: boolean,
   baseGamePoints: number, // pre-captain base points for multiplier mode
+  side: 'cover' | 'against' = 'cover',
 ): number {
-  const covered = didCoverSpread(game, lockedSpread, isHome);
-  if (covered === null) return 0; // game not complete yet
+  const outcome = getSpreadOutcome(game, lockedSpread, isHome);
+  if (outcome === null) return 0; // game not complete yet
+  if (outcome === 'push') return 0; // push: no points awarded or taken, either side
 
-  // Commissioner-overridden flat penalty on a miss, independent of flat vs
-  // multiplier mode. Off by default — with the toggle off, a miss costs
-  // exactly what it always has (the negated cover reward, below).
-  if (!covered && settings.spread_miss_penalty_enabled) {
+  // Picking "against" wins exactly when the team missed the spread, and
+  // vice versa — everything below just needs to know whether the pick won.
+  const won = side === 'cover' ? outcome === 'covered' : outcome === 'missed';
+
+  // Commissioner-overridden flat penalty on a loss, independent of flat vs
+  // multiplier mode. Off by default — with the toggle off, a loss costs
+  // exactly what it always has (the negated win reward, below).
+  if (!won && settings.spread_miss_penalty_enabled) {
     return -Math.abs(settings.spread_miss_penalty_points);
   }
 
   if (settings.spread_is_multiplier) {
     // Multiplier mode: earn/lose a fraction of base game points
     const bonus = Math.round(Math.abs(baseGamePoints) * (settings.spread_points - 1));
-    return covered ? bonus : -bonus;
+    return won ? bonus : -bonus;
   } else {
     // Flat points mode
-    return covered ? settings.spread_points : -settings.spread_points;
+    return won ? settings.spread_points : -settings.spread_points;
   }
 }
 
@@ -131,7 +138,7 @@ export function calcWeeklyScore(
           // Auto-score from game data
           const baseGamePts = game ? scoreGame(game, settings, false) : 0;
           const isHome = (game as any).is_home ?? true;
-          spreadPts = scoreSpread(game, settings, spreadPick.locked_spread, isHome, baseGamePts);
+          spreadPts = scoreSpread(game, settings, spreadPick.locked_spread, isHome, baseGamePts, spreadPick.side ?? 'cover');
         }
       }
     }

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  isP4Conference, confCategory, scoreGame, didCoverSpread, scoreSpread, buildLeaderboard, calcWeeklyScore,
+  isP4Conference, confCategory, scoreGame, getSpreadOutcome, scoreSpread, buildLeaderboard, calcWeeklyScore,
 } from './scoring';
 import { DEFAULT_SCORING } from '../types';
 import type { GameResult, GameData, LeagueMember, DraftPick, CaptainPick, TeamSeasonStats, ScoreCorrection } from '../types';
@@ -93,28 +93,67 @@ describe('scoreGame', () => {
   });
 });
 
-describe('didCoverSpread / scoreSpread', () => {
+describe('getSpreadOutcome / scoreSpread', () => {
   it('a favorite covers only if it wins by more than the spread', () => {
     // Home team favored by 7 (spread = -7): must win by more than 7.
     const barelyCovers = makeGame({ home_score: 28, away_score: 20 }); // margin 8
-    expect(didCoverSpread(barelyCovers, -7, true)).toBe(true);
+    expect(getSpreadOutcome(barelyCovers, -7, true)).toBe('covered');
 
-    const justMisses = makeGame({ home_score: 27, away_score: 20 }); // margin 7
-    expect(didCoverSpread(justMisses, -7, true)).toBe(false);
+    const justMisses = makeGame({ home_score: 26, away_score: 20 }); // margin 6
+    expect(getSpreadOutcome(justMisses, -7, true)).toBe('missed');
   });
 
   it('an underdog covers if it loses by less than the spread, or wins outright', () => {
     // Away team is a 3-point underdog (spread = +3 from away perspective).
     const coversAsLosingUnderdog = makeGame({ home_score: 20, away_score: 19 }); // away loses by 1
-    expect(didCoverSpread(coversAsLosingUnderdog, 3, false)).toBe(true);
+    expect(getSpreadOutcome(coversAsLosingUnderdog, 3, false)).toBe('covered');
 
     const missesAsLosingUnderdog = makeGame({ home_score: 25, away_score: 19 }); // away loses by 6
-    expect(didCoverSpread(missesAsLosingUnderdog, 3, false)).toBe(false);
+    expect(getSpreadOutcome(missesAsLosingUnderdog, 3, false)).toBe('missed');
+  });
+
+  it('returns "push" when the final margin lands exactly on the line', () => {
+    // Home team favored by 7 (spread = -7): margin of exactly 7 is a push.
+    const push = makeGame({ home_score: 27, away_score: 20 }); // margin 7
+    expect(getSpreadOutcome(push, -7, true)).toBe('push');
   });
 
   it('returns null for an incomplete game', () => {
     const game = makeGame({ completed: false, home_score: null, away_score: null });
-    expect(didCoverSpread(game, -7, true)).toBeNull();
+    expect(getSpreadOutcome(game, -7, true)).toBeNull();
+  });
+
+  it('a push always scores 0, regardless of side, mode, or miss-penalty override', () => {
+    const push = makeGame({ home_score: 27, away_score: 20 }); // margin 7, spread -7
+    const flatSettings = { ...DEFAULT_SCORING, spread_is_multiplier: false, spread_points: 2 };
+    expect(scoreSpread(push, flatSettings, -7, true, 1, 'cover')).toBe(0);
+    expect(scoreSpread(push, flatSettings, -7, true, 1, 'against')).toBe(0);
+
+    const penaltySettings = { ...flatSettings, spread_miss_penalty_enabled: true, spread_miss_penalty_points: 5 };
+    expect(scoreSpread(push, penaltySettings, -7, true, 1, 'cover')).toBe(0);
+
+    const multiplierSettings = { ...DEFAULT_SCORING, spread_is_multiplier: true, spread_points: 1.5 };
+    expect(scoreSpread(push, multiplierSettings, -7, true, 4, 'against')).toBe(0);
+  });
+
+  it('picking "against" wins exactly when the team misses the spread, and vice versa', () => {
+    const settings = { ...DEFAULT_SCORING, spread_is_multiplier: false, spread_points: 2 };
+    const covered = makeGame({ home_score: 30, away_score: 10 }); // margin 20, well past -7
+    const missed = makeGame({ home_score: 20, away_score: 17 }); // margin 3, under 7
+
+    // Cover side: wins when the team covers, loses when it misses.
+    expect(scoreSpread(covered, settings, -7, true, 1, 'cover')).toBe(2);
+    expect(scoreSpread(missed, settings, -7, true, 1, 'cover')).toBe(-2);
+
+    // Against side: flipped — wins when the team misses, loses when it covers.
+    expect(scoreSpread(covered, settings, -7, true, 1, 'against')).toBe(-2);
+    expect(scoreSpread(missed, settings, -7, true, 1, 'against')).toBe(2);
+  });
+
+  it('defaults to "cover" when no side is passed, matching pre-existing behavior', () => {
+    const settings = { ...DEFAULT_SCORING, spread_is_multiplier: false, spread_points: 2 };
+    const covered = makeGame({ home_score: 30, away_score: 10 });
+    expect(scoreSpread(covered, settings, -7, true, 1)).toBe(2);
   });
 
   it('flat mode awards/deducts a fixed point value', () => {

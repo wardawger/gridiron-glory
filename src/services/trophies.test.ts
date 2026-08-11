@@ -158,7 +158,7 @@ describe('computeTrophies', () => {
     const scoring = { ...DEFAULT_SCORING, spread_enabled: true, free_agency_enabled: true };
     const draftPicks = [pick({ team_id: 't1', user_id: 'u1' })];
     const spreadPicks: SpreadPick[] = [
-      { id: 's1', league_id: 'L', user_id: 'u1', team_id: 't1', week: 1, locked_spread: -7, picked_at: '', result: 'covered', points: 2, commissioner_override: false },
+      { id: 's1', league_id: 'L', user_id: 'u1', team_id: 't1', week: 1, locked_spread: -7, side: 'cover', picked_at: '', result: 'covered', points: 2, commissioner_override: false },
     ];
     const freeAgencyMoves: FreeAgencyMove[] = [
       { id: 'f1', league_id: 'L', user_id: 'u1', week: 1, dropped_team_id: 't1', dropped_team_name: 'Team One', dropped_team_logo: '', dropped_team_conference: 'SEC', added_team_id: 't2', added_team_name: 'Team Two', added_team_logo: '', added_team_conference: 'ACC', penalty_points: 0, created_at: '' },

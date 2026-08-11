@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Shield, TrendingUp, TrendingDown, Minus, Star, Calendar, List, X, MapPin, Tv, Clock, Zap, Coins, ChevronDown } from 'lucide-react';
 import type { RosterEntry, CaptainPick, GameData, ScoringSettings, LeagueMember, WeeklyScore, GameResult, SpreadPick, SpreadData, FreeAgencyMove, DraftPick, ScoreCorrection } from '../../types';
-import { calcWeeklyScore, scoreGame, didCoverSpread, scoreSpread } from '../../services/scoring';
+import { calcWeeklyScore, scoreGame, getSpreadOutcome, scoreSpread } from '../../services/scoring';
 import { rosterAtWeek } from '../../services/roster';
 import { useTabCrossfade } from '../../hooks/useCrossfade';
 import { Tooltip } from '../ui/Tooltip';
@@ -27,7 +27,7 @@ interface Props {
   spreadData: Record<number, SpreadData>;
   spreadPicks: SpreadPick[];
   spreadUsage: Map<string, number>;
-  onSetSpread?: (week: number, teamId: string, lockedSpread: number) => Promise<{ error?: string }>;
+  onSetSpread?: (week: number, teamId: string, lockedSpread: number, side?: 'cover' | 'against') => Promise<{ error?: string }>;
   onRemoveSpread?: (week: number, teamId: string) => Promise<{ error?: string }>;
   onRefreshSpreads: (week: number) => Promise<void>;
   freeAgencyMoves: FreeAgencyMove[];
@@ -113,17 +113,23 @@ function GameScoreModal({ game, teamName, teamLogo, week, isCaptain, scoring, sp
   // spread that week. Reuses the same scoring functions the real weekly
   // total is computed with, so this always agrees with the rest of the app.
   let spreadPts = 0;
-  let spreadCovered: boolean | null = null;
+  let spreadOutcome: 'covered' | 'missed' | 'push' | null = null;
+  const spreadSide = spreadPick?.side ?? 'cover';
   if (spreadPick && isComplete) {
     if (spreadPick.points !== null && spreadPick.result !== null) {
       spreadPts = spreadPick.points;
-      spreadCovered = spreadPick.result === 'covered';
+      spreadOutcome = spreadPick.result;
     } else {
       const baseGamePts = scoreGame(game, scoring, false);
-      spreadCovered = didCoverSpread(game, spreadPick.locked_spread, isHome);
-      spreadPts = scoreSpread(game, scoring, spreadPick.locked_spread, isHome, baseGamePts);
+      spreadOutcome = getSpreadOutcome(game, spreadPick.locked_spread, isHome);
+      spreadPts = scoreSpread(game, scoring, spreadPick.locked_spread, isHome, baseGamePts, spreadSide);
     }
   }
+  // Push always nets 0 regardless of side; otherwise "against" wins when
+  // the line was missed and vice versa.
+  const spreadWon = spreadOutcome === null || spreadOutcome === 'push'
+    ? null
+    : spreadSide === 'cover' ? spreadOutcome === 'covered' : spreadOutcome === 'missed';
 
   const basePoints    = scoreGame(game, scoring, false);
   const captainBonus  = scoreGame(game, scoring, isCaptain) - basePoints;
@@ -262,15 +268,21 @@ function GameScoreModal({ game, teamName, teamLogo, week, isCaptain, scoring, sp
           ))}
 
           {/* Spread pick */}
-          {spreadPick && isComplete && spreadCovered !== null && (
+          {spreadPick && isComplete && spreadOutcome !== null && (
             <div className="mt-3 pt-3 border-t border-turf-800 flex items-center justify-between text-sm">
               <div className="flex items-center gap-2">
-                <Coins className={`w-3.5 h-3.5 flex-shrink-0 ${spreadCovered ? 'text-field-400' : 'text-red-300'}`} />
-                <span className={spreadCovered ? 'text-field-300' : 'text-red-300'}>
-                  Spread {spreadCovered ? 'Covered' : 'Missed'} ({formatSpread(spreadPick.locked_spread)})
+                <Coins className={`w-3.5 h-3.5 flex-shrink-0 ${
+                  spreadOutcome === 'push' ? 'text-turf-400' : spreadWon ? 'text-field-400' : 'text-red-300'
+                }`} />
+                <span className={spreadOutcome === 'push' ? 'text-turf-300' : spreadWon ? 'text-field-300' : 'text-red-300'}>
+                  {spreadSide === 'against' ? 'Picked against · ' : ''}
+                  {spreadOutcome === 'push' ? 'Push' : spreadOutcome === 'covered' ? 'Covered' : 'Missed'}
+                  {' '}({formatSpread(spreadPick.locked_spread)})
                 </span>
               </div>
-              <span className={`font-mono font-medium ${spreadPts >= 0 ? 'text-field-400' : 'text-red-300'}`}>
+              <span className={`font-mono font-medium ${
+                spreadPts > 0 ? 'text-field-400' : spreadPts < 0 ? 'text-red-300' : 'text-turf-400'
+              }`}>
                 {spreadPts > 0 ? '+' : ''}{spreadPts}
               </span>
             </div>
@@ -857,8 +869,15 @@ export function RosterView({
                       const canPick = isOwner && !!onSetSpread && !atWeekLimit && !atTeamLimit && !kickedOff && !stackBlocked && weekSpread !== null;
                       const spreadResult = existingPick?.result ?? null;
                       const canRemove = !!existingPick && !spreadResult && !kickedOff && isOwner && !!onRemoveSpread;
+                      // Switching cover↔against on an existing pre-result pick reuses
+                      // onSetSpread's upsert, so it isn't gated by the week/team caps
+                      // that only apply to making a brand-new pick.
+                      const canSwitchSide = !!existingPick && !spreadResult && !kickedOff && isOwner && !!onSetSpread;
                       const isOn = !!existingPick;
                       const toggleDisabled = isOn ? !canRemove : !canPick;
+                      const pickWon = !spreadResult || spreadResult === 'push'
+                        ? null
+                        : (existingPick!.side === 'cover' ? spreadResult === 'covered' : spreadResult === 'missed');
 
                       const handleToggle = async () => {
                         if (toggleDisabled) return;
@@ -870,11 +889,33 @@ export function RosterView({
                         }
                       };
 
+                      const handlePickSide = async (side: 'cover' | 'against') => {
+                        if (existingPick) {
+                          if (existingPick.side === side) {
+                            if (!canRemove || !onRemoveSpread) return;
+                            await onRemoveSpread(selectedWeek, entry.team_id);
+                          } else {
+                            if (!canSwitchSide || !onSetSpread || weekSpread === null) return;
+                            const result = await onSetSpread(selectedWeek, entry.team_id, weekSpread, side);
+                            if (result.error) setSpreadError(result.error);
+                          }
+                        } else {
+                          if (!canPick || !onSetSpread || weekSpread === null) return;
+                          const result = await onSetSpread(selectedWeek, entry.team_id, weekSpread, side);
+                          if (result.error) setSpreadError(result.error);
+                        }
+                      };
+
                       let subtext: string;
                       if (existingPick) {
-                        if (spreadResult === 'covered')      subtext = `✓ Covered ${formatSpread(existingPick.locked_spread)}`;
-                        else if (spreadResult === 'missed')  subtext = `✗ Missed ${formatSpread(existingPick.locked_spread)}`;
-                        else subtext = `Locked ${formatSpread(existingPick.locked_spread)} · ${teamSeasonUses}/${scoring.spread_max_per_team} season`;
+                        if (spreadResult === 'push') subtext = `Push ${formatSpread(existingPick.locked_spread)}`;
+                        else if (spreadResult === 'covered' || spreadResult === 'missed') {
+                          subtext = `${pickWon ? '✓ Won' : '✗ Lost'} ${formatSpread(existingPick.locked_spread)}`;
+                        } else {
+                          subtext = `Locked ${formatSpread(existingPick.locked_spread)}${
+                            scoring.spread_allow_against_pick ? ` · ${existingPick.side === 'against' ? 'Against' : 'Cover'}` : ''
+                          } · ${teamSeasonUses}/${scoring.spread_max_per_team} season`;
+                        }
                       } else if (spreadsLoading && !weekSpread) {
                         subtext = 'Loading line…';
                       } else if (weekSpread === null) {
@@ -891,12 +932,14 @@ export function RosterView({
                         subtext = `${formatSpread(weekSpread)} (${weekSpread < 0 ? 'favored' : weekSpread > 0 ? 'underdog' : "pick 'em"}) · ${weekPicks.length}/${scoring.spread_max_per_week} this week`;
                       }
 
-                      const trackColor = spreadResult === 'covered' ? 'bg-field-600'
-                        : spreadResult === 'missed' ? 'bg-red-600'
+                      const trackColor = spreadResult === 'push' ? 'bg-turf-500'
+                        : pickWon === true ? 'bg-field-600'
+                        : pickWon === false ? 'bg-red-600'
                         : isOn ? 'bg-blue-600'
                         : 'bg-turf-700';
-                      const labelColor = spreadResult === 'covered' ? 'text-field-400'
-                        : spreadResult === 'missed' ? 'text-red-300'
+                      const labelColor = spreadResult === 'push' ? 'text-turf-300'
+                        : pickWon === true ? 'text-field-400'
+                        : pickWon === false ? 'text-red-300'
                         : isOn ? 'text-blue-300'
                         : 'text-turf-300';
 
@@ -908,16 +951,41 @@ export function RosterView({
                             </span>
                             <p className="text-xs text-turf-500 truncate">{subtext}</p>
                           </div>
-                          <button
-                            type="button"
-                            onClick={handleToggle}
-                            disabled={toggleDisabled}
-                            aria-label={isOn ? 'Remove spread pick' : 'Pick spread'}
-                            aria-pressed={isOn}
-                            className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${trackColor} ${toggleDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-                          >
-                            <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${isOn ? 'left-5' : 'left-0.5'}`} />
-                          </button>
+                          {scoring.spread_allow_against_pick ? (
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              {(['cover', 'against'] as const).map(side => {
+                                const active = existingPick?.side === side;
+                                const disabled = active ? !canRemove : (existingPick ? !canSwitchSide : !canPick);
+                                return (
+                                  <button
+                                    key={side}
+                                    type="button"
+                                    onClick={() => handlePickSide(side)}
+                                    disabled={disabled}
+                                    aria-pressed={active}
+                                    className={`px-2 py-1 rounded text-[10px] font-semibold uppercase tracking-wide transition-colors ${
+                                      active
+                                        ? side === 'cover' ? 'bg-field-600 text-white' : 'bg-blue-600 text-white'
+                                        : 'bg-turf-800 text-turf-400 hover:text-white'
+                                    } disabled:opacity-40 disabled:cursor-not-allowed`}
+                                  >
+                                    {side === 'cover' ? 'Cover' : 'Against'}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={handleToggle}
+                              disabled={toggleDisabled}
+                              aria-label={isOn ? 'Remove spread pick' : 'Pick spread'}
+                              aria-pressed={isOn}
+                              className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${trackColor} ${toggleDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            >
+                              <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${isOn ? 'left-5' : 'left-0.5'}`} />
+                            </button>
+                          )}
                         </div>
                       );
                     })()}
@@ -1099,7 +1167,10 @@ export function RosterView({
                                     <div className="text-turf-700 text-xs">max</div>
                                   )}
 
-                                  {/* Spread pick indicator — clickable to remove if owner and game not started */}
+                                  {/* Spread pick indicator — clickable to remove if owner and game not started.
+                                      When against-picks are allowed, a click on an existing cover pick
+                                      switches it to against (reusing the same locked line) before a second
+                                      click removes it — cycling cover → against → removed. */}
                                   {scoring.spread_enabled && (() => {
                                     const sp = spreadPicks.find(
                                       p => p.team_id === entry.team_id && p.week === w
@@ -1116,35 +1187,49 @@ export function RosterView({
                                       && weekSpread !== null;
                                     const canRemoveSpread = isOwner && onRemoveSpread && !!sp
                                       && !sp.result && !kicked && !isPast;
+                                    const canSwitchSpreadSide = isOwner && onSetSpread && !!sp
+                                      && !sp.result && !kicked && !isPast;
+                                    const pickWon = !sp?.result || sp.result === 'push'
+                                      ? null
+                                      : (sp!.side === 'cover' ? sp!.result === 'covered' : sp!.result === 'missed');
 
-                                    if (sp) return (
-                                      <div className={`text-xs font-mono mt-0.5 flex items-center gap-0.5 ${
-                                        sp.result === 'covered' ? 'text-field-400' :
-                                        sp.result === 'missed'  ? 'text-red-300' : 'text-blue-400'
-                                      }`}>
-                                        {canRemoveSpread ? (
-                                          <button
-                                            onClick={e => {
-                                              e.stopPropagation();
-                                              onRemoveSpread!(w, entry.team_id).then(r => {
-                                                if (r.error) setSpreadError(r.error);
-                                              });
-                                            }}
-                                            className="hover:text-red-300 transition-colors border border-current/20 hover:border-red-800 rounded px-0.5 flex items-center gap-0.5"
-                                            title="Remove spread pick"
-                                          >
-                                            <Coins className="w-2.5 h-2.5" />{formatSpread(sp.locked_spread)}
-                                            {sp.result === 'covered' ? '✓' : sp.result === 'missed' ? '✗' : ' ✕'}
-                                          </button>
-                                        ) : (
-                                          <span className="flex items-center gap-0.5">
-                                            <Coins className="w-2.5 h-2.5" />{formatSpread(sp.locked_spread)}
-                                            {sp.result === 'covered' && '✓'}
-                                            {sp.result === 'missed' && '✗'}
-                                          </span>
-                                        )}
-                                      </div>
-                                    );
+                                    if (sp) {
+                                      const sidePrefix = scoring.spread_allow_against_pick
+                                        ? (sp.side === 'against' ? 'A ' : 'C ')
+                                        : '';
+                                      const resultGlyph = sp.result === 'push' ? '=' : sp.result === null ? '' : pickWon ? '✓' : '✗';
+                                      return (
+                                        <div className={`text-xs font-mono mt-0.5 flex items-center gap-0.5 ${
+                                          sp.result === 'push' ? 'text-turf-400' :
+                                          pickWon === true ? 'text-field-400' :
+                                          pickWon === false ? 'text-red-300' : 'text-blue-400'
+                                        }`}>
+                                          {(scoring.spread_allow_against_pick ? canSwitchSpreadSide : canRemoveSpread) ? (
+                                            <button
+                                              onClick={e => {
+                                                e.stopPropagation();
+                                                const action = scoring.spread_allow_against_pick && sp.side === 'cover'
+                                                  ? onSetSpread!(w, entry.team_id, sp.locked_spread, 'against')
+                                                  : onRemoveSpread!(w, entry.team_id);
+                                                action.then(r => {
+                                                  if (r.error) setSpreadError(r.error);
+                                                });
+                                              }}
+                                              className="hover:text-red-300 transition-colors border border-current/20 hover:border-red-800 rounded px-0.5 flex items-center gap-0.5"
+                                              title={scoring.spread_allow_against_pick && sp.side === 'cover' ? 'Switch to against' : 'Remove spread pick'}
+                                            >
+                                              <Coins className="w-2.5 h-2.5" />{sidePrefix}{formatSpread(sp.locked_spread)}
+                                              {sp.result === null ? ' ✕' : resultGlyph}
+                                            </button>
+                                          ) : (
+                                            <span className="flex items-center gap-0.5">
+                                              <Coins className="w-2.5 h-2.5" />{sidePrefix}{formatSpread(sp.locked_spread)}
+                                              {resultGlyph}
+                                            </span>
+                                          )}
+                                        </div>
+                                      );
+                                    }
                                     if (canPickSpread) return (
                                       <button
                                         onClick={e => {
