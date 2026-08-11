@@ -219,7 +219,7 @@ export function MembersTab({
                     label={`${m.role === 'commissioner' ? 'Remove' : 'Make'} ${m.display_name} co-commissioner`}
                   />
                 )}
-                {league.draft_status === 'complete' && m.role !== 'commissioner' && m.user_id !== currentUserId && (
+                {league.draft_status !== 'active' && m.role !== 'commissioner' && m.user_id !== currentUserId && (
                   <button
                     onClick={() => { setRemoveMemberError(''); setMemberToRemove(m); }}
                     className="btn-secondary btn-sm text-red-300 hover:text-red-200 hover:border-red-800"
@@ -454,8 +454,10 @@ export function MembersTab({
             </div>
             <p className="text-sm text-turf-300">
               This permanently removes <span className="text-white font-medium">{memberToRemove.display_name}</span> from{' '}
-              <span className="text-white font-medium">{league.name}</span>. Their drafted teams return to the
-              available pool and their results are excluded from standings and trophies.{' '}
+              <span className="text-white font-medium">{league.name}</span>.{' '}
+              {league.draft_status === 'pending'
+                ? "They haven't drafted yet, so this has no impact on the league."
+                : 'Their drafted teams return to the available pool and their results are excluded from standings and trophies.'}{' '}
               <span className="text-red-300 font-medium">There is no way to recover this.</span>
             </p>
             {removeMemberError && (

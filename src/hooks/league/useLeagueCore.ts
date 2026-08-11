@@ -586,14 +586,17 @@ export function useLeagueCore(user: User | null) {
     return {};
   };
 
-  // Remove a member from the league entirely — only once the draft is
-  // complete. Deletes their draft picks (and every other per-user table)
+  // Remove a member from the league entirely — either before the draft
+  // starts (nothing to clean up, since they have no picks yet) or once the
+  // draft is complete. Disallowed mid-draft, since removing a member with
+  // an in-progress pick order would leave the draft in an inconsistent
+  // state. Deletes their draft picks (and every other per-user table)
   // rather than just the membership row, since DraftRoom reads raw
   // draft_picks directly (not filtered by members), so this is what
   // actually frees their teams back into the available pool.
   const removeMember = async (targetUserId: string): Promise<{ error?: string }> => {
     if (!league || !user || !isCommissioner) return { error: 'Not authorized' };
-    if (league.draft_status !== 'complete') return { error: 'Members can only be removed once the draft is complete' };
+    if (league.draft_status === 'active') return { error: 'Members can only be removed before the draft starts or after it is complete' };
     if (targetUserId === user.id) return { error: "You can't remove yourself" };
 
     const target = members.find(m => m.user_id === targetUserId);
