@@ -16,18 +16,15 @@
 // service-role key so the email's actual content can't be spoofed by
 // tampering with the client request.
 //
-// No custom sending domain is configured yet, so this sends from Resend's
-// shared sandbox address (onboarding@resend.dev) — until a domain is
-// verified in the Resend dashboard, delivery only succeeds to the Resend
-// account's own verified email, not arbitrary invitees. See the Resend
-// docs for adding a domain when that's ready.
+// Sends from a verified gridironglory.app domain in Resend, so delivery
+// works to any invitee — not just the Resend account's own inbox.
 
 import { buildInviteEmailHtml } from './lib/inviteEmailTemplate.mjs';
 
 const SUPABASE_URL   = process.env.SUPABASE_URL;
 const SERVICE_KEY    = process.env.SUPABASE_SERVICE_KEY;
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
-const FROM_ADDRESS    = 'Gridiron Glory <onboarding@resend.dev>';
+const FROM_ADDRESS    = 'Gridiron Glory <invites@gridironglory.app>';
 
 async function sbGet(pathWithQuery) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${pathWithQuery}`, {
