@@ -170,4 +170,23 @@ describe('computeTrophies', () => {
     expect(ids).toContain('beat_spread');
     expect(ids).toContain('used_free_agency');
   });
+
+  it('awards beat_spread based on which side won, not just result === covered', () => {
+    const scoring = { ...DEFAULT_SCORING, spread_enabled: true };
+    const draftPicks = [
+      pick({ team_id: 't1', user_id: 'u1' }),
+      pick({ team_id: 't2', user_id: 'u2' }),
+    ];
+    const spreadPicks: SpreadPick[] = [
+      // u1 bet against and the team covered anyway — u1 lost the bet, despite result === 'covered'.
+      { id: 's1', league_id: 'L', user_id: 'u1', team_id: 't1', week: 1, locked_spread: -7, side: 'against', picked_at: '', result: 'covered', points: -2, commissioner_override: false },
+      // u2 bet against and the team missed — u2 won the bet, despite result === 'missed'.
+      { id: 's2', league_id: 'L', user_id: 'u2', team_id: 't2', week: 1, locked_spread: -7, side: 'against', picked_at: '', result: 'missed', points: 2, commissioner_override: false },
+    ];
+
+    const snapshot = computeTrophies(members, draftPicks, [], spreadPicks, [], [], {}, scoring);
+    const beatSpread = snapshot.categories.find(c => c.id === 'beat_spread')!;
+
+    expect(beatSpread.winners.map(w => w.user_id)).toEqual(['u2']);
+  });
 });

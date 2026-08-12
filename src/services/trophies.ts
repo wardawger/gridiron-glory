@@ -5,7 +5,7 @@ import type {
 } from '../types';
 import { normalizeScoring } from '../types';
 import { isP4Conference } from './scoring';
-import { calcWeeklyScore } from './scoring';
+import { calcWeeklyScore, didWinSpreadPick } from './scoring';
 import { rosterAtWeek } from './roster';
 
 export const TROPHY_META: Record<TrophyCategoryId, { label: string; description: string }> = {
@@ -84,7 +84,11 @@ function computeBeatSpread(members: LeagueMember[], spreadPicks: SpreadPick[], t
   members.forEach(member => {
     const seen = new Set<string>();
     const teams: TrophyTeamRef[] = [];
-    spreadPicks.filter(p => p.user_id === member.user_id && p.result === 'covered').forEach(p => {
+    spreadPicks.filter(p =>
+      p.user_id === member.user_id &&
+      (p.result === 'covered' || p.result === 'missed') &&
+      didWinSpreadPick(p.side, p.result)
+    ).forEach(p => {
       if (seen.has(p.team_id)) return;
       seen.add(p.team_id);
       const info = teamInfo.get(p.team_id);

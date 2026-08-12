@@ -116,9 +116,13 @@ export function useSpreadPicks(
     points: number,
   ): Promise<{ error?: string }> => {
     if (!league || !isCommissioner) return { error: 'Not authorized' };
+    // A push is always worth 0, regardless of what the caller passes — enforced
+    // here rather than trusted from every call site, matching the auto-scoring
+    // path in scoreSpread().
+    const resolvedPoints = result === 'push' ? 0 : points;
     const { error: err } = await supabase
       .from('spread_picks')
-      .update({ result, points, commissioner_override: true })
+      .update({ result, points: resolvedPoints, commissioner_override: true })
       .eq('id', pickId);
     if (err) return { error: err.message };
     return {};

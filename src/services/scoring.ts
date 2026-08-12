@@ -67,6 +67,17 @@ export function getSpreadOutcome(
   return teamMargin > -lockedSpread ? 'covered' : 'missed';
 }
 
+// Whether a pick won its bet — shared by live scoring and anything else
+// (e.g. trophy computation) that needs to know win/loss without
+// duplicating the cover/against flip. Only meaningful for a decided
+// (non-push) outcome; callers must exclude 'push' themselves.
+export function didWinSpreadPick(
+  side: 'cover' | 'against',
+  outcome: 'covered' | 'missed',
+): boolean {
+  return side === 'cover' ? outcome === 'covered' : outcome === 'missed';
+}
+
 export function scoreSpread(
   game: GameResult,
   settings: ScoringSettings,
@@ -79,9 +90,7 @@ export function scoreSpread(
   if (outcome === null) return 0; // game not complete yet
   if (outcome === 'push') return 0; // push: no points awarded or taken, either side
 
-  // Picking "against" wins exactly when the team missed the spread, and
-  // vice versa — everything below just needs to know whether the pick won.
-  const won = side === 'cover' ? outcome === 'covered' : outcome === 'missed';
+  const won = didWinSpreadPick(side, outcome);
 
   // Commissioner-overridden flat penalty on a loss, independent of flat vs
   // multiplier mode. Off by default — with the toggle off, a loss costs
