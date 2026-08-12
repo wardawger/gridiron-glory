@@ -141,7 +141,7 @@ export function AuthPage({ auth }: Props) {
       if (err) setMsg({ type: 'error', text: err.message });
       else {
         posthog.capture('account_signed_up');
-        setMsg({ type: 'success', text: 'Check your email to confirm your account, then sign in.' });
+        setMsg({ type: 'success', text: 'Check your email to confirm your account, then sign in and get ready to draft.' });
       }
     } else {
       const err = await auth.resetPasswordForEmail(email);
@@ -248,9 +248,9 @@ export function AuthPage({ auth }: Props) {
             )}
 
             {mode === 'forgot' && (
-              <div className="mb-6">
-                <h2 className="text-lg font-semibold text-white">Reset your password</h2>
-                <p className="text-turf-400 text-sm mt-1">
+              <div className="mb-6 text-center">
+                <h2 className="font-display text-3xl tracking-wider text-white">Reset Password</h2>
+                <p className="text-turf-400 text-sm mt-2">
                   Enter your email and we'll send you a link to reset your password.
                 </p>
               </div>
@@ -377,7 +377,17 @@ export function AuthPage({ auth }: Props) {
             made that empty margin more visually prominent, not less. */}
         {isDesktop && (
           <div className="w-full flex flex-col gap-6 lg:order-1">
-            <div className="w-full max-w-[1000px] mx-auto">
+            <div className="relative w-full max-w-[1000px] mx-auto">
+              {/* Ties the deck to the act of signing in, rather than leaving
+                  it as pure decoration beside the card — a design-critique
+                  finding (the deck is the app's most product-specific
+                  material, but had no stated reason for being here).
+                  Positioned absolutely above the panel, not in normal flow,
+                  so it doesn't push the panel's top edge out of alignment
+                  with the sign-in card's top edge on the other column. */}
+              <p className="absolute -top-7 inset-x-0 text-xs text-turf-500 uppercase tracking-wide text-center">
+                What you're signing in for
+              </p>
               <BrandSlidesPanel />
             </div>
             <AppSummary />
