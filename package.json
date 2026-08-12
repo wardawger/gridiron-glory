@@ -12,12 +12,15 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
     "canvas-confetti": "^1.9.4",
+    "clsx": "^2.1.1",
+    "framer-motion": "^13.1.0",
     "lucide-react": "^0.383.0",
     "posthog-js": "^1.414.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.26.0",
-    "recharts": "^2.12.7"
+    "recharts": "^2.12.7",
+    "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {
     "@types/canvas-confetti": "^1.9.0",
