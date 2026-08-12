@@ -1,3 +1,13 @@
+[build.environment]
+  # These VITE_-prefixed vars are deliberately bundled into the built
+  # client JS by Vite (that's what the VITE_ prefix means) -- they're all
+  # designed to be public (Supabase URL/anon key are safe by Supabase's
+  # own docs, protected by RLS; CFBD/PostHog keys are low-stakes client
+  # tokens). Netlify's secrets scanner otherwise flags their own
+  # intentional presence in dist/ as an "exposed secret" and fails the
+  # build. Omit them by key so the scanner still catches anything else.
+  SECRETS_SCAN_OMIT_KEYS = "VITE_SUPABASE_URL,VITE_SUPABASE_ANON_KEY,VITE_CFBD_KEY,VITE_POSTHOG_KEY,VITE_POSTHOG_HOST"
+
 [[redirects]]
   from = "/*"
   to = "/index.html"

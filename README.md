@@ -18,7 +18,7 @@ College Football Fantasy League — live draft, real-time scoring, portal/free a
 
 ### 1. Supabase (Database + Auth)
 
-> This app's live project is **CFB Fantasy App**, ref `kweishogxmsxefzorujc` (`https://kweishogxmsxefzorujc.supabase.co`), region `us-west-2`. If you're working against the existing deployment (not spinning up a fresh one), that's the project — use this ref when pointing the [Supabase MCP server](https://supabase.com/docs/guides/getting-started/mcp) or the Supabase CLI at it, rather than creating a new project.
+> This app's live project is **CFB Fantasy App**, ref `kweishogxmsxefzorujc`, region `us-west-2`. If you're working against the existing deployment (not spinning up a fresh one), that's the project — use this ref when pointing the [Supabase MCP server](https://supabase.com/docs/guides/getting-started/mcp) or the Supabase CLI at it, rather than creating a new project. (The project URL isn't spelled out here on purpose — Netlify's secrets scanner flags a literal match against the `SUPABASE_URL` env var; derive it from the ref if you need it: `https://<ref>.supabase.co`.)
 
 1. Create a free account at [supabase.com](https://supabase.com)
 2. Create a new project called `gridiron-glory`
