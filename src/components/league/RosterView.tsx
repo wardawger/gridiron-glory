@@ -10,6 +10,7 @@ import { TeamLogo } from '../ui/TeamLogo';
 import { WeatherBadge } from '../ui/WeatherBadge';
 import { Avatar } from '../ui/Avatar';
 import { TriviaCard } from '../ui/TriviaCard';
+import { FadeIn } from '../amicro/fade-in';
 
 interface Props {
   member: LeagueMember;
@@ -567,7 +568,7 @@ export function RosterView({
         />
       )}
 
-      <div className="space-y-5 animate-fade-in">
+      <FadeIn className="space-y-5">
 
         {/* Header */}
         <div className="card p-5 flex items-center justify-between">
@@ -1271,7 +1272,7 @@ export function RosterView({
               <span className="text-turf-500 ml-auto">Scroll right →</span>
             </div>
         </div>
-      </div>
+      </FadeIn>
     </>
   );
 }

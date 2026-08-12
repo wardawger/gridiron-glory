@@ -8,6 +8,7 @@ import type {
 import { Avatar } from '../ui/Avatar';
 import { TeamLogo } from '../ui/TeamLogo';
 import { computeTrophies } from '../../services/trophies';
+import { TiltCard } from '../amicro/tilt-card';
 
 interface Props {
   league: League;
@@ -36,7 +37,7 @@ function PodiumCard({ entry, place }: { entry: SeasonHistoryEntry; place: 0 | 1 
   const style = PODIUM_STYLES[place];
   const Icon = style.icon;
   return (
-    <div className={`card-inner p-4 text-center ring-1 ${style.ring} ${style.bg}`}>
+    <TiltCard maxTilt={10} cardClassName={`card-inner p-4 text-center ring-1 ${style.ring} ${style.bg}`}>
       <Icon className={`w-6 h-6 mx-auto mb-2 ${style.iconClass}`} />
       <Avatar
         displayName={entry.display_name}
@@ -48,7 +49,7 @@ function PodiumCard({ entry, place }: { entry: SeasonHistoryEntry; place: 0 | 1 
       <p className="font-medium text-white mt-2 truncate">{entry.display_name}</p>
       <p className="text-xs text-turf-500">{style.label}</p>
       <p className="font-mono font-bold text-lg text-white mt-1">{entry.total_points} pts</p>
-    </div>
+    </TiltCard>
   );
 }
 

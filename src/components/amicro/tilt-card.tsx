@@ -50,7 +50,7 @@ export function TiltCard({
       onMouseMove={handleMouseMove}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={handleMouseLeave}
-      className={`relative w-full aspect-[4/3] max-w-[320px] cursor-pointer ${className}`}
+      className={`relative cursor-pointer ${className}`}
       style={{ perspective: '800px' }}
     >
       <motion.div
@@ -59,9 +59,9 @@ export function TiltCard({
           rotateY,
           transformStyle: 'preserve-3d',
         }}
-        className={`w-full h-full rounded-2xl bg-gradient-to-br from-neutral-100 to-neutral-250 dark:from-neutral-850 dark:to-neutral-900 border border-neutral-200/20 shadow-lg flex items-center justify-center p-6 select-none ${cardClassName}`}
+        className={`w-full h-full select-none ${cardClassName}`}
       >
-        <div style={{ transform: 'translateZ(40px)', transformStyle: 'preserve-3d' }} className="w-full h-full flex flex-col justify-center items-center">
+        <div style={{ transform: 'translateZ(24px)', transformStyle: 'preserve-3d' }} className="w-full h-full">
           {children}
         </div>
       </motion.div>

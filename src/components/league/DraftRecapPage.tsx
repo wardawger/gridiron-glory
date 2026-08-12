@@ -7,6 +7,7 @@ import { P4_CONFERENCES, isP4Conference } from '../../services/scoring';
 import { useTabCrossfade } from '../../hooks/useCrossfade';
 import { TeamLogo } from '../ui/TeamLogo';
 import { TriviaCard } from '../ui/TriviaCard';
+import { FadeUp } from '../amicro/fade-up';
 import ncaaLogo from '../../assets/ncaa-logo.webp';
 
 type View = 'timeline' | 'byManager';
@@ -194,6 +195,7 @@ export function DraftRecapPage({ league, members, draftPicks, teams }: Props) {
       </div>
 
       {sortedPicks.length > 0 && (
+        <FadeUp>
         <div className="card p-5 space-y-4">
           <h3 className="font-medium text-white text-sm">League Conference Breakdown</h3>
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
@@ -265,6 +267,7 @@ export function DraftRecapPage({ league, members, draftPicks, teams }: Props) {
             </div>
           </div>
         </div>
+        </FadeUp>
       )}
 
       {sortedPicks.length === 0 ? (
