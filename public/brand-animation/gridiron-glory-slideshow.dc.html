@@ -251,7 +251,7 @@
   </sc-if>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props="{&quot;wrapAround&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;},&quot;showDots&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;}}">
+<script type="text/x-dc" data-dc-script data-props="{&quot;wrapAround&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;},&quot;showDots&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;}}">
 class Component extends DCLogic {
   state = { i: 0 };
   frameRef = React.createRef();
@@ -340,7 +340,7 @@ class Component extends DCLogic {
       lineColor: k === arr.length - 1 ? 'transparent' : f.color,
     }));
 
-    const showDots = this.props.showDots ?? false;
+    const showDots = this.props.showDots ?? true;
     const dots = [0, 1, 2, 3, 4].map((k) => ({
       bg: k === i ? '#22c55e' : 'rgba(245,246,247,0.25)',
       go: () => this.go(k),

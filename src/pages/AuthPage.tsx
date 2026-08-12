@@ -36,6 +36,17 @@ function GoogleIcon({ className }: { className?: string }) {
   );
 }
 
+// Supabase's raw auth error strings are accurate but offer no next step.
+// Translate the ones users actually hit into copy that names the likely
+// cause and points at the recovery action already on this screen (the
+// Forgot Password link/mode) rather than leaving them to guess.
+function friendlyAuthError(message: string): string {
+  if (/invalid login credentials/i.test(message)) {
+    return "That email and password don't match — double-check them, or reset your password below.";
+  }
+  return message;
+}
+
 // Matches Tailwind's `lg` breakpoint. The brand animation column is
 // desktop-only — on mobile it's skipped entirely (not just hidden) so a
 // phone never pays for it.
@@ -123,7 +134,7 @@ export function AuthPage({ auth }: Props) {
     setMsg(null);
     if (mode === 'login') {
       const err = await auth.signIn(email, password);
-      if (err) setMsg({ type: 'error', text: err.message });
+      if (err) setMsg({ type: 'error', text: friendlyAuthError(err.message) });
     } else if (mode === 'signup') {
       if (!name.trim()) { setMsg({ type: 'error', text: 'Display name required' }); setSubmitting(false); return; }
       const err = await auth.signUp(email, password, name.trim());
@@ -288,18 +299,22 @@ export function AuthPage({ auth }: Props) {
                 <button
                   type="button"
                   onClick={() => { setMode('forgot'); setMsg(null); }}
-                  className="text-sm text-turf-400 hover:text-field-400 transition-colors -mt-2 self-end"
+                  className="text-sm text-turf-400 hover:text-field-400 transition-colors -mt-2 self-end py-2 -my-2"
                 >
                   Forgot password?
                 </button>
               )}
 
               {msg && (
-                <div className={`text-sm rounded-lg px-3 py-2 ${
-                  msg.type === 'error'
-                    ? 'bg-red-900/40 text-red-300 border border-red-800'
-                    : 'bg-field-900/40 text-field-300 border border-field-800'
-                }`}>
+                <div
+                  role="alert"
+                  aria-live={msg.type === 'error' ? 'assertive' : 'polite'}
+                  className={`text-sm rounded-lg px-3 py-2 ${
+                    msg.type === 'error'
+                      ? 'bg-red-900/40 text-red-300 border border-red-800'
+                      : 'bg-field-900/40 text-field-300 border border-field-800'
+                  }`}
+                >
                   {msg.text}
                 </div>
               )}
@@ -313,7 +328,7 @@ export function AuthPage({ auth }: Props) {
                 <button
                   type="button"
                   onClick={() => { setMode('login'); setMsg(null); }}
-                  className="text-sm text-turf-400 hover:text-field-400 transition-colors w-full text-center"
+                  className="text-sm text-turf-400 hover:text-field-400 transition-colors w-full text-center py-2"
                 >
                   Back to sign in
                 </button>
@@ -328,7 +343,7 @@ export function AuthPage({ auth }: Props) {
                     <button
                       type="button"
                       onClick={() => { setMode('signup'); setMsg(null); }}
-                      className="text-field-400 hover:text-field-300 font-medium transition-colors"
+                      className="text-field-400 hover:text-field-300 font-medium transition-colors py-2 -my-2"
                     >
                       Sign Up
                     </button>
@@ -339,7 +354,7 @@ export function AuthPage({ auth }: Props) {
                     <button
                       type="button"
                       onClick={() => { setMode('login'); setMsg(null); }}
-                      className="text-field-400 hover:text-field-300 font-medium transition-colors"
+                      className="text-field-400 hover:text-field-300 font-medium transition-colors py-2 -my-2"
                     >
                       Sign In
                     </button>
