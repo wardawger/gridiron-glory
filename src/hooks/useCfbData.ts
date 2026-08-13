@@ -22,7 +22,14 @@ interface CfbState {
   refreshSpreads: (week: number) => Promise<void>;
 }
 
-export function useCfbData(): CfbState {
+// `enabled` gates every fetch on having a session. The CFBD proxy now
+// requires an authenticated caller, and this hook mounts above the auth
+// gate in App.tsx — without this it would fire on the login screen, take a
+// row of 401s, and then never retry, because the effect's only other
+// dependency is the 30-minute refresh tick. Passing auth state in means
+// the load runs the moment a session appears. It also stops logged-out
+// visitors from triggering a full season-data fetch they can't see.
+export function useCfbData(enabled = true): CfbState {
   const [teams, setTeams]             = useState<CfbTeam[]>([]);
   const [gameData, setGameData]       = useState<GameData>({});
   const [rankings, setRankings]       = useState<APRanking[]>([]);
@@ -35,6 +42,12 @@ export function useCfbData(): CfbState {
   const [tick, setTick]               = useState(0);
 
   useEffect(() => {
+    if (!enabled) {
+      // Not an error state and not perpetually "loading" — there's just
+      // nothing to fetch until someone signs in.
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
     async function load() {
       setLoading(true);
@@ -83,7 +96,7 @@ export function useCfbData(): CfbState {
     }
     load();
     return () => { cancelled = true; };
-  }, [tick]);
+  }, [tick, enabled]);
 
   // Auto-refresh every 30 minutes
   useEffect(() => {

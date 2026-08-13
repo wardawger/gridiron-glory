@@ -297,12 +297,20 @@ export function useLeagueCore(user: User | null) {
     // Best-effort — the invite row (and its shareable /join/:token link)
     // already exists regardless of whether the email actually sends, so a
     // failure here never blocks or invalidates the invite itself.
+    // The function now requires a session and checks server-side that the
+    // caller commissions this league; it also looks the inviter's display
+    // name up itself rather than accepting one from here, so that the
+    // "X invited you" line in the email can't be forged.
     let emailSent = false;
     try {
+      const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch('/.netlify/functions/send-invite-email', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ inviteId: data.id, inviterName: myMembership?.display_name ?? 'Someone' }),
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify({ inviteId: data.id }),
       });
       emailSent = res.ok;
     } catch {

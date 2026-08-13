@@ -1,5 +1,6 @@
 import type { CfbTeam, GameData, GameResult, APRanking, TeamSeasonStats, SpreadData, TeamRatings } from '../types';
 import { P4_CONFERENCES as P4_CONF_LIST } from '../types';
+import { supabase } from '../lib/supabase';
 
 // All CFBD API calls are routed through a Netlify serverless proxy to avoid
 // CORS issues when fetching from the browser. The proxy adds the API key
@@ -13,9 +14,17 @@ function proxyUrl(path: string, params: Record<string, string | number> = {}): s
   return `${PROXY}?${qs.toString()}`;
 }
 
-// Drop-in replacement for fetch({BASE}{path}?{params}, { headers })
+// Drop-in replacement for fetch({BASE}{path}?{params}, { headers }).
+// The proxy requires a signed-in caller — it spends a metered CFBD key, so
+// leaving it open let anyone drain the quota. Callers are all behind the
+// auth gate already (useCfbData only runs once there's a session), so a
+// missing token here means something is wrong rather than something
+// expected, and the proxy's 401 surfaces it instead of failing silently.
 async function cfbdFetch(path: string, params: Record<string, string | number> = {}): Promise<Response> {
-  return fetch(proxyUrl(path, params));
+  const { data: { session } } = await supabase.auth.getSession();
+  return fetch(proxyUrl(path, params), {
+    headers: session ? { Authorization: `Bearer ${session.access_token}` } : {},
+  });
 }
 
 // Canonical P4 list (types/index.ts) — previously diverged here (also

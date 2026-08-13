@@ -16,6 +16,8 @@
 //     fetched_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 //   );
 
+import { verifyUser } from './lib/verifyUser.mjs';
+
 const CFBD_BASE   = 'https://api.collegefootballdata.com';
 const CACHE_TTL_H = 24; // hours before cache entry is considered stale
 
@@ -63,10 +65,27 @@ export default async (req) => {
   const corsHeaders = {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'authorization, content-type',
   };
 
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
+  const apiKey      = process.env.CFBD_KEY;
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const serviceKey  = process.env.SUPABASE_SERVICE_KEY;
+
+  // This forwards to a metered third-party API using a key that never
+  // leaves the server. Without a caller check it was an open proxy —
+  // anyone could burn the whole CFBD quota. Any signed-in user is
+  // sufficient here: the data is public college-football stats, so the
+  // gate is about quota abuse, not about who may see what.
+  const user = await verifyUser(req, supabaseUrl, serviceKey);
+  if (!user) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401, headers: corsHeaders,
+    });
   }
 
   const url       = new URL(req.url);
@@ -77,10 +96,6 @@ export default async (req) => {
       status: 400, headers: corsHeaders,
     });
   }
-
-  const apiKey      = process.env.CFBD_KEY;
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const serviceKey  = process.env.SUPABASE_SERVICE_KEY;
 
   if (!apiKey) {
     return new Response(JSON.stringify({ error: 'CFBD_KEY env var not set' }), {

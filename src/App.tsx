@@ -215,7 +215,7 @@ function AnimatedRoutes({ lg, league, auth, cfb }: AnimatedRoutesProps) {
 export default function App() {
   const auth   = useAuth();
   const league = useLeague(auth.user);
-  const cfb    = useCfbData();
+  const cfb    = useCfbData(!!auth.user);
 
   // Resume an invite flow once the user is authenticated, regardless of
   // whether that happened via the invite's own auth prompt, the general

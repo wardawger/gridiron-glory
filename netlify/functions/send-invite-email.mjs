@@ -20,6 +20,7 @@
 // works to any invitee — not just the Resend account's own inbox.
 
 import { buildInviteEmailHtml } from './lib/inviteEmailTemplate.mjs';
+import { verifyUser } from './lib/verifyUser.mjs';
 
 const SUPABASE_URL   = process.env.SUPABASE_URL;
 const SERVICE_KEY    = process.env.SUPABASE_SERVICE_KEY;
@@ -35,7 +36,11 @@ async function sbGet(pathWithQuery) {
 }
 
 export default async (req) => {
-  const headers = { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' };
+  const headers = {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'authorization, content-type',
+  };
 
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers });
@@ -50,9 +55,18 @@ export default async (req) => {
     return new Response(JSON.stringify({ error: 'RESEND_API_KEY env var not set' }), { status: 500, headers });
   }
 
-  let inviteId, inviterName;
+  // Unauthenticated, this endpoint sent real mail from a verified sending
+  // domain to any address a stranger named, with attacker-controlled text
+  // in the subject line — a spam/phishing relay that would have burned the
+  // Resend quota and the domain's reputation along with it.
+  const user = await verifyUser(req, SUPABASE_URL, SERVICE_KEY);
+  if (!user) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers });
+  }
+
+  let inviteId;
   try {
-    ({ inviteId, inviterName } = await req.json());
+    ({ inviteId } = await req.json());
   } catch {
     return new Response(JSON.stringify({ error: 'Invalid JSON body' }), { status: 400, headers });
   }
@@ -63,7 +77,7 @@ export default async (req) => {
   let invite;
   try {
     const rows = await sbGet(
-      `invites?id=eq.${encodeURIComponent(inviteId)}&select=invited_email,token,leagues(name)`
+      `invites?id=eq.${encodeURIComponent(inviteId)}&select=league_id,invited_email,token,leagues(name)`
     );
     invite = rows[0];
   } catch (e) {
@@ -71,6 +85,26 @@ export default async (req) => {
   }
   if (!invite) {
     return new Response(JSON.stringify({ error: 'Invite not found' }), { status: 404, headers });
+  }
+
+  // Being signed in isn't enough — the caller has to be a commissioner of
+  // the league this invite belongs to, otherwise any account could send
+  // mail on behalf of any league. The display name comes from that same
+  // lookup rather than from the request body, so the "X invited you"
+  // line can't be forged.
+  let inviterName;
+  try {
+    const rows = await sbGet(
+      `league_members?league_id=eq.${encodeURIComponent(invite.league_id)}` +
+      `&user_id=eq.${encodeURIComponent(user.id)}&select=display_name,role`
+    );
+    const membership = rows[0];
+    if (!membership || membership.role !== 'commissioner') {
+      return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers });
+    }
+    inviterName = membership.display_name;
+  } catch (e) {
+    return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers });
   }
 
   const origin  = req.headers.get('origin') || process.env.SITE_URL || '';

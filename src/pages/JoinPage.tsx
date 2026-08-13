@@ -27,11 +27,14 @@ export function JoinPage({ user, onJoined }: Props) {
     if (user && joinedTokenRef.current === token) return;
 
     const join = async () => {
-      const { data: invite, error: invErr } = await supabase
-        .from('invites')
-        .select('*, leagues(name)')
-        .eq('token', token)
-        .maybeSingle();
+      // Reads through a token-scoped RPC rather than selecting from
+      // `invites` directly: that table's old policy let anyone (signed in
+      // or not) read every row, which exposed every pending invite token
+      // and invited email address. The table is now commissioner-only and
+      // this function returns just the one invite the token names.
+      const { data: rows, error: invErr } = await supabase
+        .rpc('get_invite_by_token', { p_token: token });
+      const invite = rows?.[0];
 
       if (invErr || !invite) {
         setStatus('error');
@@ -39,7 +42,7 @@ export function JoinPage({ user, onJoined }: Props) {
         return;
       }
 
-      const name = (invite.leagues as any)?.name ?? 'the league';
+      const name = invite.league_name ?? 'the league';
       setLeagueName(name);
 
       if (invite.accepted) {
@@ -107,7 +110,7 @@ export function JoinPage({ user, onJoined }: Props) {
         return;
       }
 
-      await supabase.from('invites').update({ accepted: true }).eq('id', invite.id);
+      await supabase.rpc('accept_invite', { p_token: token });
       posthog.capture('league_joined');
 
       setStatus('success');
