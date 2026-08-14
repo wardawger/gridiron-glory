@@ -1,0 +1,31 @@
+-- ============================================================
+-- is_league_member() ACL fix — run in Supabase SQL Editor
+-- Project Settings → SQL Editor → New Query → Paste → Run
+-- ============================================================
+--
+-- Found while re-running the Security Advisor after
+-- supabase-migration-tighten-read-policies.sql: is_league_member() still
+-- showed up as anon-executable even though that migration's
+-- `revoke execute on function public.is_league_member(uuid) from public`
+-- line had been applied without error.
+--
+-- The reason: on this project, EXECUTE on new functions in the public
+-- schema isn't granted through the PUBLIC pseudo-role at all — it's
+-- granted directly to anon/authenticated/service_role via a per-schema
+-- default privilege (visible in pg_default_acl). `revoke ... from public`
+-- only strips a grant actually held by PUBLIC, so it was a silent no-op
+-- against anon's own explicit grant. Confirmed directly against pg_proc's
+-- proacl (not just the linter, which can lag) before and after this fix.
+--
+-- is_league_commissioner() and is_league_creator() happened to end up
+-- correctly locked down despite using the same `from public` wording —
+-- not fully understood why, but verified correct by direct ACL inspection
+-- rather than assumed. Revoking by explicit role name, as below, is the
+-- reliable form and is what every future function-ACL migration in this
+-- repo should use instead of `from public`.
+
+revoke all privileges on function public.is_league_member(uuid) from anon;
+
+-- authenticated still needs it — is_league_member() is called from inside
+-- other tables' RLS policy expressions, which evaluate with the querying
+-- role's own privileges.
