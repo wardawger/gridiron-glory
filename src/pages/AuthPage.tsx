@@ -377,17 +377,7 @@ export function AuthPage({ auth }: Props) {
             made that empty margin more visually prominent, not less. */}
         {isDesktop && (
           <div className="w-full flex flex-col gap-6 lg:order-1">
-            <div className="relative w-full max-w-[1000px] mx-auto">
-              {/* Ties the deck to the act of signing in, rather than leaving
-                  it as pure decoration beside the card — a design-critique
-                  finding (the deck is the app's most product-specific
-                  material, but had no stated reason for being here).
-                  Positioned absolutely above the panel, not in normal flow,
-                  so it doesn't push the panel's top edge out of alignment
-                  with the sign-in card's top edge on the other column. */}
-              <p className="absolute -top-7 inset-x-0 text-xs text-turf-500 uppercase tracking-wide text-center">
-                What you're signing in for
-              </p>
+            <div className="w-full max-w-[1000px] mx-auto">
               <BrandSlidesPanel />
             </div>
             <AppSummary />
