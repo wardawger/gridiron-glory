@@ -112,6 +112,39 @@ export function DraftRoom({
   );
   const g5Configured = scoring.g5_conf_min > 0 || scoring.g5_conf_max < 99;
 
+  // Categories (P4 conference names, or the 'G5' sentinel for the combined
+  // non-P4 bucket) still short of their minimum, and how many more each
+  // needs. Deliberately keyed by remaining need summed ACROSS categories,
+  // not checked one category at a time — a single conference needing 1
+  // more team never looks urgent on its own (1 < picksRemaining easily),
+  // but three different conferences each needing 1 more, with only 2
+  // picks left, is exactly as blocked as one conference needing 2. This
+  // is what let a real drafter take a non-P4 team while three P4
+  // conferences were collectively unsatisfiable with their remaining
+  // picks — each conference's own need was individually "not yet urgent."
+  const categoryNeeds = useMemo(() => {
+    const needs: { category: string; needed: number }[] = [];
+    (P4_CONF_LIST as readonly string[]).forEach(conf => {
+      const current = myConfCounts[conf] ?? 0;
+      const needed = Math.max(0, scoring.p4_conf_min - current);
+      if (needed > 0) needs.push({ category: conf, needed });
+    });
+    const g5Needed = Math.max(0, scoring.g5_conf_min - myG5Count);
+    if (g5Needed > 0) needs.push({ category: 'G5', needed: g5Needed });
+    return needs;
+  }, [myConfCounts, myG5Count, scoring.p4_conf_min, scoring.g5_conf_min]);
+
+  // Once the total still-needed across every category equals (or somehow
+  // exceeds) the picks left, every remaining pick is precious — none of
+  // them can go to a category that already met its minimum, since that
+  // would burn a pick without shrinking the deficit. Below that
+  // threshold, there's slack and any legal team is fine.
+  const mustPickCategories = useMemo(() => {
+    const totalNeeded = categoryNeeds.reduce((s, n) => s + n.needed, 0);
+    if (totalNeeded === 0 || totalNeeded < myPicksRemaining) return [];
+    return categoryNeeds.map(n => n.category);
+  }, [categoryNeeds, myPicksRemaining]);
+
   // Check if a team is blocked by conference rules
   const getConfBlock = (team: CfbTeam): string | null => {
     if (scoring.excluded_conferences.includes(team.conference)) {
@@ -125,26 +158,26 @@ export function DraftRoom({
     } else if (myG5Count >= scoring.g5_conf_max) {
       return `Max ${scoring.g5_conf_max} G5/non-P4 teams`;
     }
+    if (mustPickCategories.length > 0 && !mustPickCategories.includes(confCategory(team.conference))) {
+      return `You must pick from: ${mustPickCategories.join(', ')}`;
+    }
     return null;
   };
 
-  // Warn if minimum won't be met
+  // Warn if minimum won't be met — scoped to the same urgency threshold as
+  // mustPickCategories (every remaining pick is now spoken for), not just
+  // "this category isn't at its minimum yet," which would fire from round
+  // one onward and drown out the one moment this warning actually matters.
   const confWarnings = useMemo(() => {
-    if (!isMyTurn) return [];
-    const warnings: string[] = [];
-    (P4_CONF_LIST as readonly string[]).forEach(conf => {
-      const current = myConfCounts[conf] ?? 0;
-      const needed = Math.max(0, scoring.p4_conf_min - current);
-      if (needed > 0 && needed >= myPicksRemaining) {
-        warnings.push(`Must pick ${needed} more from ${conf}`);
-      }
-    });
-    const g5Needed = Math.max(0, scoring.g5_conf_min - myG5Count);
-    if (g5Needed > 0 && g5Needed >= myPicksRemaining) {
-      warnings.push(`Must pick ${g5Needed} more G5/non-P4 team${g5Needed === 1 ? '' : 's'}`);
-    }
-    return warnings;
-  }, [myConfCounts, myG5Count, myPicksRemaining, isMyTurn, scoring.p4_conf_min, scoring.g5_conf_min]);
+    if (!isMyTurn || mustPickCategories.length === 0) return [];
+    return categoryNeeds
+      .filter(n => mustPickCategories.includes(n.category))
+      .map(n =>
+        n.category === 'G5'
+          ? `Must pick ${n.needed} more G5/non-P4 team${n.needed === 1 ? '' : 's'}`
+          : `Must pick ${n.needed} more from ${n.category}`
+      );
+  }, [categoryNeeds, mustPickCategories, isMyTurn]);
 
   // Build draft board
   const pickSlots = useMemo(() => {
@@ -257,24 +290,6 @@ export function DraftRoom({
     const block = getConfBlock(team);
     if (block) {
       setPickError(block);
-      setTimeout(() => setPickError(''), 3000);
-      return;
-    }
-
-    // Categories (P4 conference names, or the 'G5' sentinel for the combined
-    // non-P4 bucket) the user must pick from this turn to still be able to
-    // hit their minimums before picks run out.
-    const mustPickCategories = (P4_CONF_LIST as readonly string[]).filter(conf => {
-      const current = myConfCounts[conf] ?? 0;
-      const needed = Math.max(0, scoring.p4_conf_min - current);
-      return needed > 0 && needed >= myPicksRemaining;
-    });
-    const g5Needed = Math.max(0, scoring.g5_conf_min - myG5Count);
-    if (g5Needed > 0 && g5Needed >= myPicksRemaining) {
-      mustPickCategories.push('G5');
-    }
-    if (mustPickCategories.length > 0 && !mustPickCategories.includes(confCategory(team.conference))) {
-      setPickError(`You must pick from: ${mustPickCategories.join(', ')}`);
       setTimeout(() => setPickError(''), 3000);
       return;
     }
