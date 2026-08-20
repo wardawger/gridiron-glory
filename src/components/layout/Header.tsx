@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Trophy, Users, Shield, BarChart3, LogOut, RefreshCw, Zap, ChevronDown, Plus, History, ArrowLeftRight, Award, Info, ClipboardList, Archive } from 'lucide-react';
+import { Trophy, Users, Shield, BarChart3, LogOut, RefreshCw, Zap, ChevronDown, Plus, History, ArrowLeftRight, Award, Info, ClipboardList, Archive, Menu, X } from 'lucide-react';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import type { League, LeagueMember, WaiverClaim } from '../../types';
 import { Avatar } from '../ui/Avatar';
@@ -42,10 +42,12 @@ export function Header({
   }, [league?.id, userId, waiverClaims, loc.pathname]);
   const [showLeaguePicker, setShowLeaguePicker] = useState(false);
   const [showLeagueInfo, setShowLeagueInfo] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
   const infoRef = useRef<HTMLDivElement>(null);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
 
-  // Close either dropdown when clicking outside its own container
+  // Close any dropdown when clicking outside its own container
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
@@ -54,10 +56,19 @@ export function Header({
       if (infoRef.current && !infoRef.current.contains(e.target as Node)) {
         setShowLeagueInfo(false);
       }
+      if (mobileMenuRef.current && !mobileMenuRef.current.contains(e.target as Node)) {
+        setShowMobileMenu(false);
+      }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
+
+  // A route change means a nav link was just followed — close the menu
+  // rather than leaving it open over the newly-loaded page.
+  useEffect(() => {
+    setShowMobileMenu(false);
+  }, [loc.pathname]);
 
   const nav = [
     { to: '/',          label: 'Standings',  icon: Trophy },
@@ -258,29 +269,55 @@ export function Header({
             <button onClick={onSignOut} className="btn-ghost btn-sm" title="Sign out" aria-label="Sign out">
               <LogOut className="w-4 h-4" />
             </button>
-          </div>
-        </div>
 
-        {/* Mobile nav — League Info items flattened inline, no dropdown */}
-        <div className="flex md:hidden gap-1 pb-2 overflow-x-auto">
-          {[...nav.slice(0, 3), ...leagueInfoItems, ...nav.slice(3)].map(({ to, label, icon: Icon, badge }: any) => {
-            const active = loc.pathname === to;
-            return (
-              <Link
-                key={to}
-                to={to}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium whitespace-nowrap transition-colors ${
-                  active
-                    ? 'bg-field-900/60 text-field-400'
-                    : 'text-turf-400 hover:text-white'
-                }`}
+            {/* Hamburger toggle — mobile only, the desktop <nav> above
+                covers this same link set at md: and up. */}
+            <div className="relative md:hidden" ref={mobileMenuRef}>
+              <button
+                onClick={() => setShowMobileMenu(v => !v)}
+                className="btn-ghost btn-sm relative"
+                title="Menu"
+                aria-label="Menu"
+                aria-expanded={showMobileMenu}
               >
-                <Icon className="w-3 h-3" />
-                {label}
-                <CountBadge count={badge ?? 0} />
-              </Link>
-            );
-          })}
+                {showMobileMenu ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+                {!showMobileMenu && (
+                  <CountBadge count={unseenWaiverCount} className="absolute -top-1 -right-1" />
+                )}
+              </button>
+
+              {showMobileMenu && (
+                <div className="absolute top-full right-0 mt-1 w-64 card shadow-xl shadow-black/40 overflow-hidden animate-slide-up z-50 p-1.5 max-h-[70vh] overflow-y-auto">
+                  {[...nav.slice(0, 3), ...leagueInfoItems, ...nav.slice(3)].map(({ to, label, icon: Icon, description, badge }: any) => {
+                    const active = loc.pathname === to;
+                    return (
+                      <Link
+                        key={to}
+                        to={to}
+                        onClick={() => setShowMobileMenu(false)}
+                        className={`flex items-start gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors ${
+                          active
+                            ? 'bg-field-900/60 text-field-400'
+                            : 'text-turf-300 hover:bg-turf-800 hover:text-white'
+                        }`}
+                      >
+                        <Icon className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <div className="font-medium flex items-center gap-1.5">
+                            {label}
+                            <CountBadge count={badge ?? 0} />
+                          </div>
+                          {description && (
+                            <div className="text-xs text-turf-500 truncate">{description}</div>
+                          )}
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </header>
