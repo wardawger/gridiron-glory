@@ -272,8 +272,18 @@ export default function App() {
     );
   }
 
-  // User is logged in but has no leagues yet
+  // User is logged in but has no leagues yet. If they got here via an
+  // invite link, the token survives in localStorage (set by JoinPage
+  // before it sent them off to sign up/in) even though the actual browser
+  // URL is often just "/" by now — client-side navigation away from
+  // /join/:token, an OAuth round-trip, or an email-confirmation link
+  // opened in a new tab all land back here without that path. Checking
+  // for it before falling through to CreateLeaguePage means a new user
+  // never sees "create a league" while they're mid-invite, rather than
+  // relying solely on the hard-reload recovery below (which still handles
+  // the case where the user already belongs to a different league).
   if (!league.league) {
+    const pendingInvite = localStorage.getItem('pending_invite');
     return (
       <BrowserRouter>
         <Routes>
@@ -286,10 +296,12 @@ export default function App() {
             />
           } />
           <Route path="*" element={
-            <CreateLeaguePage
-              displayName={auth.displayName ?? 'Commissioner'}
-              onCreate={league.createLeague}
-            />
+            pendingInvite
+              ? <Navigate to={`/join/${pendingInvite}`} replace />
+              : <CreateLeaguePage
+                  displayName={auth.displayName ?? 'Commissioner'}
+                  onCreate={league.createLeague}
+                />
           } />
         </Routes>
       </BrowserRouter>

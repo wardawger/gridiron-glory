@@ -79,6 +79,11 @@ export function JoinPage({ user, onJoined }: Props) {
       }
 
       joinedTokenRef.current = token;
+      // Cleared here (not just by App.tsx's hard-reload recovery path) so a
+      // completed join never leaves a stale token behind — otherwise a later
+      // legitimate visit to /create-league could get redirected right back
+      // here.
+      localStorage.removeItem('pending_invite');
 
       // Check already a member
       const { data: existing } = await supabase
