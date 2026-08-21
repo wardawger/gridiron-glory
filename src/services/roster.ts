@@ -44,6 +44,15 @@ export function rosterAtWeek(
   return Array.from(roster.values());
 }
 
+// Shared kickoff check — a team's spread pick, captain pick, or bench/starter
+// status all lock once its game for the week has actually started. Extracted
+// here (moved out of RosterView.tsx, its original single call site) so
+// scoring.ts can use the same definition rather than duplicating it.
+export function isGameKickedOff(startDate: string | null | undefined): boolean {
+  if (!startDate) return false;
+  return new Date(startDate) <= new Date();
+}
+
 // Free agency moves are always recorded at the league's current week, so a
 // member's present-day roster is just their roster as of that week.
 export function currentRosters(

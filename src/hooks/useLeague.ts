@@ -5,6 +5,7 @@ import { useSpreadPicks } from './league/useSpreadPicks';
 import { useFreeAgencyAndWaivers } from './league/useFreeAgencyAndWaivers';
 import { useManualBonuses } from './league/useManualBonuses';
 import { useScoreCorrections } from './league/useScoreCorrections';
+import { useBenchPicks } from './league/useBenchPicks';
 
 // Thin composer: useLeagueCore owns all raw state + both realtime/polling
 // effects + core league/draft/member actions; the domain hooks below are
@@ -35,13 +36,17 @@ export function useLeague(user: User | null) {
     core.league, user, core.isCommissioner, core.setScoreCorrections,
   );
 
+  const { swapBench, ensureBenchSeeded } = useBenchPicks(
+    core.setBenchPicks, core.leagueRef, core.userRef, core.benchPicksRef,
+  );
+
   return {
     league: core.league, allLeagues: core.allLeagues, allMemberships: core.allMemberships,
     selectedLeagueId: core.selectedLeagueId,
     members: core.members, draftPicks: core.draftPicks, captainPicks: core.captainPicks,
     manualBonuses: core.manualBonuses, spreadPicks: core.spreadPicks,
     freeAgencyMoves: core.freeAgencyMoves, waiverClaims: core.waiverClaims,
-    scoreCorrections: core.scoreCorrections, seasonHistory: core.seasonHistory,
+    scoreCorrections: core.scoreCorrections, benchPicks: core.benchPicks, seasonHistory: core.seasonHistory,
     rosters: core.rosters, myMembership: core.myMembership, isCommissioner: core.isCommissioner,
     loading: core.loading, error: core.error,
     switchLeague: core.switchLeague, createLeague: core.createLeague, sendInvite: core.sendInvite,
@@ -49,6 +54,7 @@ export function useLeague(user: User | null) {
     deleteLeague: core.deleteLeague, endSeason: core.endSeason,
     setCaptain, addManualBonus, removeManualBonus, addScoreCorrection, removeScoreCorrection,
     setSpreadPick, removeSpreadPick, overrideSpreadResult, clearSpreadOverride,
+    swapBench, ensureBenchSeeded,
     updateWeek: core.updateWeek, updateScoring: core.updateScoring, removeFromRoster: core.removeFromRoster,
     makeFreeAgencyMove, submitWaiverClaim,
     updateDisplayName: core.updateDisplayName, updateAvatar: core.updateAvatar, updateMemberRole: core.updateMemberRole,

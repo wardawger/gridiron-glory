@@ -1,4 +1,4 @@
-import { ClipboardList, Coins, ArrowLeftRight, Award, Gift, TrendingUp, TrendingDown, Clock } from 'lucide-react';
+import { ClipboardList, Coins, ArrowLeftRight, Award, Gift, TrendingUp, TrendingDown, Clock, Users } from 'lucide-react';
 import type { League, LeagueMember } from '../../types';
 import { normalizeScoring, STAT_BONUS_CATEGORIES, STAT_BONUS_LABELS, BONUS_LABELS, BONUS_GROUPS } from '../../types';
 
@@ -119,6 +119,21 @@ export function LeagueSettingsPage({ league, members }: Props) {
             {scoring.spread_allow_captain_stack
               ? 'You can pick the spread on your Captain\'s team the same week.'
               : 'You cannot pick the spread on your Captain\'s team the same week — pick a different team.'}
+          </p>
+        </div>
+      )}
+
+      {/* Bench */}
+      {scoring.bench_enabled && (
+        <div className="card p-5 space-y-3">
+          <div className="flex items-center gap-2">
+            <Users className="w-4 h-4 text-field-400" />
+            <h3 className="font-medium text-white text-sm">Bench</h3>
+            <span className="badge-green text-xs ml-auto">Enabled</span>
+          </div>
+          <p className="text-xs text-turf-500">
+            Each roster runs {scoring.starters_count} starters and {scoring.bench_count} bench teams every week — only starters score.
+            A team's starter/bench status locks once its game kicks off.
           </p>
         </div>
       )}

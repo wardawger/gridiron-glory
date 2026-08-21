@@ -114,6 +114,12 @@ export interface ScoringSettings {
   waiver_priority_metric: 'worst_record' | 'fewest_points';
   waiver_process_day: number;  // 0=Sun..6=Sat, evaluated in waiver_timezone
   waiver_timezone: string;     // IANA zone, e.g. 'America/New_York'
+  // Starters/bench weekly lineups — when disabled, every rostered team
+  // scores every week (today's behavior). starters_count + bench_count
+  // must always equal the league's max_teams_per_user.
+  bench_enabled: boolean;
+  starters_count: number;
+  bench_count: number;
 }
 
 export const DEFAULT_SCORING: ScoringSettings = {
@@ -161,6 +167,12 @@ export const DEFAULT_SCORING: ScoringSettings = {
   waiver_priority_metric: 'worst_record',
   waiver_process_day: 3, // Wednesday
   waiver_timezone: 'America/New_York',
+  // Bench defaults — off until commissioner enables. 10/0 is a neutral
+  // placeholder (every league that turns this on sets its own real split
+  // summing to its own max_teams_per_user); it's never read while disabled.
+  bench_enabled: false,
+  starters_count: 10,
+  bench_count: 0,
 };
 
 // Fills in any missing/legacy-shaped scoring fields with defaults — handles
@@ -273,6 +285,18 @@ export interface RosterEntry {
 }
 
 export interface CaptainPick {
+  id: string;
+  league_id: string;
+  user_id: string;
+  team_id: string;
+  week: number;
+  picked_at: string;
+}
+
+// Presence of a row = that team is benched for that user/week (doesn't
+// score); absence = starter (the default — every team scores unless
+// explicitly benched). Only meaningful when scoring.bench_enabled is on.
+export interface BenchPick {
   id: string;
   league_id: string;
   user_id: string;
@@ -545,6 +569,7 @@ export interface WeeklyScore {
   points: number;
   captain_team_id: string | null;
   spread_team_ids: string[];
+  bench_team_ids: string[];
   breakdown: ScoreBreakdown[];
   fa_points: number; // free agency penalty applied this week (<= 0)
   correction_points: number; // commissioner score corrections applied this week
@@ -555,6 +580,7 @@ export interface ScoreBreakdown {
   team_name: string;
   points: number;
   is_captain: boolean;
+  is_benched: boolean;
   spread_points: number;
   game: GameResult | null;
 }

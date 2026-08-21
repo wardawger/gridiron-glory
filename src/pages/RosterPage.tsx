@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { RosterView } from '../components/league/RosterView';
-import type { League, LeagueMember, DraftPick, CaptainPick, GameData, SpreadPick, SpreadData, FreeAgencyMove, ScoreCorrection } from '../types';
+import type { League, LeagueMember, DraftPick, CaptainPick, GameData, SpreadPick, SpreadData, FreeAgencyMove, ScoreCorrection, BenchPick } from '../types';
 import { calcWeeklyScore } from '../services/scoring';
 import { rosterAtWeek } from '../services/roster';
 
@@ -15,17 +15,21 @@ interface Props {
   spreadPicks: SpreadPick[];
   freeAgencyMoves: FreeAgencyMove[];
   scoreCorrections: ScoreCorrection[];
+  benchPicks: BenchPick[];
   userId: string;
   onSetCaptain: (week: number, teamId: string) => void;
   onSetSpread: (week: number, teamId: string, lockedSpread: number, side?: 'cover' | 'against') => Promise<{ error?: string }>;
   onRemoveSpread: (week: number, teamId: string) => Promise<{ error?: string }>;
   onRefreshSpreads: (week: number) => Promise<void>;
+  onSwapBench: (week: number, benchTeamId: string, starterTeamId: string) => Promise<{ error?: string }>;
+  onEnsureBenchSeeded: (week: number, rosterTeamIds: string[]) => Promise<void>;
 }
 
 export function RosterPage({
   league, members, draftPicks, captainPicks, gameData,
-  spreadData, spreadPicks, freeAgencyMoves, scoreCorrections,
+  spreadData, spreadPicks, freeAgencyMoves, scoreCorrections, benchPicks,
   userId, onSetCaptain, onSetSpread, onRemoveSpread, onRefreshSpreads,
+  onSwapBench, onEnsureBenchSeeded,
 }: Props) {
   const { userId: paramUserId } = useParams<{ userId?: string }>();
   const targetId = paramUserId ?? userId;
@@ -40,9 +44,9 @@ export function RosterPage({
   const weeklyScores = useMemo(() => {
     return Array.from({ length: 18 }, (_, i) => {
       const weekRoster = rosterAtWeek(targetId, i, draftPicks, freeAgencyMoves);
-      return calcWeeklyScore(targetId, i, weekRoster, captainPicks, gameData, league.scoring, spreadPicks, freeAgencyMoves, scoreCorrections);
+      return calcWeeklyScore(targetId, i, weekRoster, captainPicks, gameData, league.scoring, spreadPicks, freeAgencyMoves, scoreCorrections, benchPicks);
     });
-  }, [targetId, draftPicks, freeAgencyMoves, captainPicks, gameData, league.scoring, spreadPicks, scoreCorrections]);
+  }, [targetId, draftPicks, freeAgencyMoves, captainPicks, gameData, league.scoring, spreadPicks, scoreCorrections, benchPicks]);
 
   const captainUsage = useMemo(() => {
     const map = new Map<string, number>();
@@ -92,6 +96,9 @@ export function RosterPage({
       viewUserId={targetId}
       members={members}
       currentUserId={userId}
+      benchPicks={benchPicks.filter(p => p.user_id === targetId)}
+      onSwapBench={targetId === userId ? onSwapBench : undefined}
+      onEnsureBenchSeeded={targetId === userId ? onEnsureBenchSeeded : undefined}
     />
   );
 }

@@ -2,7 +2,7 @@ import type {
   ScoringSettings, GameResult, WeeklyScore, ScoreBreakdown,
   LeaderboardEntry, LeagueMember, RosterEntry, CaptainPick,
   GameData, ManualBonus, TeamSeasonStats, StatRankingBonus,
-  SpreadPick, DraftPick, FreeAgencyMove, ScoreCorrection,
+  SpreadPick, DraftPick, FreeAgencyMove, ScoreCorrection, BenchPick,
 } from '../types';
 import { STAT_BONUS_CATEGORIES, normalizeScoring } from '../types';
 import { rosterAtWeek, currentRosters } from './roster';
@@ -119,6 +119,7 @@ export function calcWeeklyScore(
   spreadPicks: SpreadPick[] = [],
   freeAgencyMoves: FreeAgencyMove[] = [],
   scoreCorrections: ScoreCorrection[] = [],
+  benchPicks: BenchPick[] = [],
 ): WeeklyScore {
   const captainPick = captainPicks.find(
     p => p.user_id === userId && p.week === week
@@ -130,14 +131,22 @@ export function calcWeeklyScore(
   );
   const spreadTeamIds = weekSpreadPicks.map(p => p.team_id);
 
+  const weekBenchTeamIds = new Set(
+    benchPicks.filter(p => p.user_id === userId && p.week === week).map(p => p.team_id)
+  );
+
   const breakdown: ScoreBreakdown[] = roster.map(entry => {
     const game      = gameData[entry.team_id]?.[week] ?? null;
     const isCaptain = entry.team_id === captainTeamId;
-    const gamePts   = game ? scoreGame(game, settings, isCaptain) : 0;
+    // A benched team never scores, regardless of captain status or spread
+    // pick — bench overrides both rather than needing separate validation
+    // to keep a benched team from also being captain/spread-picked.
+    const isBenched = settings.bench_enabled && weekBenchTeamIds.has(entry.team_id);
+    const gamePts   = (game && !isBenched) ? scoreGame(game, settings, isCaptain) : 0;
 
     // Spread points for this team this week
     let spreadPts = 0;
-    if (settings.spread_enabled && game) {
+    if (settings.spread_enabled && game && !isBenched) {
       const spreadPick = weekSpreadPicks.find(p => p.team_id === entry.team_id);
       if (spreadPick) {
         // If commissioner already resolved it, use stored points
@@ -157,6 +166,7 @@ export function calcWeeklyScore(
       team_name:    entry.team_name,
       points:       gamePts + spreadPts,
       is_captain:   isCaptain,
+      is_benched:   isBenched,
       spread_points: spreadPts,
       game,
     };
@@ -176,6 +186,7 @@ export function calcWeeklyScore(
     points:          breakdown.reduce((s, b) => s + b.points, 0) + faPoints + correctionPoints,
     captain_team_id: captainTeamId,
     spread_team_ids: spreadTeamIds,
+    bench_team_ids:  Array.from(weekBenchTeamIds),
     breakdown,
     fa_points:       faPoints,
     correction_points: correctionPoints,
@@ -252,6 +263,7 @@ export function buildLeaderboard(
   scoreCorrections: ScoreCorrection[] = [],
   currentWeek = 0,
   totalWeeks = 17,
+  benchPicks: BenchPick[] = [],
 ): LeaderboardEntry[] {
   const rosters = currentRosters(members, draftPicks, freeAgencyMoves, currentWeek);
   const statBonuses = calcStatRankingBonuses(rosters, seasonStats, !confChampComplete, settings);
@@ -264,7 +276,7 @@ export function buildLeaderboard(
       for (let w = 0; w <= totalWeeks; w++) {
         const weekRoster = rosterAtWeek(member.user_id, w, draftPicks, freeAgencyMoves);
         weekly.push(calcWeeklyScore(
-          member.user_id, w, weekRoster, captainPicks, gameData, settings, spreadPicks, freeAgencyMoves, scoreCorrections
+          member.user_id, w, weekRoster, captainPicks, gameData, settings, spreadPicks, freeAgencyMoves, scoreCorrections, benchPicks
         ));
       }
 

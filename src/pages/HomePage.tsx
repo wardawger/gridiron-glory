@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Loader2, Coins, Trophy, BarChart3 } from 'lucide-react';
 import { Leaderboard } from '../components/league/Leaderboard';
 import { TriviaCard } from '../components/ui/TriviaCard';
-import type { League, LeagueMember, CaptainPick, GameData, ManualBonus, DraftPick, TeamSeasonStats, APRanking, SpreadPick, FreeAgencyMove, CfbTeam, ScoreCorrection } from '../types';
+import type { League, LeagueMember, CaptainPick, GameData, ManualBonus, DraftPick, TeamSeasonStats, APRanking, SpreadPick, FreeAgencyMove, CfbTeam, ScoreCorrection, BenchPick } from '../types';
 import { buildLeaderboard } from '../services/scoring';
 
 interface Props {
@@ -15,6 +15,7 @@ interface Props {
   spreadPicks: SpreadPick[];
   freeAgencyMoves: FreeAgencyMove[];
   scoreCorrections: ScoreCorrection[];
+  benchPicks: BenchPick[];
   gameData: GameData;
   seasonStats: Map<string, TeamSeasonStats>;
   rankings: APRanking[];
@@ -25,7 +26,7 @@ interface Props {
 
 export function HomePage({
   league, members, draftPicks, captainPicks, manualBonuses, spreadPicks, freeAgencyMoves, scoreCorrections,
-  gameData, seasonStats, rankings, teams, userId, cfbLoading,
+  benchPicks, gameData, seasonStats, rankings, teams, userId, cfbLoading,
 }: Props) {
   const confChampComplete = league.current_week >= 15;
 
@@ -33,9 +34,9 @@ export function HomePage({
     () => buildLeaderboard(
       members, draftPicks, captainPicks, gameData,
       league.scoring, manualBonuses, seasonStats, confChampComplete, spreadPicks,
-      freeAgencyMoves, scoreCorrections, league.current_week
+      freeAgencyMoves, scoreCorrections, league.current_week, 17, benchPicks
     ),
-    [members, draftPicks, captainPicks, gameData, league.scoring, manualBonuses, seasonStats, confChampComplete, spreadPicks, freeAgencyMoves, scoreCorrections, league.current_week]
+    [members, draftPicks, captainPicks, gameData, league.scoring, manualBonuses, seasonStats, confChampComplete, spreadPicks, freeAgencyMoves, scoreCorrections, league.current_week, benchPicks]
   );
 
   return (

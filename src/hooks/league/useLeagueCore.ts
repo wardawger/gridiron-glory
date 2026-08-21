@@ -5,7 +5,7 @@ import { supabase } from '../../lib/supabase';
 import type {
   League, LeagueMember, DraftPick, CaptainPick,
   ManualBonus, SpreadPick, FreeAgencyMove, LeagueRole, AvatarType,
-  SeasonHistory, SeasonHistoryEntry, WaiverClaim, TrophySnapshot, ScoreCorrection,
+  SeasonHistory, SeasonHistoryEntry, WaiverClaim, TrophySnapshot, ScoreCorrection, BenchPick,
 } from '../../types';
 import { DEFAULT_SCORING } from '../../types';
 import { currentRosters } from '../../services/roster';
@@ -30,6 +30,7 @@ export function useLeagueCore(user: User | null) {
   const [freeAgencyMoves, setFreeAgencyMoves] = useState<FreeAgencyMove[]>([]);
   const [waiverClaims, setWaiverClaims] = useState<WaiverClaim[]>([]);
   const [scoreCorrections, setScoreCorrections] = useState<ScoreCorrection[]>([]);
+  const [benchPicks, setBenchPicks]     = useState<BenchPick[]>([]);
   const [seasonHistory, setSeasonHistory] = useState<SeasonHistory[]>([]);
   const [loading, setLoading]           = useState(true);
   const [error, setError]               = useState<string | null>(null);
@@ -50,6 +51,7 @@ export function useLeagueCore(user: User | null) {
   const draftPicksRef   = useRef(draftPicks);
   const freeAgencyMovesRef = useRef(freeAgencyMoves);
   const waiverClaimsRef = useRef(waiverClaims);
+  const benchPicksRef   = useRef(benchPicks);
   leagueRef.current       = league;
   userRef.current         = user;
   captainPicksRef.current = captainPicks;
@@ -58,6 +60,7 @@ export function useLeagueCore(user: User | null) {
   draftPicksRef.current   = draftPicks;
   freeAgencyMovesRef.current = freeAgencyMoves;
   waiverClaimsRef.current = waiverClaims;
+  benchPicksRef.current   = benchPicks;
 
   // silent=true skips the loading flag App.tsx uses to show a full-page
   // blocking spinner — used for background refreshes (e.g. after joining a
@@ -101,7 +104,7 @@ export function useLeagueCore(user: User | null) {
   }, [user]);
 
   const loadLeagueData = useCallback(async (leagueId: string) => {
-    const [membersRes, picksRes, captainRes, bonusRes, spreadRes, faRes, waiverRes, correctionRes, historyRes] = await Promise.all([
+    const [membersRes, picksRes, captainRes, bonusRes, spreadRes, faRes, waiverRes, correctionRes, benchRes, historyRes] = await Promise.all([
       supabase.from('league_members').select('*').eq('league_id', leagueId),
       supabase.from('draft_picks').select('*').eq('league_id', leagueId).order('pick_number'),
       supabase.from('captain_picks').select('*').eq('league_id', leagueId),
@@ -110,6 +113,7 @@ export function useLeagueCore(user: User | null) {
       supabase.from('free_agency_moves').select('*').eq('league_id', leagueId),
       supabase.from('waiver_claims').select('*').eq('league_id', leagueId),
       supabase.from('score_corrections').select('*').eq('league_id', leagueId),
+      supabase.from('bench_picks').select('*').eq('league_id', leagueId),
       supabase.from('season_history').select('*').eq('league_id', leagueId).order('archived_at', { ascending: false }),
     ]);
 
@@ -121,6 +125,7 @@ export function useLeagueCore(user: User | null) {
     if (faRes.data)         setFreeAgencyMoves(faRes.data);
     if (waiverRes.data)     setWaiverClaims(waiverRes.data);
     if (correctionRes.data) setScoreCorrections(correctionRes.data);
+    if (benchRes.data)      setBenchPicks(benchRes.data);
     if (historyRes.data)    setSeasonHistory(historyRes.data);
   }, []);
 
@@ -143,6 +148,7 @@ export function useLeagueCore(user: User | null) {
     setFreeAgencyMoves([]);
     setWaiverClaims([]);
     setScoreCorrections([]);
+    setBenchPicks([]);
     setSeasonHistory([]);
   };
 
@@ -215,6 +221,13 @@ export function useLeagueCore(user: User | null) {
         supabase.from('score_corrections').select('*').eq('league_id', league.id)
           .then(({ data }) => { if (data) setScoreCorrections(data); });
       })
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'bench_picks',
+        filter: `league_id=eq.${league.id}`,
+      }, () => {
+        supabase.from('bench_picks').select('*').eq('league_id', league.id)
+          .then(({ data }) => { if (data) setBenchPicks(data); });
+      })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
@@ -245,8 +258,22 @@ export function useLeagueCore(user: User | null) {
 
   // ─── Actions ──────────────────────────────────────────────────────────────
 
-  const createLeague = async (name: string, maxTeams: number, playerCount: number) => {
+  const createLeague = async (
+    name: string,
+    maxTeams: number,
+    playerCount: number,
+    bench?: { enabled: boolean; startersCount: number; benchCount: number },
+  ) => {
     if (!user) return { error: 'Not logged in' };
+
+    const scoring = bench
+      ? {
+          ...DEFAULT_SCORING,
+          bench_enabled:  bench.enabled,
+          starters_count: bench.startersCount,
+          bench_count:    bench.benchCount,
+        }
+      : DEFAULT_SCORING;
 
     const { data: lg, error: lgErr } = await supabase
       .from('leagues')
@@ -257,7 +284,7 @@ export function useLeagueCore(user: User | null) {
         draft_order: [user.id],
         draft_status: 'pending',
         draft_current_pick: 1,
-        scoring: DEFAULT_SCORING,
+        scoring,
       })
       .select()
       .single();
@@ -447,6 +474,7 @@ export function useLeagueCore(user: User | null) {
       supabase.from('captain_picks').delete().eq('league_id', league.id),
       supabase.from('manual_bonuses').delete().eq('league_id', league.id),
       supabase.from('spread_picks').delete().eq('league_id', league.id),
+      supabase.from('bench_picks').delete().eq('league_id', league.id),
     ]);
     const deleteErr = deletes.find(d => d.error)?.error;
     if (deleteErr) return { error: deleteErr.message };
@@ -471,6 +499,7 @@ export function useLeagueCore(user: User | null) {
     setCaptainPicks([]);
     setManualBonuses([]);
     setSpreadPicks([]);
+    setBenchPicks([]);
     if (historyRow) {
       setSeasonHistory(prev => [historyRow as SeasonHistory, ...prev]);
     }
@@ -489,6 +518,7 @@ export function useLeagueCore(user: User | null) {
     await supabase.from('spread_picks').delete().eq('league_id', league.id);
     await supabase.from('free_agency_moves').delete().eq('league_id', league.id);
     await supabase.from('waiver_claims').delete().eq('league_id', league.id);
+    await supabase.from('bench_picks').delete().eq('league_id', league.id);
 
     const { error: err } = await supabase.from('leagues').delete().eq('id', league.id);
     if (err) return { error: err.message };
@@ -617,6 +647,7 @@ export function useLeagueCore(user: User | null) {
       supabase.from('free_agency_moves').delete().eq('league_id', league.id).eq('user_id', targetUserId),
       supabase.from('manual_bonuses').delete().eq('league_id', league.id).eq('user_id', targetUserId),
       supabase.from('score_corrections').delete().eq('league_id', league.id).eq('user_id', targetUserId),
+      supabase.from('bench_picks').delete().eq('league_id', league.id).eq('user_id', targetUserId),
     ]);
     const deleteErr = deletes.find(d => d.error)?.error;
     if (deleteErr) return { error: deleteErr.message };
@@ -639,6 +670,7 @@ export function useLeagueCore(user: User | null) {
     setManualBonuses(prev => prev.filter(b => b.user_id !== targetUserId));
     setScoreCorrections(prev => prev.filter(c => c.user_id !== targetUserId));
     setWaiverClaims(prev => prev.filter(w => w.user_id !== targetUserId));
+    setBenchPicks(prev => prev.filter(p => p.user_id !== targetUserId));
     setMembers(prev => prev.filter(m => m.user_id !== targetUserId));
 
     return {};
@@ -647,7 +679,7 @@ export function useLeagueCore(user: User | null) {
   return {
     // Public state
     league, allLeagues, allMemberships, selectedLeagueId,
-    members, draftPicks, captainPicks, manualBonuses, spreadPicks, freeAgencyMoves, waiverClaims, scoreCorrections, seasonHistory,
+    members, draftPicks, captainPicks, manualBonuses, spreadPicks, freeAgencyMoves, waiverClaims, scoreCorrections, benchPicks, seasonHistory,
     rosters, myMembership, isCommissioner, loading, error,
     // Public actions
     switchLeague, createLeague, sendInvite, startDraft, makeDraftPick, resetDraft, deleteLeague, endSeason,
@@ -655,8 +687,8 @@ export function useLeagueCore(user: User | null) {
     updateDisplayName, updateAvatar, updateMemberRole, removeMember,
     reload: () => loadAllLeagues(true),
     // Setters + refs consumed by the domain action-factory hooks
-    setCaptainPicks, setSpreadPicks, setFreeAgencyMoves, setWaiverClaims, setManualBonuses, setScoreCorrections,
-    leagueRef, userRef, captainPicksRef, spreadPicksRef, membersRef, draftPicksRef, freeAgencyMovesRef, waiverClaimsRef,
+    setCaptainPicks, setSpreadPicks, setFreeAgencyMoves, setWaiverClaims, setManualBonuses, setScoreCorrections, setBenchPicks,
+    leagueRef, userRef, captainPicksRef, spreadPicksRef, membersRef, draftPicksRef, freeAgencyMovesRef, waiverClaimsRef, benchPicksRef,
   };
 }
 

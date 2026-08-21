@@ -1,10 +1,16 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, Trophy, Users, ChevronRight } from 'lucide-react';
+import { Toggle } from '../components/ui/Toggle';
 
 interface Props {
   displayName: string;
-  onCreate: (name: string, maxTeams: number, playerCount: number) => Promise<{ error?: string }>;
+  onCreate: (
+    name: string,
+    maxTeams: number,
+    playerCount: number,
+    bench?: { enabled: boolean; startersCount: number; benchCount: number },
+  ) => Promise<{ error?: string }>;
   hasExistingLeague?: boolean;
 }
 
@@ -13,15 +19,23 @@ export function CreateLeaguePage({ displayName, onCreate, hasExistingLeague }: P
   const [name, setName]         = useState('');
   const [maxTeams, setMaxTeams] = useState(10);
   const [players, setPlayers]   = useState(4);
+  const [benchEnabled, setBenchEnabled]   = useState(false);
+  const [startersCount, setStartersCount] = useState(10);
+  const [benchCount, setBenchCount]       = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError]       = useState('');
 
   const handle = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
+    if (benchEnabled && startersCount + benchCount !== maxTeams) {
+      setError(`Starters + Bench must total ${maxTeams} (Teams per Player)`);
+      return;
+    }
     setSubmitting(true);
     setError('');
-    const result = await onCreate(name.trim(), maxTeams, players);
+    const result = await onCreate(name.trim(), maxTeams, players,
+      { enabled: benchEnabled, startersCount, benchCount });
     setSubmitting(false);
     if (result.error) { setError(result.error); return; }
     navigate('/');
@@ -93,6 +107,48 @@ export function CreateLeaguePage({ displayName, onCreate, hasExistingLeague }: P
               <p className="font-medium text-turf-300">Draft summary</p>
               <p>{players} players · {maxTeams} teams each · {players * maxTeams} total picks</p>
               <p>Snake draft · invite others after creation</p>
+            </div>
+
+            <div className="card-inner p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-turf-200">Enable Bench</p>
+                  <p className="text-xs text-turf-500 mt-0.5">Split each roster into starters and bench, set weekly</p>
+                </div>
+                <Toggle
+                  checked={benchEnabled}
+                  onChange={() => setBenchEnabled(prev => !prev)}
+                  label="Bench Enabled"
+                />
+              </div>
+
+              {benchEnabled && (
+                <div className="grid grid-cols-2 gap-4 pt-2 border-t border-turf-800">
+                  <div>
+                    <label className="label">Starters</label>
+                    <input
+                      className="input font-mono"
+                      type="number"
+                      min="1"
+                      value={startersCount}
+                      onChange={e => setStartersCount(parseInt(e.target.value) || 0)}
+                    />
+                  </div>
+                  <div>
+                    <label className="label">Bench</label>
+                    <input
+                      className="input font-mono"
+                      type="number"
+                      min="0"
+                      value={benchCount}
+                      onChange={e => setBenchCount(parseInt(e.target.value) || 0)}
+                    />
+                  </div>
+                  <p className="text-xs text-turf-500 col-span-2">
+                    Must total {maxTeams} — currently {startersCount + benchCount}.
+                  </p>
+                </div>
+              )}
             </div>
 
             {error && (

@@ -23,6 +23,7 @@ const postseasonGroups = BONUS_GROUPS.filter(g => !g.label.startsWith('Statistic
 export function ScoringTab({ league, teams, onUpdateScoring }: Props) {
   const [scoring, setScoring] = useState<ScoringSettings>(normalizeScoring(league.scoring));
   const [showSavedToast, setShowSavedToast] = useState(false);
+  const [saveError, setSaveError] = useState('');
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Live conference list, not hardcoded — avoids the exact kind of drift the
@@ -45,12 +46,18 @@ export function ScoringTab({ league, teams, onUpdateScoring }: Props) {
   const spreadPanel     = useCrossfadeVisibility(scoring.spread_enabled);
   const freeAgencyPanel = useCrossfadeVisibility(scoring.free_agency_enabled);
   const waiverPanel     = useCrossfadeVisibility(scoring.waiver_enabled);
+  const benchPanel      = useCrossfadeVisibility(scoring.bench_enabled);
 
   useEffect(() => () => {
     if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
   }, []);
 
   const handleSaveScoring = () => {
+    if (scoring.bench_enabled && scoring.starters_count + scoring.bench_count !== league.max_teams_per_user) {
+      setSaveError(`Starters + Bench must total ${league.max_teams_per_user} (this league's teams per player)`);
+      return;
+    }
+    setSaveError('');
     onUpdateScoring(scoring);
     setShowSavedToast(true);
     if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
@@ -621,6 +628,57 @@ export function ScoringTab({ league, teams, onUpdateScoring }: Props) {
               </p>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Starters / Bench settings */}
+      <div className="card p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-medium text-white text-sm">Bench</h3>
+            <p className="text-xs text-turf-400 mt-0.5">Split each roster into starters (score that week) and bench (don't). Locks per-team once its game kicks off.</p>
+          </div>
+          <Toggle
+            checked={scoring.bench_enabled}
+            onChange={() => setScoring(prev => ({ ...prev, bench_enabled: !prev.bench_enabled }))}
+            label="Bench Enabled"
+          />
+        </div>
+
+        {benchPanel.shown && (
+          <div className={`space-y-4 pt-2 border-t border-turf-800 ${benchPanel.className}`}>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="label">Starters</label>
+                <input
+                  className="input font-mono"
+                  type="number"
+                  min="1"
+                  value={scoring.starters_count}
+                  onChange={e => setScoring(prev => ({ ...prev, starters_count: parseInt(e.target.value) || 0 }))}
+                />
+              </div>
+              <div>
+                <label className="label">Bench</label>
+                <input
+                  className="input font-mono"
+                  type="number"
+                  min="0"
+                  value={scoring.bench_count}
+                  onChange={e => setScoring(prev => ({ ...prev, bench_count: parseInt(e.target.value) || 0 }))}
+                />
+              </div>
+            </div>
+            <p className="text-xs text-turf-500">
+              Must total {league.max_teams_per_user} — this league's teams per player. Currently {scoring.starters_count + scoring.bench_count}.
+            </p>
+          </div>
+        )}
+      </div>
+
+      {saveError && (
+        <div className="text-sm bg-red-900/40 text-red-300 border border-red-800 rounded-lg px-3 py-2">
+          {saveError}
         </div>
       )}
 

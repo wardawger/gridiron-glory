@@ -3,7 +3,7 @@ import { Shield, UserPlus, Settings, Gift } from 'lucide-react';
 import type {
   League, LeagueMember, ManualBonus, DraftPick, SpreadPick, FreeAgencyMove,
   ScoringSettings, LeagueRole, CaptainPick, GameData, TeamSeasonStats, SeasonHistoryEntry, CfbTeam,
-  TrophySnapshot, ScoreCorrection,
+  TrophySnapshot, ScoreCorrection, BenchPick,
 } from '../../types';
 import { buildLeaderboard } from '../../services/scoring';
 import { computeTrophies } from '../../services/trophies';
@@ -22,6 +22,7 @@ interface Props {
   spreadPicks: SpreadPick[];
   freeAgencyMoves: FreeAgencyMove[];
   scoreCorrections: ScoreCorrection[];
+  benchPicks: BenchPick[];
   gameData: GameData;
   seasonStats: Map<string, TeamSeasonStats>;
   teams: CfbTeam[];
@@ -47,7 +48,7 @@ type Tab = 'members' | 'scoring' | 'adjustments';
 
 export function AdminPanel({
   league, currentUserId, members, draftPicks, captainPicks, manualBonuses, spreadPicks, freeAgencyMoves, scoreCorrections,
-  gameData, seasonStats, teams, isCommissioner,
+  benchPicks, gameData, seasonStats, teams, isCommissioner,
   onSendInvite, onUpdateWeek, onUpdateScoring, onAddBonus, onRemoveBonus, onAddCorrection, onRemoveCorrection,
   onResetDraft, onDeleteLeague,
   onEndSeason, onOverrideSpread, onClearSpreadOverride, onUpdateMemberRole, onRemoveMember,
@@ -62,14 +63,14 @@ export function AdminPanel({
     const board = buildLeaderboard(
       members, draftPicks, captainPicks, gameData,
       league.scoring, manualBonuses, seasonStats, true, spreadPicks,
-      freeAgencyMoves, scoreCorrections, league.current_week
+      freeAgencyMoves, scoreCorrections, league.current_week, 17, benchPicks
     );
     return board.map((e, i) => ({
       user_id: e.user_id, display_name: e.display_name,
       avatar_type: e.avatar_type, avatar_value: e.avatar_value,
       total_points: e.total_points, rank: i + 1,
     }));
-  }, [members, draftPicks, captainPicks, gameData, league.scoring, manualBonuses, seasonStats, spreadPicks, freeAgencyMoves, scoreCorrections, league.current_week]);
+  }, [members, draftPicks, captainPicks, gameData, league.scoring, manualBonuses, seasonStats, spreadPicks, freeAgencyMoves, scoreCorrections, league.current_week, benchPicks]);
 
   // Snapshotted alongside finalStandings so End Season can freeze both at
   // once — trophies are unrecoverable once the underlying tables are wiped.

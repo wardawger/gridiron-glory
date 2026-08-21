@@ -3,7 +3,7 @@ import {
   isP4Conference, confCategory, scoreGame, getSpreadOutcome, scoreSpread, buildLeaderboard, calcWeeklyScore,
 } from './scoring';
 import { DEFAULT_SCORING } from '../types';
-import type { GameResult, GameData, LeagueMember, DraftPick, CaptainPick, TeamSeasonStats, ScoreCorrection } from '../types';
+import type { GameResult, GameData, LeagueMember, DraftPick, CaptainPick, TeamSeasonStats, ScoreCorrection, BenchPick, SpreadPick } from '../types';
 
 function makeGame(overrides: Partial<GameResult> = {}): GameResult {
   return {
@@ -286,5 +286,65 @@ describe('calcWeeklyScore correction_points', () => {
   it('defaults to no corrections when the param is omitted', () => {
     const score = calcWeeklyScore('u1', 1, roster, [], gameData, DEFAULT_SCORING);
     expect(score.correction_points).toBe(0);
+  });
+});
+
+describe('calcWeeklyScore bench', () => {
+  const roster = [{ team_id: 't1', team_name: 'Team One', team_logo: '', team_conference: 'SEC', team_color: '' }];
+  const gameData: GameData = { t1: { 1: makeGame({ week: 1, result: 'W' }) } };
+  const benchSettings = { ...DEFAULT_SCORING, bench_enabled: true, starters_count: 9, bench_count: 1 };
+
+  function makeBenchPick(overrides: Partial<BenchPick> = {}): BenchPick {
+    return {
+      id: 'bp1', league_id: 'L', user_id: 'u1', team_id: 't1', week: 1, picked_at: '',
+      ...overrides,
+    };
+  }
+
+  it('a benched team scores 0 even though its game was a win', () => {
+    const score = calcWeeklyScore('u1', 1, roster, [], gameData, benchSettings, [], [], [], [makeBenchPick()]);
+    expect(score.points).toBe(0);
+    expect(score.breakdown[0].is_benched).toBe(true);
+    expect(score.breakdown[0].points).toBe(0);
+    expect(score.bench_team_ids).toEqual(['t1']);
+  });
+
+  it('bench overrides captain — a benched captain still scores 0', () => {
+    const captainPicks: CaptainPick[] = [{ id: 'c1', league_id: 'L', user_id: 'u1', team_id: 't1', week: 1, picked_at: '' }];
+    const score = calcWeeklyScore('u1', 1, roster, captainPicks, gameData, benchSettings, [], [], [], [makeBenchPick()]);
+    expect(score.points).toBe(0);
+    expect(score.breakdown[0].is_captain).toBe(true);
+    expect(score.breakdown[0].is_benched).toBe(true);
+  });
+
+  it('bench overrides a spread pick — a benched team earns no spread points either', () => {
+    const spreadSettings = { ...benchSettings, spread_enabled: true };
+    const spreadPicks: SpreadPick[] = [{
+      id: 'sp1', league_id: 'L', user_id: 'u1', team_id: 't1', week: 1,
+      locked_spread: -7, picked_at: '', result: null, points: null,
+      commissioner_override: false, side: 'cover',
+    }];
+    const score = calcWeeklyScore('u1', 1, roster, [], gameData, spreadSettings, spreadPicks, [], [], [makeBenchPick()]);
+    expect(score.points).toBe(0);
+    expect(score.breakdown[0].spread_points).toBe(0);
+  });
+
+  it('a starter (not in benchPicks) still scores normally', () => {
+    const score = calcWeeklyScore('u1', 1, roster, [], gameData, benchSettings, [], [], [], []);
+    expect(score.points).toBe(DEFAULT_SCORING.win);
+    expect(score.breakdown[0].is_benched).toBe(false);
+    expect(score.bench_team_ids).toEqual([]);
+  });
+
+  it('ignores bench rows entirely when bench_enabled is off', () => {
+    const score = calcWeeklyScore('u1', 1, roster, [], gameData, DEFAULT_SCORING, [], [], [], [makeBenchPick()]);
+    expect(score.points).toBe(DEFAULT_SCORING.win);
+    expect(score.breakdown[0].is_benched).toBe(false);
+  });
+
+  it('defaults to no bench picks when the param is omitted', () => {
+    const score = calcWeeklyScore('u1', 1, roster, [], gameData, benchSettings);
+    expect(score.points).toBe(DEFAULT_SCORING.win);
+    expect(score.bench_team_ids).toEqual([]);
   });
 });

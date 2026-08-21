@@ -1,9 +1,9 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, TrendingUp, TrendingDown, Minus, Star, Calendar, List, X, MapPin, Tv, Clock, Zap, Coins, ChevronDown } from 'lucide-react';
-import type { RosterEntry, CaptainPick, GameData, ScoringSettings, LeagueMember, WeeklyScore, GameResult, SpreadPick, SpreadData, FreeAgencyMove, DraftPick, ScoreCorrection } from '../../types';
+import { Shield, TrendingUp, TrendingDown, Minus, Star, Calendar, List, X, MapPin, Tv, Clock, Zap, Coins, ChevronDown, UserCheck, Armchair, Lock } from 'lucide-react';
+import type { RosterEntry, CaptainPick, GameData, ScoringSettings, LeagueMember, WeeklyScore, GameResult, SpreadPick, SpreadData, FreeAgencyMove, DraftPick, ScoreCorrection, BenchPick } from '../../types';
 import { calcWeeklyScore, scoreGame, getSpreadOutcome, scoreSpread } from '../../services/scoring';
-import { rosterAtWeek } from '../../services/roster';
+import { rosterAtWeek, isGameKickedOff } from '../../services/roster';
 import { useTabCrossfade } from '../../hooks/useCrossfade';
 import { Tooltip } from '../ui/Tooltip';
 import { TeamLogo } from '../ui/TeamLogo';
@@ -36,6 +36,10 @@ interface Props {
   viewUserId: string;
   members: LeagueMember[];
   currentUserId: string;
+  // Bench props
+  benchPicks: BenchPick[];
+  onSwapBench?: (week: number, benchTeamId: string, starterTeamId: string) => Promise<{ error?: string }>;
+  onEnsureBenchSeeded?: (week: number, rosterTeamIds: string[]) => Promise<void>;
 }
 
 const WEEKS = Array.from({ length: 16 }, (_, i) => i); // weeks 0–15
@@ -65,11 +69,6 @@ function spreadLabel(spread: number | null | undefined, teamName: string): strin
   return spread < 0
     ? `${teamName} favored by ${Math.abs(spread)}`
     : `${teamName} underdog by ${spread}`;
-}
-
-function isGameKickedOff(startDate: string | null | undefined): boolean {
-  if (!startDate) return false;
-  return new Date(startDate) <= new Date();
 }
 
 // ── Game Score Breakdown Modal ───────────────────────────────────────────────
@@ -471,6 +470,7 @@ export function RosterView({
   currentWeek, weeklyScores, isOwner, onSetCaptain, captainUsage,
   spreadData, spreadPicks, spreadUsage, onSetSpread, onRemoveSpread, onRefreshSpreads,
   freeAgencyMoves, scoreCorrections, viewUserId, members, currentUserId,
+  benchPicks, onSwapBench, onEnsureBenchSeeded,
 }: Props) {
   const navigate = useNavigate();
   const { active: view, select: selectView, panelClass: viewPanelClass } = useTabCrossfade<'week' | 'schedule'>('week');
@@ -486,6 +486,14 @@ export function RosterView({
   const [modalTeam, setModalTeam] = useState<RosterEntry | null>(null);
   const [spreadError, setSpreadError] = useState<string | null>(null);
   const [spreadsLoading, setSpreadsLoading] = useState(false);
+  const [benchError, setBenchError] = useState<string | null>(null);
+  // A swap is click-source-then-click-target: selecting a team on one side
+  // (starter/bench) then a team on the other side within the same week
+  // completes the swap. Scoped to a single week — the Full Schedule grid
+  // shares this handler across columns, so a click in a different week
+  // simply restarts the selection there instead of trying to swap across
+  // weeks.
+  const [swapSource, setSwapSource] = useState<{ week: number; teamId: string; benched: boolean } | null>(null);
   const [gameScoreModal, setGameScoreModal] = useState<{
     game: GameResult; teamId: string; teamName: string; teamLogo: string;
     week: number; isCaptain: boolean;
@@ -527,8 +535,8 @@ export function RosterView({
   }, [scoring.spread_enabled, selectedWeek]);
 
   const currentScore = useMemo(
-    () => calcWeeklyScore(member.user_id, selectedWeek, weekRoster, captainPicks, gameData, scoring, spreadPicks, freeAgencyMoves, scoreCorrections),
-    [member.user_id, selectedWeek, weekRoster, captainPicks, gameData, scoring, spreadPicks, freeAgencyMoves, scoreCorrections]
+    () => calcWeeklyScore(member.user_id, selectedWeek, weekRoster, captainPicks, gameData, scoring, spreadPicks, freeAgencyMoves, scoreCorrections, benchPicks),
+    [member.user_id, selectedWeek, weekRoster, captainPicks, gameData, scoring, spreadPicks, freeAgencyMoves, scoreCorrections, benchPicks]
   );
 
   const captainThisWeek = captainPicks.find(
@@ -537,6 +545,350 @@ export function RosterView({
 
   const getCaptainForWeek = (week: number) =>
     captainPicks.find(p => p.user_id === member.user_id && p.week === week)?.team_id ?? null;
+
+  const isBenchedForWeek = (teamId: string, week: number) =>
+    benchPicks.some(p => p.user_id === member.user_id && p.week === week && p.team_id === teamId);
+
+  // First visit to a week with no bench rows yet — seed a valid lineup so
+  // the exact-count invariant holds immediately. Only the roster's owner
+  // can write their own bench_picks rows (RLS), so this only fires when
+  // they're viewing their own roster.
+  useEffect(() => {
+    if (!isOwner || !scoring.bench_enabled || !onEnsureBenchSeeded) return;
+    onEnsureBenchSeeded(selectedWeek, weekRoster.map(e => e.team_id));
+  }, [isOwner, scoring.bench_enabled, selectedWeek, weekRoster, onEnsureBenchSeeded]);
+
+  const handleSwapClick = (week: number, teamId: string, benchedFlag: boolean) => {
+    if (!onSwapBench) return;
+    setBenchError(null);
+    setSwapSource(prev => {
+      if (!prev || prev.week !== week) return { week, teamId, benched: benchedFlag };
+      if (prev.teamId === teamId) return null;
+      if (prev.benched === benchedFlag) return { week, teamId, benched: benchedFlag };
+      const benchTeamId   = prev.benched ? prev.teamId : teamId;
+      const starterTeamId = prev.benched ? teamId : prev.teamId;
+      onSwapBench(week, benchTeamId, starterTeamId).then(r => { if (r.error) setBenchError(r.error); });
+      return null;
+    });
+  };
+
+  // Shared by the Starters/Bench grouped grids (bench enabled) and the flat
+  // grid (bench disabled) — factored out so bench grouping doesn't require
+  // duplicating this large per-team card body.
+  const renderCard = (entry: RosterEntry, benchedFlag: boolean) => {
+    const game = gameData[entry.team_id]?.[selectedWeek];
+    const isCaptain = entry.team_id === captainThisWeek;
+    const weekBreak = currentScore.breakdown.find(b => b.team_id === entry.team_id);
+    const captainUses = captainUsage.get(entry.team_id) ?? 0;
+    const captainKickedOff = isGameKickedOff((game as any)?.start_date);
+    // The commissioner advancing current_week past this one locks it too,
+    // independent of the game's own kickoff time — a game with a missing
+    // or not-yet-set start_date shouldn't stay editable forever just
+    // because CFBD hasn't populated it, once the league has moved on.
+    const isPastWeek = selectedWeek < currentWeek;
+    const canBeCaptain = (captainUses < 2 || isCaptain) && !captainKickedOff && !isPastWeek;
+    const oppLogo = (game as any)?.opponent_logo ?? null;
+    const isHome  = (game as any)?.is_home  ?? true;
+    const gameDateInfo = game ? formatGameDate(game.start_date, game.start_time_tbd) : null;
+    const benchKickedOff = isGameKickedOff((game as any)?.start_date);
+    const benchSelected = swapSource?.week === selectedWeek && swapSource.teamId === entry.team_id;
+    const canSwap = isOwner && !!onSwapBench && !benchKickedOff && !isPastWeek;
+
+    return (
+      <div
+        key={entry.team_id}
+        className={`card relative overflow-hidden p-4 transition-all ${isCaptain ? 'border-gold-500/50 bg-amber-950/20' : ''}`}
+      >
+        {/* Oversized, faded team logo watermark */}
+        {entry.team_logo && (
+          <img
+            src={entry.team_logo}
+            alt=""
+            aria-hidden="true"
+            className="pointer-events-none select-none absolute top-1/2 -translate-y-1/2 -right-6 w-40 h-40 object-contain opacity-10"
+          />
+        )}
+
+        <div className="relative z-10">
+        {/* Clickable header — opens schedule modal */}
+        <div
+          className="flex items-start gap-3 cursor-pointer hover:opacity-90 transition-opacity"
+          onClick={() => setModalTeam(entry)}
+        >
+          <TeamLogo src={entry.team_logo} alt={entry.team_name} fallbackName={entry.team_name} size={40} />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-white truncate">{entry.team_name}</span>
+              {isCaptain && (
+                <span className="badge-gold text-xs">
+                  <Star className="w-2.5 h-2.5 fill-current" /> Captain
+                </span>
+              )}
+            </div>
+            <span className="text-xs text-turf-500">{entry.team_conference}</span>
+          </div>
+          {weekBreak && weekBreak.points !== 0 && (
+            <div className={`font-mono font-bold text-sm flex-shrink-0 ${weekBreak.points > 0 ? 'text-field-400' : 'text-red-300'}`}>
+              {weekBreak.points > 0 ? '+' : ''}{weekBreak.points}
+            </div>
+          )}
+        </div>
+
+        {scoring.bench_enabled && (
+          <button
+            type="button"
+            disabled={!canSwap}
+            onClick={() => handleSwapClick(selectedWeek, entry.team_id, benchedFlag)}
+            className={`mt-2 w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+              benchSelected
+                ? 'border-field-500 bg-field-900/30 text-field-300'
+                : benchedFlag
+                ? 'border-turf-700 text-turf-400'
+                : 'border-field-800/50 bg-field-900/10 text-field-400'
+            } ${!canSwap ? 'opacity-50 cursor-not-allowed' : 'hover:border-field-600'}`}
+          >
+            {benchKickedOff || isPastWeek
+              ? <Lock className="w-3 h-3 flex-shrink-0" />
+              : benchedFlag
+              ? <Armchair className="w-3 h-3 flex-shrink-0" />
+              : <UserCheck className="w-3 h-3 flex-shrink-0" />}
+            {benchKickedOff
+              ? (benchedFlag ? 'Benched — locked' : 'Starting — locked')
+              : isPastWeek
+              ? (benchedFlag ? 'Benched — week advanced' : 'Starting — week advanced')
+              : benchSelected
+              ? 'Tap the team to swap with'
+              : benchedFlag ? 'Benched — tap to swap in' : 'Starting — tap to bench'}
+          </button>
+        )}
+
+        {game ? (
+          <div
+            role="button"
+            tabIndex={0}
+            className="mt-3 w-full text-left group/game cursor-pointer"
+            onClick={() => setGameScoreModal({
+              game,
+              teamId: entry.team_id,
+              teamName: entry.team_name,
+              teamLogo: entry.team_logo,
+              week: selectedWeek,
+              isCaptain,
+            })}
+            onKeyDown={e => { if (e.key === 'Enter') setGameScoreModal({ game, teamId: entry.team_id, teamName: entry.team_name, teamLogo: entry.team_logo, week: selectedWeek, isCaptain }); }}
+          >
+            <div className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-turf-800/60 transition-colors">
+              <div className="flex items-center gap-2 min-w-0">
+                <TeamLogo src={oppLogo} alt={game.opponent} fallbackName={game.opponent} size={24} />
+                <div className="text-xs text-turf-400 truncate">
+                  {game.result ? (
+                    <span className="flex items-center gap-1">
+                      {game.result === 'W'
+                        ? <TrendingUp className="w-3 h-3 text-field-400 flex-shrink-0" />
+                        : <TrendingDown className="w-3 h-3 text-red-300 flex-shrink-0" />
+                      }
+                      <span className={game.result === 'W' ? 'text-field-300' : 'text-red-300'}>
+                        {game.result} {isHome ? 'vs' : 'at'} {game.opponent}
+                        {game.opponent_rank && <span className="text-turf-500"> (#{game.opponent_rank})</span>}
+                      </span>
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1 text-turf-500">
+                      <Minus className="w-3 h-3 flex-shrink-0" />
+                      {isHome ? 'vs' : 'at'} {game.opponent} — {gameDateInfo!.date}
+                      {gameDateInfo!.time !== 'TBD' ? ` · ${gameDateInfo!.time}` : ''}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {game.home_score != null && game.away_score != null && (
+                  <span className="font-mono text-xs text-turf-500">
+                    {game.home_score}–{game.away_score}
+                  </span>
+                )}
+                <span className="text-turf-700 group-hover/game:text-turf-500 transition-colors text-xs">↗</span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <p className="mt-2 text-xs text-turf-500">No game this week</p>
+        )}
+
+        {isOwner && onSetCaptain && game && (
+          <div className="mt-3 pt-3 border-t border-turf-800/60 flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <span className={`text-xs font-medium flex items-center gap-1 ${isCaptain ? 'text-gold-400' : 'text-turf-300'}`}>
+                <Star className="w-3 h-3 flex-shrink-0" /> {isCaptain ? 'Captain ×2' : 'Captain'}
+              </span>
+              <p className="text-xs text-turf-500">
+                {captainKickedOff
+                  ? (isCaptain ? 'Game started — locked' : 'Game started')
+                  : isPastWeek
+                  ? (isCaptain ? 'Week advanced — locked' : 'Week advanced')
+                  : isCaptain
+                  ? 'Doubles points this week'
+                  : canBeCaptain
+                  ? `${2 - captainUses} use${2 - captainUses === 1 ? '' : 's'} left`
+                  : 'Limit reached'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => onSetCaptain(selectedWeek, entry.team_id)}
+              disabled={captainKickedOff || isPastWeek || (!canBeCaptain && !isCaptain)}
+              aria-label={isCaptain ? 'Remove captain' : 'Set captain'}
+              aria-pressed={isCaptain}
+              className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${
+                isCaptain ? 'bg-gold-500' : canBeCaptain ? 'bg-turf-700' : 'bg-turf-800 opacity-50 cursor-not-allowed'
+              }`}
+            >
+              <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${isCaptain ? 'left-5' : 'left-0.5'}`} />
+            </button>
+          </div>
+        )}
+
+        {/* Spread pick — shown when feature is enabled and team has a game */}
+        {scoring.spread_enabled && game && (() => {
+          const weekSpread = spreadData[selectedWeek]?.[entry.team_id] ?? null;
+          const existingPick = spreadPicks.find(
+            p => p.team_id === entry.team_id && p.week === selectedWeek
+          );
+          const teamSeasonUses = spreadUsage.get(entry.team_id) ?? 0;
+          const weekPicks = spreadPicks.filter(p => p.week === selectedWeek);
+          const atWeekLimit = !existingPick && weekPicks.length >= scoring.spread_max_per_week;
+          const atTeamLimit = !existingPick && teamSeasonUses >= scoring.spread_max_per_team;
+          const kickedOff = isGameKickedOff((game as any)?.start_date);
+          const stackBlocked = !scoring.spread_allow_captain_stack && isCaptain && !existingPick;
+          const canPick = isOwner && !!onSetSpread && !atWeekLimit && !atTeamLimit && !kickedOff && !isPastWeek && !stackBlocked && weekSpread !== null;
+          const spreadResult = existingPick?.result ?? null;
+          const canRemove = !!existingPick && !spreadResult && !kickedOff && !isPastWeek && isOwner && !!onRemoveSpread;
+          // Switching cover↔against on an existing pre-result pick reuses
+          // onSetSpread's upsert, so it isn't gated by the week/team caps
+          // that only apply to making a brand-new pick.
+          const canSwitchSide = !!existingPick && !spreadResult && !kickedOff && !isPastWeek && isOwner && !!onSetSpread;
+          const isOn = !!existingPick;
+          const toggleDisabled = isOn ? !canRemove : !canPick;
+          const pickWon = !spreadResult || spreadResult === 'push'
+            ? null
+            : (existingPick!.side === 'cover' ? spreadResult === 'covered' : spreadResult === 'missed');
+
+          const handleToggle = async () => {
+            if (toggleDisabled) return;
+            if (isOn) {
+              if (onRemoveSpread) await onRemoveSpread(selectedWeek, entry.team_id);
+            } else if (onSetSpread && weekSpread !== null) {
+              const result = await onSetSpread(selectedWeek, entry.team_id, weekSpread);
+              if (result.error) setSpreadError(result.error);
+            }
+          };
+
+          const handlePickSide = async (side: 'cover' | 'against') => {
+            if (existingPick) {
+              if (existingPick.side === side) {
+                if (!canRemove || !onRemoveSpread) return;
+                await onRemoveSpread(selectedWeek, entry.team_id);
+              } else {
+                if (!canSwitchSide || !onSetSpread || weekSpread === null) return;
+                const result = await onSetSpread(selectedWeek, entry.team_id, weekSpread, side);
+                if (result.error) setSpreadError(result.error);
+              }
+            } else {
+              if (!canPick || !onSetSpread || weekSpread === null) return;
+              const result = await onSetSpread(selectedWeek, entry.team_id, weekSpread, side);
+              if (result.error) setSpreadError(result.error);
+            }
+          };
+
+          let subtext: string;
+          if (existingPick) {
+            if (spreadResult === 'push') subtext = `Push ${formatSpread(existingPick.locked_spread)}`;
+            else if (spreadResult === 'covered' || spreadResult === 'missed') {
+              subtext = `${pickWon ? '✓ Won' : '✗ Lost'} ${formatSpread(existingPick.locked_spread)}`;
+            } else {
+              subtext = `Locked ${formatSpread(existingPick.locked_spread)}${
+                scoring.spread_allow_against_pick ? ` · ${existingPick.side === 'against' ? 'Against' : 'Cover'}` : ''
+              } · ${teamSeasonUses}/${scoring.spread_max_per_team} season`;
+            }
+          } else if (spreadsLoading && !weekSpread) {
+            subtext = 'Loading line…';
+          } else if (weekSpread === null) {
+            subtext = 'No line yet';
+          } else if (kickedOff) {
+            subtext = 'Game in progress';
+          } else if (isPastWeek) {
+            subtext = 'Week advanced';
+          } else if (stackBlocked) {
+            subtext = 'Captain stack disabled';
+          } else if (atTeamLimit) {
+            subtext = `Team limit (${scoring.spread_max_per_team}/season)`;
+          } else if (atWeekLimit) {
+            subtext = `Week limit (${scoring.spread_max_per_week}/week)`;
+          } else {
+            subtext = `${formatSpread(weekSpread)} (${weekSpread < 0 ? 'favored' : weekSpread > 0 ? 'underdog' : "pick 'em"}) · ${weekPicks.length}/${scoring.spread_max_per_week} this week`;
+          }
+
+          const trackColor = spreadResult === 'push' ? 'bg-turf-500'
+            : pickWon === true ? 'bg-field-600'
+            : pickWon === false ? 'bg-red-600'
+            : isOn ? 'bg-blue-600'
+            : 'bg-turf-700';
+          const labelColor = spreadResult === 'push' ? 'text-turf-300'
+            : pickWon === true ? 'text-field-400'
+            : pickWon === false ? 'text-red-300'
+            : isOn ? 'text-blue-300'
+            : 'text-turf-300';
+
+          return (
+            <div className="mt-2 pt-2 border-t border-turf-800/60 flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <span className={`text-xs font-medium flex items-center gap-1 ${labelColor}`}>
+                  <Coins className="w-3 h-3 flex-shrink-0" /> Spread
+                </span>
+                <p className="text-xs text-turf-500 truncate">{subtext}</p>
+              </div>
+              {scoring.spread_allow_against_pick ? (
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  {(['cover', 'against'] as const).map(side => {
+                    const active = existingPick?.side === side;
+                    const disabled = active ? !canRemove : (existingPick ? !canSwitchSide : !canPick);
+                    return (
+                      <button
+                        key={side}
+                        type="button"
+                        onClick={() => handlePickSide(side)}
+                        disabled={disabled}
+                        aria-pressed={active}
+                        className={`px-2 py-1 rounded text-[10px] font-semibold uppercase tracking-wide transition-colors ${
+                          active
+                            ? side === 'cover' ? 'bg-field-600 text-white' : 'bg-blue-600 text-white'
+                            : 'bg-turf-800 text-turf-400 hover:text-white'
+                        } disabled:opacity-40 disabled:cursor-not-allowed`}
+                      >
+                        {side === 'cover' ? 'Cover' : 'Against'}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleToggle}
+                  disabled={toggleDisabled}
+                  aria-label={isOn ? 'Remove spread pick' : 'Pick spread'}
+                  aria-pressed={isOn}
+                  className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${trackColor} ${toggleDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${isOn ? 'left-5' : 'left-0.5'}`} />
+                </button>
+              )}
+            </div>
+          );
+        })()}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <>
@@ -718,285 +1070,34 @@ export function RosterView({
               <p>{roster.length === 0 ? 'No teams drafted yet' : 'No teams rostered that week'}</p>
               {roster.length === 0 && <TriviaCard className="mt-8" />}
             </div>
+          ) : scoring.bench_enabled ? (
+            <div className="space-y-4">
+              <div>
+                <p className="text-xs text-turf-500 uppercase tracking-wide font-medium px-1 mb-2">Starters ({scoring.starters_count})</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {weekRoster.filter(e => !isBenchedForWeek(e.team_id, selectedWeek)).map(entry => renderCard(entry, false))}
+                </div>
+              </div>
+              <div>
+                <p className="text-xs text-turf-500 uppercase tracking-wide font-medium px-1 mb-2">Bench ({scoring.bench_count})</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {weekRoster.filter(e => isBenchedForWeek(e.team_id, selectedWeek)).map(entry => renderCard(entry, true))}
+                </div>
+              </div>
+            </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {weekRoster.map(entry => {
-                const game = gameData[entry.team_id]?.[selectedWeek];
-                const isCaptain = entry.team_id === captainThisWeek;
-                const weekBreak = currentScore.breakdown.find(b => b.team_id === entry.team_id);
-                const captainUses = captainUsage.get(entry.team_id) ?? 0;
-                const captainKickedOff = isGameKickedOff((game as any)?.start_date);
-                const canBeCaptain = (captainUses < 2 || isCaptain) && !captainKickedOff;
-                const oppLogo = (game as any)?.opponent_logo ?? null;
-                const isHome  = (game as any)?.is_home  ?? true;
-                const gameDateInfo = game ? formatGameDate(game.start_date, game.start_time_tbd) : null;
-
-                return (
-                  <div
-                    key={entry.team_id}
-                    className={`card relative overflow-hidden p-4 transition-all ${isCaptain ? 'border-gold-500/50 bg-amber-950/20' : ''}`}
-                  >
-                    {/* Oversized, faded team logo watermark */}
-                    {entry.team_logo && (
-                      <img
-                        src={entry.team_logo}
-                        alt=""
-                        aria-hidden="true"
-                        className="pointer-events-none select-none absolute top-1/2 -translate-y-1/2 -right-6 w-40 h-40 object-contain opacity-10"
-                      />
-                    )}
-
-                    <div className="relative z-10">
-                    {/* Clickable header — opens schedule modal */}
-                    <div
-                      className="flex items-start gap-3 cursor-pointer hover:opacity-90 transition-opacity"
-                      onClick={() => setModalTeam(entry)}
-                    >
-                      <TeamLogo src={entry.team_logo} alt={entry.team_name} fallbackName={entry.team_name} size={40} />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-white truncate">{entry.team_name}</span>
-                          {isCaptain && (
-                            <span className="badge-gold text-xs">
-                              <Star className="w-2.5 h-2.5 fill-current" /> Captain
-                            </span>
-                          )}
-                        </div>
-                        <span className="text-xs text-turf-500">{entry.team_conference}</span>
-                      </div>
-                      {weekBreak && weekBreak.points !== 0 && (
-                        <div className={`font-mono font-bold text-sm flex-shrink-0 ${weekBreak.points > 0 ? 'text-field-400' : 'text-red-300'}`}>
-                          {weekBreak.points > 0 ? '+' : ''}{weekBreak.points}
-                        </div>
-                      )}
-                    </div>
-
-                    {game ? (
-                      <div
-                        role="button"
-                        tabIndex={0}
-                        className="mt-3 w-full text-left group/game cursor-pointer"
-                        onClick={() => setGameScoreModal({
-                          game,
-                          teamId: entry.team_id,
-                          teamName: entry.team_name,
-                          teamLogo: entry.team_logo,
-                          week: selectedWeek,
-                          isCaptain,
-                        })}
-                        onKeyDown={e => { if (e.key === 'Enter') setGameScoreModal({ game, teamId: entry.team_id, teamName: entry.team_name, teamLogo: entry.team_logo, week: selectedWeek, isCaptain }); }}
-                      >
-                        <div className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-turf-800/60 transition-colors">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <TeamLogo src={oppLogo} alt={game.opponent} fallbackName={game.opponent} size={24} />
-                            <div className="text-xs text-turf-400 truncate">
-                              {game.result ? (
-                                <span className="flex items-center gap-1">
-                                  {game.result === 'W'
-                                    ? <TrendingUp className="w-3 h-3 text-field-400 flex-shrink-0" />
-                                    : <TrendingDown className="w-3 h-3 text-red-300 flex-shrink-0" />
-                                  }
-                                  <span className={game.result === 'W' ? 'text-field-300' : 'text-red-300'}>
-                                    {game.result} {isHome ? 'vs' : 'at'} {game.opponent}
-                                    {game.opponent_rank && <span className="text-turf-500"> (#{game.opponent_rank})</span>}
-                                  </span>
-                                </span>
-                              ) : (
-                                <span className="flex items-center gap-1 text-turf-500">
-                                  <Minus className="w-3 h-3 flex-shrink-0" />
-                                  {isHome ? 'vs' : 'at'} {game.opponent} — {gameDateInfo!.date}
-                                  {gameDateInfo!.time !== 'TBD' ? ` · ${gameDateInfo!.time}` : ''}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            {game.home_score != null && game.away_score != null && (
-                              <span className="font-mono text-xs text-turf-500">
-                                {game.home_score}–{game.away_score}
-                              </span>
-                            )}
-                            <span className="text-turf-700 group-hover/game:text-turf-500 transition-colors text-xs">↗</span>
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="mt-2 text-xs text-turf-500">No game this week</p>
-                    )}
-
-                    {isOwner && onSetCaptain && game && (
-                      <div className="mt-3 pt-3 border-t border-turf-800/60 flex items-center justify-between gap-2">
-                        <div className="min-w-0">
-                          <span className={`text-xs font-medium flex items-center gap-1 ${isCaptain ? 'text-gold-400' : 'text-turf-300'}`}>
-                            <Star className="w-3 h-3 flex-shrink-0" /> {isCaptain ? 'Captain ×2' : 'Captain'}
-                          </span>
-                          <p className="text-xs text-turf-500">
-                            {captainKickedOff
-                              ? (isCaptain ? 'Game started — locked' : 'Game started')
-                              : isCaptain
-                              ? 'Doubles points this week'
-                              : canBeCaptain
-                              ? `${2 - captainUses} use${2 - captainUses === 1 ? '' : 's'} left`
-                              : 'Limit reached'}
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => onSetCaptain(selectedWeek, entry.team_id)}
-                          disabled={captainKickedOff || (!canBeCaptain && !isCaptain)}
-                          aria-label={isCaptain ? 'Remove captain' : 'Set captain'}
-                          aria-pressed={isCaptain}
-                          className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${
-                            isCaptain ? 'bg-gold-500' : canBeCaptain ? 'bg-turf-700' : 'bg-turf-800 opacity-50 cursor-not-allowed'
-                          }`}
-                        >
-                          <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${isCaptain ? 'left-5' : 'left-0.5'}`} />
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Spread pick — shown when feature is enabled and team has a game */}
-                    {scoring.spread_enabled && game && (() => {
-                      const weekSpread = spreadData[selectedWeek]?.[entry.team_id] ?? null;
-                      const existingPick = spreadPicks.find(
-                        p => p.team_id === entry.team_id && p.week === selectedWeek
-                      );
-                      const teamSeasonUses = spreadUsage.get(entry.team_id) ?? 0;
-                      const weekPicks = spreadPicks.filter(p => p.week === selectedWeek);
-                      const atWeekLimit = !existingPick && weekPicks.length >= scoring.spread_max_per_week;
-                      const atTeamLimit = !existingPick && teamSeasonUses >= scoring.spread_max_per_team;
-                      const kickedOff = isGameKickedOff((game as any)?.start_date);
-                      const stackBlocked = !scoring.spread_allow_captain_stack && isCaptain && !existingPick;
-                      const canPick = isOwner && !!onSetSpread && !atWeekLimit && !atTeamLimit && !kickedOff && !stackBlocked && weekSpread !== null;
-                      const spreadResult = existingPick?.result ?? null;
-                      const canRemove = !!existingPick && !spreadResult && !kickedOff && isOwner && !!onRemoveSpread;
-                      // Switching cover↔against on an existing pre-result pick reuses
-                      // onSetSpread's upsert, so it isn't gated by the week/team caps
-                      // that only apply to making a brand-new pick.
-                      const canSwitchSide = !!existingPick && !spreadResult && !kickedOff && isOwner && !!onSetSpread;
-                      const isOn = !!existingPick;
-                      const toggleDisabled = isOn ? !canRemove : !canPick;
-                      const pickWon = !spreadResult || spreadResult === 'push'
-                        ? null
-                        : (existingPick!.side === 'cover' ? spreadResult === 'covered' : spreadResult === 'missed');
-
-                      const handleToggle = async () => {
-                        if (toggleDisabled) return;
-                        if (isOn) {
-                          if (onRemoveSpread) await onRemoveSpread(selectedWeek, entry.team_id);
-                        } else if (onSetSpread && weekSpread !== null) {
-                          const result = await onSetSpread(selectedWeek, entry.team_id, weekSpread);
-                          if (result.error) setSpreadError(result.error);
-                        }
-                      };
-
-                      const handlePickSide = async (side: 'cover' | 'against') => {
-                        if (existingPick) {
-                          if (existingPick.side === side) {
-                            if (!canRemove || !onRemoveSpread) return;
-                            await onRemoveSpread(selectedWeek, entry.team_id);
-                          } else {
-                            if (!canSwitchSide || !onSetSpread || weekSpread === null) return;
-                            const result = await onSetSpread(selectedWeek, entry.team_id, weekSpread, side);
-                            if (result.error) setSpreadError(result.error);
-                          }
-                        } else {
-                          if (!canPick || !onSetSpread || weekSpread === null) return;
-                          const result = await onSetSpread(selectedWeek, entry.team_id, weekSpread, side);
-                          if (result.error) setSpreadError(result.error);
-                        }
-                      };
-
-                      let subtext: string;
-                      if (existingPick) {
-                        if (spreadResult === 'push') subtext = `Push ${formatSpread(existingPick.locked_spread)}`;
-                        else if (spreadResult === 'covered' || spreadResult === 'missed') {
-                          subtext = `${pickWon ? '✓ Won' : '✗ Lost'} ${formatSpread(existingPick.locked_spread)}`;
-                        } else {
-                          subtext = `Locked ${formatSpread(existingPick.locked_spread)}${
-                            scoring.spread_allow_against_pick ? ` · ${existingPick.side === 'against' ? 'Against' : 'Cover'}` : ''
-                          } · ${teamSeasonUses}/${scoring.spread_max_per_team} season`;
-                        }
-                      } else if (spreadsLoading && !weekSpread) {
-                        subtext = 'Loading line…';
-                      } else if (weekSpread === null) {
-                        subtext = 'No line yet';
-                      } else if (kickedOff) {
-                        subtext = 'Game in progress';
-                      } else if (stackBlocked) {
-                        subtext = 'Captain stack disabled';
-                      } else if (atTeamLimit) {
-                        subtext = `Team limit (${scoring.spread_max_per_team}/season)`;
-                      } else if (atWeekLimit) {
-                        subtext = `Week limit (${scoring.spread_max_per_week}/week)`;
-                      } else {
-                        subtext = `${formatSpread(weekSpread)} (${weekSpread < 0 ? 'favored' : weekSpread > 0 ? 'underdog' : "pick 'em"}) · ${weekPicks.length}/${scoring.spread_max_per_week} this week`;
-                      }
-
-                      const trackColor = spreadResult === 'push' ? 'bg-turf-500'
-                        : pickWon === true ? 'bg-field-600'
-                        : pickWon === false ? 'bg-red-600'
-                        : isOn ? 'bg-blue-600'
-                        : 'bg-turf-700';
-                      const labelColor = spreadResult === 'push' ? 'text-turf-300'
-                        : pickWon === true ? 'text-field-400'
-                        : pickWon === false ? 'text-red-300'
-                        : isOn ? 'text-blue-300'
-                        : 'text-turf-300';
-
-                      return (
-                        <div className="mt-2 pt-2 border-t border-turf-800/60 flex items-center justify-between gap-2">
-                          <div className="min-w-0">
-                            <span className={`text-xs font-medium flex items-center gap-1 ${labelColor}`}>
-                              <Coins className="w-3 h-3 flex-shrink-0" /> Spread
-                            </span>
-                            <p className="text-xs text-turf-500 truncate">{subtext}</p>
-                          </div>
-                          {scoring.spread_allow_against_pick ? (
-                            <div className="flex items-center gap-1 flex-shrink-0">
-                              {(['cover', 'against'] as const).map(side => {
-                                const active = existingPick?.side === side;
-                                const disabled = active ? !canRemove : (existingPick ? !canSwitchSide : !canPick);
-                                return (
-                                  <button
-                                    key={side}
-                                    type="button"
-                                    onClick={() => handlePickSide(side)}
-                                    disabled={disabled}
-                                    aria-pressed={active}
-                                    className={`px-2 py-1 rounded text-[10px] font-semibold uppercase tracking-wide transition-colors ${
-                                      active
-                                        ? side === 'cover' ? 'bg-field-600 text-white' : 'bg-blue-600 text-white'
-                                        : 'bg-turf-800 text-turf-400 hover:text-white'
-                                    } disabled:opacity-40 disabled:cursor-not-allowed`}
-                                  >
-                                    {side === 'cover' ? 'Cover' : 'Against'}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={handleToggle}
-                              disabled={toggleDisabled}
-                              aria-label={isOn ? 'Remove spread pick' : 'Pick spread'}
-                              aria-pressed={isOn}
-                              className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${trackColor} ${toggleDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            >
-                              <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${isOn ? 'left-5' : 'left-0.5'}`} />
-                            </button>
-                          )}
-                        </div>
-                      );
-                    })()}
-                    </div>
-                  </div>
-                );
-              })}
+              {weekRoster.map(entry => renderCard(entry, false))}
             </div>
           )}
         </div>
+
+        {benchError && (
+          <div className="card p-3 border-red-800/50 bg-red-950/20 text-xs text-red-300 flex items-center justify-between">
+            <span>{benchError}</span>
+            <button onClick={() => setBenchError(null)} className="text-red-500 hover:text-red-300 ml-2">✕</button>
+          </div>
+        )}
 
         {/* ── FULL SCHEDULE VIEW ── */}
         {scoring.spread_enabled && (
@@ -1246,6 +1347,32 @@ export function RosterView({
                                     );
                                     return null;
                                   })()}
+
+                                  {/* Bench/starter indicator — click-to-select, then click a
+                                      team in the same week's opposite group to swap. */}
+                                  {scoring.bench_enabled && (() => {
+                                    const benchedHere = isBenchedForWeek(entry.team_id, w);
+                                    const kicked = isGameKickedOff((game as any)?.start_date);
+                                    const selected = swapSource?.week === w && swapSource.teamId === entry.team_id;
+                                    const canInteract = isOwner && !!onSwapBench && !kicked && !isPast;
+                                    return (
+                                      <button
+                                        type="button"
+                                        disabled={!canInteract}
+                                        onClick={e => { e.stopPropagation(); handleSwapClick(w, entry.team_id, benchedHere); }}
+                                        title={benchedHere ? 'Benched' : 'Starting'}
+                                        className={`mt-0.5 text-[10px] font-bold uppercase tracking-wide rounded px-1 border ${
+                                          selected
+                                            ? 'border-field-500 text-field-300 bg-field-900/40'
+                                            : benchedHere
+                                            ? 'border-turf-700 text-turf-500'
+                                            : 'border-turf-700 text-field-400'
+                                        } ${!canInteract ? 'opacity-40 cursor-not-allowed' : 'hover:border-field-600'}`}
+                                      >
+                                        {benchedHere ? 'BN' : 'ST'}
+                                      </button>
+                                    );
+                                  })()}
                                 </div>
                               ) : (
                                 <span className="text-turf-700">—</span>
@@ -1265,6 +1392,9 @@ export function RosterView({
               <span className="flex items-center gap-1"><span className="text-field-400 font-bold">W</span> Win</span>
               <span className="flex items-center gap-1"><span className="text-red-300 font-bold">L</span> Loss</span>
               <span className="flex items-center gap-1"><span className="text-amber-400">★</span> Captain</span>
+              {scoring.bench_enabled && (
+                <span className="flex items-center gap-1"><span className="text-field-400 font-bold">ST</span>/<span className="text-turf-500 font-bold">BN</span> Starter/Bench — tap to swap</span>
+              )}
               <span className="flex items-center gap-1"><span className="text-turf-400">—</span> Bye / no game</span>
               <span className="flex items-center gap-1 text-turf-500">
                 Click a team name for full schedule details
