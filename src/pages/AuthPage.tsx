@@ -215,10 +215,28 @@ export function AuthPage({ auth }: Props) {
               </div>
             )}
 
+            {/* Sign In / Sign Up as equal-weight tabs, not a heading plus a
+                small link buried at the bottom of the card — Sign Up was
+                getting missed. Matches the tab-bar pattern already used in
+                AdminPanel.tsx (same container/active-state classes) rather
+                than inventing a second tab style for the same app. */}
             {mode !== 'forgot' && (
-              <h2 className="font-display text-3xl tracking-wider text-white text-center mb-6">
-                {mode === 'login' ? 'Sign In' : 'Sign Up'}
-              </h2>
+              <div className="flex gap-1 mb-6 bg-turf-900 p-1 rounded-xl border border-turf-800">
+                {(['login', 'signup'] as const).map(m => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => { setMode(m); setMsg(null); }}
+                    className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
+                      mode === m
+                        ? 'bg-field-500 text-turf-950'
+                        : 'text-turf-400 hover:text-white'
+                    }`}
+                  >
+                    {m === 'login' ? 'Sign In' : 'Sign Up'}
+                  </button>
+                ))}
+              </div>
             )}
 
             {mode !== 'forgot' && (
@@ -334,34 +352,6 @@ export function AuthPage({ auth }: Props) {
                 </button>
               )}
             </form>
-
-            {mode !== 'forgot' && (
-              <p className="text-sm text-turf-400 text-center mt-6">
-                {mode === 'login' ? (
-                  <>
-                    Need to create an account?{' '}
-                    <button
-                      type="button"
-                      onClick={() => { setMode('signup'); setMsg(null); }}
-                      className="text-field-400 hover:text-field-300 font-medium transition-colors py-2 -my-2"
-                    >
-                      Sign Up
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    Already have an account?{' '}
-                    <button
-                      type="button"
-                      onClick={() => { setMode('login'); setMsg(null); }}
-                      className="text-field-400 hover:text-field-300 font-medium transition-colors py-2 -my-2"
-                    >
-                      Sign In
-                    </button>
-                  </>
-                )}
-              </p>
-            )}
           </div>
 
           {/* On mobile there's no video column, so the summary lives right
