@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import posthog from 'posthog-js';
 import type { useAuth } from '../hooks/useAuth';
@@ -374,6 +375,13 @@ export function AuthPage({ auth }: Props) {
           </div>
         )}
       </div>
+
+      <Link
+        to="/privacy"
+        className="absolute bottom-4 inset-x-0 text-center text-xs text-turf-500 hover:text-turf-300 transition-colors"
+      >
+        Privacy
+      </Link>
     </div>
   );
 }

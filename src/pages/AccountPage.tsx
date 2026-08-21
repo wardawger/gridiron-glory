@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Loader2, User, Mail, Calendar, Shield, Trophy, Check, Search, ChevronDown, RotateCcw } from 'lucide-react';
 import type { useAuth } from '../hooks/useAuth';
 import type { League, LeagueMember, LeagueRole, CfbTeam, AvatarType } from '../types';
@@ -417,6 +418,12 @@ export function AccountPage({
             );
           })}
         </div>
+      </div>
+
+      <div className="text-center">
+        <Link to="/privacy" className="text-xs text-turf-500 hover:text-turf-300 transition-colors">
+          Privacy
+        </Link>
       </div>
     </div>
   );

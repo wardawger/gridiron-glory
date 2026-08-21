@@ -8,6 +8,7 @@ import { AuthPage }         from './pages/AuthPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { CreateLeaguePage } from './pages/CreateLeaguePage';
 import { JoinPage }         from './pages/JoinPage';
+import { PrivacyPage }      from './pages/PrivacyPage';
 import { Loader2 }          from 'lucide-react';
 import { ErrorBoundary }    from './components/ErrorBoundary';
 
@@ -207,6 +208,7 @@ function AnimatedRoutes({ lg, league, auth, cfb }: AnimatedRoutesProps) {
               }}
             />
           } />
+          <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
@@ -266,6 +268,7 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/join/:token" element={<JoinPage user={null} />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="*" element={<AuthPage auth={auth} />} />
         </Routes>
       </BrowserRouter>
@@ -295,6 +298,7 @@ export default function App() {
               }}
             />
           } />
+          <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="*" element={
             pendingInvite
               ? <Navigate to={`/join/${pendingInvite}`} replace />
