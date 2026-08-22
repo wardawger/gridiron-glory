@@ -5,6 +5,7 @@ import { normalizeScoring, STAT_BONUS_CATEGORIES, STAT_BONUS_LABELS, BONUS_GROUP
 import { useCrossfadeVisibility } from '../../hooks/useCrossfade';
 import { Toggle } from '../ui/Toggle';
 import { Toast } from '../ui/Toast';
+import { ScoreField } from './ScoreField';
 
 interface Props {
   league: League;
@@ -70,47 +71,31 @@ export function ScoringTab({ league, teams, onUpdateScoring }: Props) {
       <div className="card p-5 space-y-4">
         <h3 className="font-medium text-white text-sm">Roster Conference Limits</h3>
         <p className="text-xs text-turf-400">Applies during the draft and to portal/waiver moves.</p>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="label">P4 Min (per conference)</label>
-            <input
-              className="input font-mono"
-              type="number"
-              min="0"
-              value={scoring.p4_conf_min}
-              onChange={e => setScoring(prev => ({ ...prev, p4_conf_min: parseInt(e.target.value) || 0 }))}
-            />
-          </div>
-          <div>
-            <label className="label">P4 Max (per conference)</label>
-            <input
-              className="input font-mono"
-              type="number"
-              min="1"
-              value={scoring.p4_conf_max}
-              onChange={e => setScoring(prev => ({ ...prev, p4_conf_max: parseInt(e.target.value) || 1 }))}
-            />
-          </div>
-          <div>
-            <label className="label">G5 Min (combined)</label>
-            <input
-              className="input font-mono"
-              type="number"
-              min="0"
-              value={scoring.g5_conf_min}
-              onChange={e => setScoring(prev => ({ ...prev, g5_conf_min: parseInt(e.target.value) || 0 }))}
-            />
-          </div>
-          <div>
-            <label className="label">G5 Max (combined)</label>
-            <input
-              className="input font-mono"
-              type="number"
-              min="1"
-              value={scoring.g5_conf_max}
-              onChange={e => setScoring(prev => ({ ...prev, g5_conf_max: parseInt(e.target.value) || 1 }))}
-            />
-          </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 sm:gap-4">
+          <ScoreField
+            label="P4 Min (per conference)"
+            min={0}
+            value={scoring.p4_conf_min}
+            onChange={v => setScoring(prev => ({ ...prev, p4_conf_min: v }))}
+          />
+          <ScoreField
+            label="P4 Max (per conference)"
+            min={1}
+            value={scoring.p4_conf_max}
+            onChange={v => setScoring(prev => ({ ...prev, p4_conf_max: v }))}
+          />
+          <ScoreField
+            label="G5 Min (combined)"
+            min={0}
+            value={scoring.g5_conf_min}
+            onChange={v => setScoring(prev => ({ ...prev, g5_conf_min: v }))}
+          />
+          <ScoreField
+            label="G5 Max (combined)"
+            min={1}
+            value={scoring.g5_conf_max}
+            onChange={v => setScoring(prev => ({ ...prev, g5_conf_max: v }))}
+          />
         </div>
         <p className="text-xs text-turf-500">
           P4 = SEC, Big Ten, Big 12, ACC — each conference is capped separately. G5/non-P4 teams share one combined limit.
@@ -150,23 +135,20 @@ export function ScoringTab({ league, teams, onUpdateScoring }: Props) {
       <div className="card p-5 space-y-4">
         <h3 className="font-medium text-white text-sm">Base Scoring</h3>
         <p className="text-xs text-turf-400">Adjust scoring settings for this league. Changes apply to all weeks.</p>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 sm:gap-4">
           {(['win', 'win_ranked', 'win_top15', 'win_top5', 'loss', 'loss_g5'] as const).map(key => {
             const labels: Record<string, string> = {
               win: 'Win', win_ranked: 'Beat Ranked', win_top15: 'Beat Top 15',
               win_top5: 'Beat Top 5', loss: 'Loss', loss_g5: 'Loss to G5',
             };
             return (
-              <div key={key}>
-                <label className="label">{labels[key]}</label>
-                <input
-                  className="input font-mono"
-                  type="number"
-                  step="0.5"
-                  value={scoring[key] as number}
-                  onChange={e => setScoring(prev => ({ ...prev, [key]: parseFloat(e.target.value) || 0 }))}
-                />
-              </div>
+              <ScoreField
+                key={key}
+                label={labels[key]}
+                step={0.5}
+                value={scoring[key] as number}
+                onChange={v => setScoring(prev => ({ ...prev, [key]: v }))}
+              />
             );
           })}
         </div>
@@ -182,21 +164,19 @@ export function ScoringTab({ league, teams, onUpdateScoring }: Props) {
           {postseasonGroups.map(group => (
             <div key={group.label} className="space-y-2">
               <p className="text-xs font-medium text-turf-300 uppercase tracking-wide">{group.label}</p>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 sm:gap-3">
                 {group.types.map(type => (
-                  <div key={type}>
-                    <label className="text-[10px] text-turf-500 uppercase tracking-wide block mb-1">{BONUS_LABELS[type]}</label>
-                    <input
-                      className="input font-mono text-center"
-                      type="number"
-                      step="0.5"
-                      value={scoring.bonus_points[type]}
-                      onChange={e => setScoring(prev => ({
-                        ...prev,
-                        bonus_points: { ...prev.bonus_points, [type]: parseFloat(e.target.value) || 0 },
-                      }))}
-                    />
-                  </div>
+                  <ScoreField
+                    key={type}
+                    label={BONUS_LABELS[type]}
+                    variant="compact"
+                    step={0.5}
+                    value={scoring.bonus_points[type]}
+                    onChange={v => setScoring(prev => ({
+                      ...prev,
+                      bonus_points: { ...prev.bonus_points, [type]: v },
+                    }))}
+                  />
                 ))}
               </div>
             </div>
@@ -252,27 +232,21 @@ export function ScoringTab({ league, teams, onUpdateScoring }: Props) {
                         />
                       </div>
                       {c.top_enabled && (
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <label className="text-[10px] text-turf-500 uppercase tracking-wide block mb-1"># of Teams</label>
-                            <input
-                              className="input font-mono text-center"
-                              type="number"
-                              min="1"
-                              value={c.top_count}
-                              onChange={e => updateCat({ top_count: parseInt(e.target.value) || 1 })}
-                            />
-                          </div>
-                          <div>
-                            <label className="text-[10px] text-turf-500 uppercase tracking-wide block mb-1">Points Each</label>
-                            <input
-                              className="input font-mono text-center"
-                              type="number"
-                              step="0.5"
-                              value={c.top_points}
-                              onChange={e => updateCat({ top_points: parseFloat(e.target.value) || 0 })}
-                            />
-                          </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 sm:gap-2">
+                          <ScoreField
+                            label="# of Teams"
+                            variant="compact"
+                            min={1}
+                            value={c.top_count}
+                            onChange={v => updateCat({ top_count: v })}
+                          />
+                          <ScoreField
+                            label="Points Each"
+                            variant="compact"
+                            step={0.5}
+                            value={c.top_points}
+                            onChange={v => updateCat({ top_points: v })}
+                          />
                         </div>
                       )}
                     </div>
@@ -290,28 +264,22 @@ export function ScoringTab({ league, teams, onUpdateScoring }: Props) {
                         />
                       </div>
                       {c.bottom_enabled && (
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <label className="text-[10px] text-turf-500 uppercase tracking-wide block mb-1"># of Teams</label>
-                            <input
-                              className="input font-mono text-center"
-                              type="number"
-                              min="1"
-                              value={c.bottom_count}
-                              onChange={e => updateCat({ bottom_count: parseInt(e.target.value) || 1 })}
-                            />
-                          </div>
-                          <div>
-                            <label className="text-[10px] text-turf-500 uppercase tracking-wide block mb-1">Points Each</label>
-                            <input
-                              className="input font-mono text-center"
-                              type="number"
-                              step="0.5"
-                              value={c.bottom_points}
-                              onChange={e => updateCat({ bottom_points: parseFloat(e.target.value) || 0 })}
-                            />
-                            <p className="text-[10px] text-turf-500 mt-0.5">Negative values subtract points</p>
-                          </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 sm:gap-2">
+                          <ScoreField
+                            label="# of Teams"
+                            variant="compact"
+                            min={1}
+                            value={c.bottom_count}
+                            onChange={v => updateCat({ bottom_count: v })}
+                          />
+                          <ScoreField
+                            label="Points Each"
+                            variant="compact"
+                            step={0.5}
+                            description="Negative values subtract points"
+                            value={c.bottom_points}
+                            onChange={v => updateCat({ bottom_points: v })}
+                          />
                         </div>
                       )}
                     </div>
@@ -367,49 +335,35 @@ export function ScoringTab({ league, teams, onUpdateScoring }: Props) {
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="label">
-                  {scoring.spread_is_multiplier ? 'Multiplier (×)' : 'Points for Covering'}
-                </label>
-                <input
-                  className="input font-mono"
-                  type="number"
-                  step={scoring.spread_is_multiplier ? '0.1' : '0.5'}
-                  min="0"
-                  value={scoring.spread_points}
-                  onChange={e => setScoring(prev => ({ ...prev, spread_points: parseFloat(e.target.value) || 0 }))}
-                />
-                <p className="text-xs text-turf-500 mt-0.5">
-                  Penalty for missing: {scoring.spread_miss_penalty_enabled
+            <div className="grid grid-cols-1 sm:grid-cols-2 sm:gap-4">
+              <ScoreField
+                label={scoring.spread_is_multiplier ? 'Multiplier (×)' : 'Points for Covering'}
+                step={scoring.spread_is_multiplier ? 0.1 : 0.5}
+                min={0}
+                value={scoring.spread_points}
+                onChange={v => setScoring(prev => ({ ...prev, spread_points: v }))}
+                description={
+                  <>Penalty for missing: {scoring.spread_miss_penalty_enabled
                     ? `-${scoring.spread_miss_penalty_points} pts (custom)`
-                    : scoring.spread_is_multiplier ? `×${scoring.spread_points}` : `-${scoring.spread_points} pts`}
-                </p>
-              </div>
+                    : scoring.spread_is_multiplier ? `×${scoring.spread_points}` : `-${scoring.spread_points} pts`}</>
+                }
+              />
 
-              <div>
-                <label className="label">Max Picks / Week</label>
-                <input
-                  className="input font-mono"
-                  type="number"
-                  min="1"
-                  max="10"
-                  value={scoring.spread_max_per_week}
-                  onChange={e => setScoring(prev => ({ ...prev, spread_max_per_week: parseInt(e.target.value) || 1 }))}
-                />
-              </div>
+              <ScoreField
+                label="Max Picks / Week"
+                min={1}
+                max={10}
+                value={scoring.spread_max_per_week}
+                onChange={v => setScoring(prev => ({ ...prev, spread_max_per_week: v }))}
+              />
 
-              <div>
-                <label className="label">Max Picks / Team / Season</label>
-                <input
-                  className="input font-mono"
-                  type="number"
-                  min="1"
-                  max="20"
-                  value={scoring.spread_max_per_team}
-                  onChange={e => setScoring(prev => ({ ...prev, spread_max_per_team: parseInt(e.target.value) || 1 }))}
-                />
-              </div>
+              <ScoreField
+                label="Max Picks / Team / Season"
+                min={1}
+                max={20}
+                value={scoring.spread_max_per_team}
+                onChange={v => setScoring(prev => ({ ...prev, spread_max_per_team: v }))}
+              />
 
               <div className="flex flex-col justify-end">
                 <label className="label">Captain Stacking</label>
@@ -461,20 +415,14 @@ export function ScoringTab({ league, teams, onUpdateScoring }: Props) {
             </div>
 
             {scoring.spread_miss_penalty_enabled && (
-              <div>
-                <label className="label">Points for Missing</label>
-                <input
-                  className="input font-mono"
-                  type="number"
-                  min="0"
-                  step="0.5"
-                  value={scoring.spread_miss_penalty_points}
-                  onChange={e => setScoring(prev => ({ ...prev, spread_miss_penalty_points: parseFloat(e.target.value) || 0 }))}
-                />
-                <p className="text-xs text-turf-500 mt-0.5">
-                  −{scoring.spread_miss_penalty_points} pts applied whenever a spread pick misses, regardless of point mode
-                </p>
-              </div>
+              <ScoreField
+                label="Points for Missing"
+                min={0}
+                step={0.5}
+                value={scoring.spread_miss_penalty_points}
+                onChange={v => setScoring(prev => ({ ...prev, spread_miss_penalty_points: v }))}
+                description={`−${scoring.spread_miss_penalty_points} pts applied whenever a spread pick misses, regardless of point mode`}
+              />
             )}
           </div>
         )}
@@ -500,27 +448,19 @@ export function ScoringTab({ league, teams, onUpdateScoring }: Props) {
 
         {freeAgencyPanel.shown && (
           <div className={`space-y-4 pt-2 border-t border-turf-800 ${freeAgencyPanel.className}`}>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="label">Max Adds/Drops / Season</label>
-                <input
-                  className="input font-mono"
-                  type="number"
-                  min="0"
-                  value={scoring.fa_max_moves_per_season}
-                  onChange={e => setScoring(prev => ({ ...prev, fa_max_moves_per_season: parseInt(e.target.value) || 0 }))}
-                />
-              </div>
-              <div>
-                <label className="label">Max Adds/Drops / Week</label>
-                <input
-                  className="input font-mono"
-                  type="number"
-                  min="0"
-                  value={scoring.fa_max_moves_per_week}
-                  onChange={e => setScoring(prev => ({ ...prev, fa_max_moves_per_week: parseInt(e.target.value) || 0 }))}
-                />
-              </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 sm:gap-4">
+              <ScoreField
+                label="Max Adds/Drops / Season"
+                min={0}
+                value={scoring.fa_max_moves_per_season}
+                onChange={v => setScoring(prev => ({ ...prev, fa_max_moves_per_season: v }))}
+              />
+              <ScoreField
+                label="Max Adds/Drops / Week"
+                min={0}
+                value={scoring.fa_max_moves_per_week}
+                onChange={v => setScoring(prev => ({ ...prev, fa_max_moves_per_week: v }))}
+              />
             </div>
 
             <div className="flex items-center justify-between">
@@ -540,20 +480,14 @@ export function ScoringTab({ league, teams, onUpdateScoring }: Props) {
             </div>
 
             {scoring.fa_penalty_enabled && (
-              <div>
-                <label className="label">Penalty Points</label>
-                <input
-                  className="input font-mono"
-                  type="number"
-                  min="0"
-                  step="0.5"
-                  value={scoring.fa_penalty_points}
-                  onChange={e => setScoring(prev => ({ ...prev, fa_penalty_points: parseFloat(e.target.value) || 0 }))}
-                />
-                <p className="text-xs text-turf-500 mt-0.5">
-                  −{scoring.fa_penalty_points} pts applied the week of each add/drop
-                </p>
-              </div>
+              <ScoreField
+                label="Penalty Points"
+                min={0}
+                step={0.5}
+                value={scoring.fa_penalty_points}
+                onChange={v => setScoring(prev => ({ ...prev, fa_penalty_points: v }))}
+                description={`−${scoring.fa_penalty_points} pts applied the week of each add/drop`}
+              />
             )}
           </div>
         )}
@@ -647,27 +581,19 @@ export function ScoringTab({ league, teams, onUpdateScoring }: Props) {
 
         {benchPanel.shown && (
           <div className={`space-y-4 pt-2 border-t border-turf-800 ${benchPanel.className}`}>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="label">Starters</label>
-                <input
-                  className="input font-mono"
-                  type="number"
-                  min="1"
-                  value={scoring.starters_count}
-                  onChange={e => setScoring(prev => ({ ...prev, starters_count: parseInt(e.target.value) || 0 }))}
-                />
-              </div>
-              <div>
-                <label className="label">Bench</label>
-                <input
-                  className="input font-mono"
-                  type="number"
-                  min="0"
-                  value={scoring.bench_count}
-                  onChange={e => setScoring(prev => ({ ...prev, bench_count: parseInt(e.target.value) || 0 }))}
-                />
-              </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 sm:gap-4">
+              <ScoreField
+                label="Starters"
+                min={1}
+                value={scoring.starters_count}
+                onChange={v => setScoring(prev => ({ ...prev, starters_count: v }))}
+              />
+              <ScoreField
+                label="Bench"
+                min={0}
+                value={scoring.bench_count}
+                onChange={v => setScoring(prev => ({ ...prev, bench_count: v }))}
+              />
             </div>
             <p className="text-xs text-turf-500">
               Must total {league.max_teams_per_user} — this league's teams per player. Currently {scoring.starters_count + scoring.bench_count}.
