@@ -20,6 +20,7 @@ export interface League {
   draft_status: DraftStatus;
   draft_order: string[];
   draft_current_pick: number;
+  draft_scheduled_at: string | null;
   max_teams_per_user: number;
   scoring: ScoringSettings;
   created_at: string;

@@ -179,6 +179,7 @@ function AnimatedRoutes({ lg, league, auth, cfb }: AnimatedRoutesProps) {
               onSendInvite={league.sendInvite}
               onUpdateWeek={league.updateWeek}
               onUpdateScoring={league.updateScoring}
+              onUpdateDraftSchedule={league.updateDraftSchedule}
               onAddBonus={league.addManualBonus}
               onRemoveBonus={league.removeManualBonus}
               onAddCorrection={league.addScoreCorrection}

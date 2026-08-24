@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Shield, UserPlus, Copy, Check, Trash2, Mail, RotateCcw, AlertTriangle, Loader2, Archive } from 'lucide-react';
+import { Shield, UserPlus, Copy, Check, Trash2, Mail, RotateCcw, AlertTriangle, Loader2, Archive, CalendarClock } from 'lucide-react';
 import type { League, LeagueMember, LeagueRole, SeasonHistoryEntry, TrophySnapshot } from '../../types';
 import { Avatar } from '../ui/Avatar';
 import { Toggle } from '../ui/Toggle';
@@ -12,6 +12,7 @@ interface Props {
   trophySnapshot: TrophySnapshot;
   onSendInvite: (email: string) => Promise<{ token?: string; emailSent?: boolean; error?: string }>;
   onUpdateWeek: (week: number) => void;
+  onUpdateDraftSchedule: (scheduledAt: string | null) => Promise<{ error?: string }>;
   onUpdateMemberRole: (userId: string, role: LeagueRole) => Promise<{ error?: string }>;
   onRemoveMember: (userId: string) => Promise<{ error?: string }>;
   onResetDraft: () => Promise<{ error?: string }>;
@@ -19,9 +20,20 @@ interface Props {
   onEndSeason: (seasonLabel: string, standings: SeasonHistoryEntry[], trophies: TrophySnapshot) => Promise<{ error?: string }>;
 }
 
+// Converts a stored ISO timestamp to the local-time string a
+// <input type="datetime-local"> expects (YYYY-MM-DDTHH:mm), and back —
+// the input has no timezone concept of its own, so this treats whatever
+// the browser shows as the commissioner's own local time.
+function isoToLocalInput(iso: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+}
+
 export function MembersTab({
   league, currentUserId, members, finalStandings, trophySnapshot,
-  onSendInvite, onUpdateWeek, onUpdateMemberRole, onRemoveMember, onResetDraft, onDeleteLeague, onEndSeason,
+  onSendInvite, onUpdateWeek, onUpdateDraftSchedule, onUpdateMemberRole, onRemoveMember, onResetDraft, onDeleteLeague, onEndSeason,
 }: Props) {
   const [inviteEmail, setEmail] = useState('');
   const [inviteLink, setLink]   = useState('');
@@ -52,6 +64,28 @@ export function MembersTab({
   const [seasonLabel, setSeasonLabel] = useState(defaultSeasonLabel);
   const [endingSeason, setEndingSeason] = useState(false);
   const [endSeasonError, setEndSeasonError] = useState('');
+
+  const [draftSchedule, setDraftSchedule] = useState(() => isoToLocalInput(league.draft_scheduled_at));
+  const [savingSchedule, setSavingSchedule] = useState(false);
+  const [scheduleError, setScheduleError] = useState('');
+
+  const handleSaveSchedule = async () => {
+    setSavingSchedule(true);
+    setScheduleError('');
+    const iso = draftSchedule ? new Date(draftSchedule).toISOString() : null;
+    const result = await onUpdateDraftSchedule(iso);
+    if (result.error) setScheduleError(result.error);
+    setSavingSchedule(false);
+  };
+
+  const handleClearSchedule = async () => {
+    setSavingSchedule(true);
+    setScheduleError('');
+    const result = await onUpdateDraftSchedule(null);
+    if (result.error) setScheduleError(result.error);
+    else setDraftSchedule('');
+    setSavingSchedule(false);
+  };
 
   const handleEndSeason = async () => {
     setEndingSeason(true);
@@ -235,6 +269,52 @@ export function MembersTab({
       </div>
       {roleError && (
         <p className="text-xs text-red-300 px-1">{roleError}</p>
+      )}
+
+      {/* Draft schedule — only meaningful before the draft actually starts;
+          draft_status only returns to 'pending' via a deliberate reset or
+          new season, matching the Invite Player card's visibility above. */}
+      {league.draft_status === 'pending' && (
+        <div className="card p-5 space-y-3">
+          <div className="flex items-center gap-2 mb-1">
+            <CalendarClock className="w-4 h-4 text-field-400" />
+            <h3 className="font-medium text-white">Draft Schedule</h3>
+          </div>
+          <p className="text-xs text-turf-400">
+            Set a planned date and time for the draft — everyone sees a countdown in the Draft Room.
+            This doesn't start the draft automatically; you still start it yourself when ready.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <input
+              className="input flex-1"
+              type="datetime-local"
+              value={draftSchedule}
+              onChange={e => setDraftSchedule(e.target.value)}
+            />
+            <div className="flex gap-2 flex-shrink-0">
+              <button
+                onClick={handleSaveSchedule}
+                disabled={savingSchedule || !draftSchedule}
+                className="btn-primary btn-sm flex-1 sm:flex-none"
+              >
+                {savingSchedule && <Loader2 className="w-4 h-4 animate-spin" />}
+                Save
+              </button>
+              {league.draft_scheduled_at && (
+                <button
+                  onClick={handleClearSchedule}
+                  disabled={savingSchedule}
+                  className="btn-secondary btn-sm flex-1 sm:flex-none"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
+          {scheduleError && (
+            <p className="text-xs text-red-300">{scheduleError}</p>
+          )}
+        </div>
       )}
 
       {/* Current week */}

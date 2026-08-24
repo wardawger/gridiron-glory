@@ -547,6 +547,22 @@ export function useLeagueCore(user: User | null) {
     await supabase.from('leagues').update({ current_week: week }).eq('id', league.id);
   };
 
+  // scheduledAt: an ISO timestamp, or null to clear the schedule. Purely
+  // informational — drives the Draft Room countdown, doesn't auto-start
+  // the draft itself.
+  const updateDraftSchedule = async (scheduledAt: string | null): Promise<{ error?: string }> => {
+    if (!league) return { error: 'No league' };
+    const { data, error } = await supabase
+      .from('leagues')
+      .update({ draft_scheduled_at: scheduledAt })
+      .eq('id', league.id)
+      .select()
+      .single();
+    if (error) return { error: error.message };
+    if (data) setAllLeagues(prev => prev.map(l => l.id === league.id ? data as League : l));
+    return {};
+  };
+
   const updateScoring = async (scoring: League['scoring']) => {
     if (!league) return;
     const { error } = await supabase.from('leagues').update({ scoring }).eq('id', league.id);
@@ -683,7 +699,7 @@ export function useLeagueCore(user: User | null) {
     rosters, myMembership, isCommissioner, loading, error,
     // Public actions
     switchLeague, createLeague, sendInvite, startDraft, makeDraftPick, resetDraft, deleteLeague, endSeason,
-    updateWeek, updateScoring, removeFromRoster,
+    updateWeek, updateScoring, updateDraftSchedule, removeFromRoster,
     updateDisplayName, updateAvatar, updateMemberRole, removeMember,
     reload: () => loadAllLeagues(true),
     // Setters + refs consumed by the domain action-factory hooks

@@ -30,6 +30,7 @@ interface Props {
   onSendInvite: (email: string) => Promise<{ token?: string; emailSent?: boolean; error?: string }>;
   onUpdateWeek: (week: number) => void;
   onUpdateScoring: (s: ScoringSettings) => void;
+  onUpdateDraftSchedule: (scheduledAt: string | null) => Promise<{ error?: string }>;
   onAddBonus: (bonus: Omit<ManualBonus, 'id' | 'awarded_at' | 'awarded_by' | 'league_id'>) => void;
   onRemoveBonus: (id: string) => void;
   onAddCorrection: (correction: Omit<ScoreCorrection, 'id' | 'league_id' | 'created_at' | 'created_by'>) => Promise<{ error?: string }>;
@@ -49,7 +50,7 @@ type Tab = 'members' | 'scoring' | 'adjustments';
 export function AdminPanel({
   league, currentUserId, members, draftPicks, captainPicks, manualBonuses, spreadPicks, freeAgencyMoves, scoreCorrections,
   benchPicks, gameData, seasonStats, teams, isCommissioner,
-  onSendInvite, onUpdateWeek, onUpdateScoring, onAddBonus, onRemoveBonus, onAddCorrection, onRemoveCorrection,
+  onSendInvite, onUpdateWeek, onUpdateScoring, onUpdateDraftSchedule, onAddBonus, onRemoveBonus, onAddCorrection, onRemoveCorrection,
   onResetDraft, onDeleteLeague,
   onEndSeason, onOverrideSpread, onClearSpreadOverride, onUpdateMemberRole, onRemoveMember,
 }: Props) {
@@ -133,6 +134,7 @@ export function AdminPanel({
           trophySnapshot={trophySnapshot}
           onSendInvite={onSendInvite}
           onUpdateWeek={onUpdateWeek}
+          onUpdateDraftSchedule={onUpdateDraftSchedule}
           onUpdateMemberRole={onUpdateMemberRole}
           onRemoveMember={onRemoveMember}
           onResetDraft={onResetDraft}

@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Search, Clock, CheckCircle2, Zap, ChevronDown, ChevronUp, AlertCircle, AlertTriangle, X, MapPin, Tv, Loader2 } from 'lucide-react';
+import { Search, Clock, CheckCircle2, Zap, ChevronDown, ChevronUp, AlertCircle, AlertTriangle, X, MapPin, Tv, Loader2, CalendarClock } from 'lucide-react';
 import type { League, LeagueMember, DraftPick, CfbTeam, GameData, TeamRatings, APRanking } from '../../types';
 import { normalizeScoring } from '../../types';
 import { getPickOwner, P4_CONFERENCES as P4_CONF_LIST, isP4Conference, confCategory } from '../../services/scoring';
@@ -20,6 +20,55 @@ function formatGameDate(startDate: string | null | undefined, startTimeTbd: bool
     ? 'TBD'
     : d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
   return { date, time };
+}
+
+// Live countdown to a commissioner-set draft time — purely informational,
+// it never starts the draft itself. Ticks locally once a second rather
+// than re-deriving from a server clock; drift over the span of a pre-draft
+// wait is not worth a network round-trip every tick.
+function DraftCountdown({ scheduledAt }: { scheduledAt: string }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const target = new Date(scheduledAt).getTime();
+  const totalSeconds = Math.max(0, Math.floor((target - now) / 1000));
+  const isPast = totalSeconds <= 0;
+  const units = [
+    { label: 'Days', value: Math.floor(totalSeconds / 86400) },
+    { label: 'Hrs',  value: Math.floor((totalSeconds % 86400) / 3600) },
+    { label: 'Min',  value: Math.floor((totalSeconds % 3600) / 60) },
+    { label: 'Sec',  value: totalSeconds % 60 },
+  ];
+
+  const formattedDate = new Date(scheduledAt).toLocaleString('en-US', {
+    weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short',
+  });
+
+  return (
+    <div className="card p-5 border-field-500/30 bg-field-950/10 space-y-3">
+      <p className="flex items-center justify-center gap-1.5 text-turf-400 text-sm">
+        <CalendarClock className="w-4 h-4 flex-shrink-0" />
+        {isPast ? "It's go time" : `Draft scheduled for ${formattedDate}`}
+      </p>
+      {isPast ? (
+        <p className="text-center text-field-300 text-sm">Waiting for the commissioner to start…</p>
+      ) : (
+        <div className="flex items-center justify-center gap-3 sm:gap-5">
+          {units.map(unit => (
+            <div key={unit.label} className="flex flex-col items-center min-w-[3.25rem]">
+              <span className="font-mono text-3xl sm:text-4xl font-bold text-field-400 tabular-nums">
+                {String(unit.value).padStart(2, '0')}
+              </span>
+              <span className="text-[10px] uppercase tracking-wide text-turf-500">{unit.label}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 interface Props {
@@ -322,6 +371,8 @@ export function DraftRoom({
               : 'Waiting for the commissioner to start the draft.'}
           </p>
         </div>
+
+        {league.draft_scheduled_at && <DraftCountdown scheduledAt={league.draft_scheduled_at} />}
 
         <div className="card p-4 text-left text-sm space-y-2">
           <p className="font-medium text-turf-300">Draft Rules</p>
