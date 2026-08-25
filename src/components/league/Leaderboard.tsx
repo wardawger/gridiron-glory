@@ -44,6 +44,44 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   );
 };
 
+// Custom scatter point — a team logo in a colored ring (ring color still
+// carries which manager's series it belongs to, matching the legend)
+// instead of a plain dot. Recharts renders scatter shapes as raw SVG, so
+// this uses an <image> with a circular clip rather than the app's usual
+// <TeamLogo> (which relies on an <img> onError fallback that isn't valid
+// inside an SVG tree) — falls back to a plain dot if a team has no logo.
+function TeamLogoDot(props: any) {
+  const { cx, cy, fill, payload } = props;
+  if (cx == null || cy == null) return <></>;
+
+  const logo = payload?.team_logo as string | undefined;
+  if (!logo) {
+    return <circle cx={cx} cy={cy} r={5} fill={fill} stroke="#0d1117" strokeWidth={1} />;
+  }
+
+  const size = 20;
+  const r = size / 2;
+  const clipId = `draft-value-logo-${payload.user_id}-${payload.pick_number}-${payload.rank}`;
+
+  return (
+    <g>
+      <clipPath id={clipId}>
+        <circle cx={cx} cy={cy} r={r - 1} />
+      </clipPath>
+      <circle cx={cx} cy={cy} r={r} fill="#ffffff" stroke={fill} strokeWidth={1.5} />
+      <image
+        href={logo}
+        x={cx - r}
+        y={cy - r}
+        width={size}
+        height={size}
+        clipPath={`url(#${clipId})`}
+        preserveAspectRatio="xMidYMid meet"
+      />
+    </g>
+  );
+}
+
 const ScatterTooltip = ({ active, payload }: any) => {
   if (!active || !payload?.length) return null;
   const p = payload[0].payload;
@@ -681,7 +719,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                 ) : (
                   <div className="h-72">
                     <ResponsiveContainer width="100%" height="100%">
-                      <ScatterChart margin={{ top: 8, right: 24, left: 0, bottom: 8 }}>
+                      <ScatterChart margin={{ top: 16, right: 24, left: 8, bottom: 8 }}>
                         <XAxis
                           type="number" dataKey="pick_number" name="Pick"
                           tick={{ fill: '#6c757d', fontSize: 11 }} axisLine={false} tickLine={false}
@@ -698,7 +736,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                           formatter={(value) => <span style={{ color: '#adb5bd' }}>{value}</span>}
                         />
                         {scatterByManager.map(m => (
-                          <Scatter key={m.name} name={m.name} data={m.data} fill={m.color} />
+                          <Scatter key={m.name} name={m.name} data={m.data} fill={m.color} shape={TeamLogoDot} />
                         ))}
                       </ScatterChart>
                     </ResponsiveContainer>

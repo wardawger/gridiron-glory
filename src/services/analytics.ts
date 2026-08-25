@@ -29,6 +29,7 @@ export interface UndraftedTeam {
 
 export interface DraftValuePoint {
   team_name: string;
+  team_logo: string;
   pick_number: number;
   rank: number;
   display_name: string;
@@ -114,7 +115,7 @@ export function computeAnalytics(
         overUnderTotal += pickNum - apRank;
         rankedCount++;
         scatterPoints.push({
-          team_name: t.team_name, pick_number: pickNum, rank: apRank,
+          team_name: t.team_name, team_logo: t.team_logo, pick_number: pickNum, rank: apRank,
           display_name: entry.display_name, user_id: entry.user_id,
         });
       }
