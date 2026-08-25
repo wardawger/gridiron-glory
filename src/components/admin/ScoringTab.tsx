@@ -572,11 +572,14 @@ export function ScoringTab({ league, teams, onUpdateScoring }: Props) {
             <h3 className="font-medium text-white text-sm">Bench</h3>
             <p className="text-xs text-turf-400 mt-0.5">Split each roster into starters (score that week) and bench (don't). Locks per-team once its game kicks off.</p>
           </div>
-          <Toggle
-            checked={scoring.bench_enabled}
-            onChange={() => setScoring(prev => ({ ...prev, bench_enabled: !prev.bench_enabled }))}
-            label="Bench Enabled"
-          />
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <span className="text-xs text-turf-400">{scoring.bench_enabled ? 'Enabled' : 'Disabled'}</span>
+            <Toggle
+              checked={scoring.bench_enabled}
+              onChange={() => setScoring(prev => ({ ...prev, bench_enabled: !prev.bench_enabled }))}
+              label="Bench Enabled"
+            />
+          </div>
         </div>
 
         {benchPanel.shown && (
