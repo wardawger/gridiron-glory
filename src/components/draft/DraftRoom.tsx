@@ -987,7 +987,7 @@ export function DraftRoom({
         )}
 
         {mobileTab === 'board' && (
-          <DraftBoard pickSlots={pickSlots} members={members} rounds={league.max_teams_per_user} perRound={league.draft_order.length} />
+          <DraftBoard pickSlots={pickSlots} members={members} rounds={league.max_teams_per_user} perRound={league.draft_order.length} currentPick={currentPick} />
         )}
       </div>
 
@@ -1271,11 +1271,12 @@ function DraftTeamModal({ team, gameData, ratings, apRank, byeConflicts, isMyTur
   );
 }
 
-function DraftBoard({ pickSlots, members, rounds, perRound }: {
+function DraftBoard({ pickSlots, members, rounds, perRound, currentPick }: {
   pickSlots: Array<{ pick: number; userId: string; draftPick: DraftPick | null }>;
   members: LeagueMember[];
   rounds: number;
   perRound: number;
+  currentPick?: number;
 }) {
   const getMemberName = (uid: string) => members.find(m => m.user_id === uid)?.display_name ?? '?';
   const roundData: Array<typeof pickSlots> = [];
@@ -1289,21 +1290,32 @@ function DraftBoard({ pickSlots, members, rounds, perRound }: {
         <div key={ri}>
           <p className="text-xs text-turf-500 mb-2 uppercase tracking-wide">Round {ri + 1}</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-            {round.map(slot => (
-              <div key={slot.pick} className="card-inner p-2.5 flex items-center gap-2">
-                {slot.draftPick ? (
-                  <>
-                    <TeamLogo src={slot.draftPick.team_logo} alt="" fallbackName={slot.draftPick.team_name} size={24} />
-                    <div className="min-w-0">
+            {round.map(slot => {
+              const isNext = slot.pick === currentPick;
+              return (
+                <div
+                  key={slot.pick}
+                  className={`p-2.5 flex flex-col gap-1.5 rounded-lg ${
+                    isNext ? 'bg-field-900/40 border border-field-700/50' : 'card-inner'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="font-mono text-[10px] text-turf-500 flex-shrink-0">#{slot.pick}</span>
+                    <span className="text-[10px] text-turf-500 truncate">{getMemberName(slot.userId)}</span>
+                  </div>
+                  {slot.draftPick ? (
+                    <div className="flex items-center gap-2">
+                      <TeamLogo src={slot.draftPick.team_logo} alt="" fallbackName={slot.draftPick.team_name} size={24} />
                       <p className="text-xs font-medium text-white truncate">{slot.draftPick.team_name}</p>
-                      <p className="text-xs text-turf-500 truncate">{getMemberName(slot.userId)}</p>
                     </div>
-                  </>
-                ) : (
-                  <span className="text-turf-700 text-xs">Skipped</span>
-                )}
-              </div>
-            ))}
+                  ) : isNext ? (
+                    <span className="text-field-400 text-xs animate-pulse">On the clock…</span>
+                  ) : (
+                    <span className="text-turf-700 text-xs">No pick yet</span>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       ))}
