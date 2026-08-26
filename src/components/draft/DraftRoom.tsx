@@ -467,7 +467,7 @@ export function DraftRoom({
         <button
           type="button"
           onClick={() => setScheduleModalTeam(team)}
-          className={`btn-sm flex-shrink-0 ${isBlocked ? 'btn-secondary' : 'btn-primary'}`}
+          className={`btn-sm flex-shrink-0 ${isBlocked || !isMyTurn ? 'btn-secondary' : 'btn-primary'}`}
         >
           Draft
         </button>
