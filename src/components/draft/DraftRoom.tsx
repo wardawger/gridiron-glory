@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Search, Clock, CheckCircle2, Zap, ChevronDown, ChevronUp, AlertCircle, AlertTriangle, X, MapPin, Tv, Loader2, CalendarClock } from 'lucide-react';
+import { Search, Clock, CheckCircle2, Zap, ChevronDown, AlertCircle, AlertTriangle, X, MapPin, Tv, Loader2, CalendarClock, Star, Users, LayoutGrid } from 'lucide-react';
 import type { League, LeagueMember, DraftPick, CfbTeam, GameData, TeamRatings, APRanking } from '../../types';
 import { normalizeScoring } from '../../types';
 import { getPickOwner, P4_CONFERENCES as P4_CONF_LIST, isP4Conference, confCategory } from '../../services/scoring';
@@ -97,13 +97,26 @@ export function DraftRoom({
   const [confFilter, setConf]   = useState(() => searchParams.get('conference') ?? 'ALL');
   const [sortBy, setSortBy]     = useState<'name' | 'fpi' | 'ap' | 'offense' | 'defense' | 'sos'>('name');
   const [picking, setPicking]   = useState(false);
-  const [showAllPicksMobile, setShowAllPicksMobile] = useState(false);
   const [lastPick, setLastPick] = useState<string | null>(null);
   const [pickError, setPickError] = useState('');
   const [scheduleModalTeam, setScheduleModalTeam] = useState<CfbTeam | null>(null);
   const [draftOrder, setDraftOrder] = useState<string[]>(
     league.draft_order.length > 0 ? league.draft_order : members.map(m => m.user_id)
   );
+  // Mobile-only tabbed layout state (Players/Queue/Rosters/Board) — desktop
+  // keeps its existing two-column layout untouched at lg: and up.
+  const [mobileTab, setMobileTab] = useState<'players' | 'queue' | 'rosters' | 'board'>('players');
+  const [rosterViewUserId, setRosterViewUserId] = useState(userId);
+  // Session-only scratchpad, not synced to the database — a personal
+  // draft-day aid, not league state anyone else needs to see.
+  const [queuedTeamIds, setQueuedTeamIds] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem(`gridiron_draft_queue_${league.id}_${userId}`);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
   const picksRef = useRef<HTMLDivElement>(null);
   const scoring = normalizeScoring(league.scoring);
 
@@ -125,6 +138,21 @@ export function DraftRoom({
   const totalPicks    = league.max_teams_per_user * league.draft_order.length;
   const currentPick   = league.draft_current_pick;
   const isDraftOver   = league.draft_status === 'complete';
+
+  useEffect(() => {
+    localStorage.setItem(`gridiron_draft_queue_${league.id}_${userId}`, JSON.stringify(queuedTeamIds));
+  }, [queuedTeamIds, league.id, userId]);
+
+  // A queued team that gets drafted (by anyone) can't be drafted again, so
+  // it's pruned out rather than left to linger as a dead entry.
+  useEffect(() => {
+    setQueuedTeamIds(prev => prev.filter(id => !pickedTeamIds.has(id)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftPicks]);
+
+  const toggleQueue = (teamId: string) => {
+    setQueuedTeamIds(prev => prev.includes(teamId) ? prev.filter(id => id !== teamId) : [...prev, teamId]);
+  };
 
   // Celebrate the moment the draft actually finishes (not on later visits to an
   // already-completed draft room).
@@ -357,6 +385,63 @@ export function DraftRoom({
 
   const getMemberName = (uid: string) =>
     members.find(m => m.user_id === uid)?.display_name ?? 'Unknown';
+
+  // Mobile row (Players/Queue tabs) — a flatter, thumb-friendly layout than
+  // the desktop card grid: star to queue, tap the row for the same schedule
+  // sheet the desktop card opens, a Draft shortcut that opens the same
+  // sheet too (Confirm Pick inside it is still what actually drafts).
+  const renderMobileTeamRow = (team: CfbTeam) => {
+    const block = isMyTurn ? getConfBlock(team) : null;
+    const isBlocked = !!block;
+    const byes = byeWeeksByTeam.get(team.id) ?? [];
+    const fpiRank = teamRatings.get(team.id)?.fpi_rank ?? null;
+    const isQueued = queuedTeamIds.includes(team.id);
+
+    return (
+      <div
+        key={team.id}
+        className={`card flex items-center gap-2 p-2.5 ${lastPick === team.id ? 'animate-pick-flash' : ''}`}
+      >
+        <button
+          type="button"
+          onClick={() => toggleQueue(team.id)}
+          aria-label={isQueued ? `Remove ${team.name} from queue` : `Add ${team.name} to queue`}
+          aria-pressed={isQueued}
+          className="flex-shrink-0 p-1.5 -m-1.5"
+        >
+          <Star className={`w-4 h-4 transition-colors ${isQueued ? 'fill-gold-400 text-gold-400' : 'text-turf-600'}`} />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setScheduleModalTeam(team)}
+          className="flex-1 min-w-0 flex items-center gap-2.5 text-left"
+        >
+          <TeamLogo src={team.logo} alt={team.name} fallbackName={team.name} size={28} />
+          <div className="min-w-0 flex-1">
+            <p className={`text-sm font-medium truncate ${isBlocked ? 'text-turf-600' : 'text-white'}`}>{team.name}</p>
+            <p className="text-xs text-turf-500 truncate">
+              {team.conference}{byes.length > 0 ? ` · Bye Wk ${byes.join(', ')}` : ''}
+            </p>
+            {isBlocked && <p className="text-xs text-red-400 truncate mt-0.5">{block}</p>}
+          </div>
+          {fpiRank != null && (
+            <span className="text-xs font-mono text-field-400 bg-field-900/30 border border-field-800/50 px-1.5 py-0.5 rounded flex-shrink-0">
+              FPI #{fpiRank}
+            </span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setScheduleModalTeam(team)}
+          className={`btn-sm flex-shrink-0 ${isBlocked ? 'btn-secondary' : 'btn-primary'}`}
+        >
+          Draft
+        </button>
+      </div>
+    );
+  };
 
   // ── PRE-DRAFT ─────────────────────────────────────────────────────────────
   if (league.draft_status === 'pending') {
@@ -599,7 +684,10 @@ export function DraftRoom({
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      {/* Desktop / tablet — unchanged two-column layout, lg: and up. Mobile
+          gets its own tabbed layout below instead of this stacking down
+          to a single column. */}
+      <div className="hidden lg:grid lg:grid-cols-3 gap-4">
         {/* Available teams */}
         <div className="lg:col-span-2 space-y-3">
           <div className="flex gap-2">
@@ -707,29 +795,162 @@ export function DraftRoom({
         {/* Draft board */}
         <div className="space-y-2">
           <p className="text-xs text-turf-500 uppercase tracking-wide font-medium">Draft Board</p>
-
-          {/* Desktop: unchanged, full scrollable board */}
-          <div ref={picksRef} className="hidden sm:block space-y-1 max-h-[660px] overflow-y-auto">
+          <div ref={picksRef} className="space-y-1 max-h-[660px] overflow-y-auto">
             {pickSlots.map(slot => renderPickSlot(slot, currentPick, getMemberName))}
           </div>
+        </div>
+      </div>
 
-          {/* Mobile: collapsed to the last 10 picks + on-deck by default */}
-          <div className="sm:hidden space-y-1">
-            {(showAllPicksMobile ? pickSlots : pickSlots.slice(Math.max(0, currentPick - 11), currentPick))
-              .map(slot => renderPickSlot(slot, currentPick, getMemberName))}
-            {pickSlots.length > 11 && (
-              <button
-                onClick={() => setShowAllPicksMobile(v => !v)}
-                className="w-full flex items-center justify-center gap-1 text-xs text-field-400 hover:text-field-300 py-2 mt-1 border-t border-turf-800/60 transition-colors"
-              >
-                {showAllPicksMobile ? (
-                  <>Show less <ChevronUp className="w-3.5 h-3.5" /></>
-                ) : (
-                  <>Show all {pickSlots.length} picks <ChevronDown className="w-3.5 h-3.5" /></>
-                )}
-              </button>
+      {/* Mobile — tabbed layout: Players / Queue / Rosters / Board, matched
+          to a bottom tab bar rather than everything stacked on one long
+          scroll. Bottom padding clears the fixed bar below. */}
+      <div className="lg:hidden pb-24 space-y-3">
+        {mobileTab === 'players' && (
+          <>
+            <div className="space-y-2">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-turf-500" />
+                <input
+                  className="input pl-9"
+                  placeholder="Search teams…"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                />
+              </div>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <select
+                    className="input appearance-none pr-8"
+                    value={confFilter}
+                    onChange={e => setConf(e.target.value)}
+                  >
+                    {conferences.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                  <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-turf-500 pointer-events-none" />
+                </div>
+                <div className="relative flex-1">
+                  <select
+                    className="input appearance-none pr-8"
+                    value={sortBy}
+                    onChange={e => setSortBy(e.target.value as typeof sortBy)}
+                    aria-label="Sort available teams"
+                  >
+                    <option value="name">Name (A–Z)</option>
+                    <option value="fpi">FPI Rank</option>
+                    <option value="ap">AP Rank</option>
+                    <option value="offense">Offense Rank</option>
+                    <option value="defense">Defense Rank</option>
+                    <option value="sos">Strength of Schedule</option>
+                  </select>
+                  <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-turf-500 pointer-events-none" />
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              {available.length === 0 ? (
+                <div className="card p-8 text-center text-turf-500 text-sm">
+                  No available teams match your filter
+                </div>
+              ) : (
+                available.map(team => renderMobileTeamRow(team))
+              )}
+            </div>
+          </>
+        )}
+
+        {mobileTab === 'queue' && (
+          <div className="space-y-2">
+            {queuedTeamIds.length === 0 ? (
+              <div className="card p-8 text-center text-turf-500 text-sm space-y-2">
+                <Star className="w-6 h-6 mx-auto text-turf-700" />
+                <p>No teams queued yet — tap the star next to a team to add it here.</p>
+              </div>
+            ) : (
+              queuedTeamIds
+                .map(id => teams.find(t => t.id === id))
+                .filter((t): t is CfbTeam => !!t && !pickedTeamIds.has(t.id))
+                .map(team => renderMobileTeamRow(team))
             )}
           </div>
+        )}
+
+        {mobileTab === 'rosters' && (
+          <div className="space-y-3">
+            <div className="relative">
+              <select
+                className="input appearance-none pr-8"
+                value={rosterViewUserId}
+                onChange={e => setRosterViewUserId(e.target.value)}
+                aria-label="View roster for"
+              >
+                {members.map(m => (
+                  <option key={m.user_id} value={m.user_id}>
+                    {m.user_id === userId ? `${m.display_name} (Me)` : m.display_name}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-turf-500 pointer-events-none" />
+            </div>
+
+            <div className="space-y-1.5">
+              {draftPicks.filter(p => p.user_id === rosterViewUserId).length === 0 ? (
+                <div className="card p-8 text-center text-turf-500 text-sm">No teams drafted yet</div>
+              ) : (
+                draftPicks
+                  .filter(p => p.user_id === rosterViewUserId)
+                  .sort((a, b) => a.pick_number - b.pick_number)
+                  .map(p => (
+                    <div key={p.id} className="card flex items-center gap-3 p-2.5">
+                      <span className="font-mono text-xs text-turf-500 w-6 flex-shrink-0">{p.pick_number}</span>
+                      <TeamLogo src={p.team_logo} alt={p.team_name} fallbackName={p.team_name} size={28} />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-white truncate">{p.team_name}</p>
+                        <p className="text-xs text-turf-500 truncate">{p.team_conference}</p>
+                      </div>
+                    </div>
+                  ))
+              )}
+            </div>
+          </div>
+        )}
+
+        {mobileTab === 'board' && (
+          <DraftBoard pickSlots={pickSlots} members={members} rounds={league.max_teams_per_user} perRound={league.draft_order.length} />
+        )}
+      </div>
+
+      {/* Mobile bottom tab bar */}
+      <div
+        className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-turf-900 border-t border-turf-800"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      >
+        <div className="grid grid-cols-4">
+          {([
+            { id: 'players', label: 'Players', icon: Search, count: 0 },
+            { id: 'queue',   label: 'Queue',   icon: Star,   count: queuedTeamIds.length },
+            { id: 'rosters', label: 'Rosters', icon: Users,  count: 0 },
+            { id: 'board',   label: 'Board',   icon: LayoutGrid, count: 0 },
+          ] as const).map(({ id, label, icon: Icon, count }) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setMobileTab(id)}
+              className={`flex flex-col items-center gap-0.5 py-2.5 text-xs font-medium transition-colors ${
+                mobileTab === id ? 'text-field-400' : 'text-turf-500'
+              }`}
+            >
+              <span className="relative">
+                <Icon className="w-5 h-5" />
+                {count > 0 && (
+                  <span className="absolute -top-1 -right-1.5 w-3.5 h-3.5 rounded-full bg-field-500 text-turf-950 text-[9px] font-bold flex items-center justify-center">
+                    {count}
+                  </span>
+                )}
+              </span>
+              {label}
+            </button>
+          ))}
         </div>
       </div>
     </div>
@@ -783,7 +1004,13 @@ interface DraftTeamModalProps {
   onClose: () => void;
 }
 
+// How long the sheet's slide-down exit plays before the parent actually
+// unmounts it — must match the sheet-down keyframe's duration in
+// tailwind.config.js, or the sheet would visually snap away mid-animation.
+const SHEET_CLOSE_MS = 200;
+
 function DraftTeamModal({ team, gameData, ratings, apRank, byeConflicts, isMyTurn, picking, pickError, blockReason, onConfirmPick, onClose }: DraftTeamModalProps) {
+  const [closing, setClosing] = useState(false);
   const teamGames = gameData[team.id] ?? {};
   const weeks = WEEKS.filter(w => teamGames[w]);
   const byes  = WEEKS.filter(w => !teamGames[w] && w >= 1 && w <= 13);
@@ -791,14 +1018,26 @@ function DraftTeamModal({ team, gameData, ratings, apRank, byeConflicts, isMyTur
   const reason = !isMyTurn ? 'Not your turn yet' : blockReason;
   const canPick = isMyTurn && !picking && !blockReason;
 
+  // Desktop's centered modal has no direction to reverse, so it still just
+  // disappears instantly (unchanged from before). Mobile's bottom sheet
+  // slides down first — closing this way rather than unmounting immediately
+  // is what makes the open/close feel like one continuous motion instead of
+  // a pop in, snap out.
+  const requestClose = () => {
+    setClosing(true);
+    setTimeout(onClose, SHEET_CLOSE_MS);
+  };
+
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4"
       style={{ backgroundColor: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)' }}
-      onClick={onClose}
+      onClick={requestClose}
     >
       <div
-        className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border border-turf-700 bg-turf-950 shadow-2xl"
+        className={`relative w-full sm:max-w-2xl max-h-[85vh] sm:max-h-[90vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl border border-turf-700 bg-turf-950 shadow-2xl sm:animate-none ${
+          closing ? 'animate-sheet-down' : 'animate-sheet-up'
+        }`}
         onClick={e => e.stopPropagation()}
       >
         {/* Header — team info + Confirm Pick action up top */}
@@ -810,7 +1049,7 @@ function DraftTeamModal({ team, gameData, ratings, apRank, byeConflicts, isMyTur
               <p className="text-sm text-turf-400">{team.conference} · 2026 Schedule</p>
             </div>
             <button
-              onClick={onClose}
+              onClick={requestClose}
               aria-label="Close"
               className="rounded-lg border border-turf-700 p-1.5 text-turf-400 hover:border-turf-500 hover:text-white transition-colors flex-shrink-0"
             >

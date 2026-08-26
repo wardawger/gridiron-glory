@@ -50,6 +50,8 @@ export default {
         'radar-in': 'radarIn 0.4s ease-out',
         'content-fade-in': 'contentFadeIn 180ms cubic-bezier(0.16, 1, 0.3, 1)',
         'content-fade-out': 'contentFadeOut 120ms ease-in',
+        'sheet-up': 'sheetUp 260ms cubic-bezier(0.16, 1, 0.3, 1)',
+        'sheet-down': 'sheetDown 200ms ease-in',
       },
       keyframes: {
         shimmer: {
@@ -79,6 +81,14 @@ export default {
         contentFadeOut: {
           '0%':   { opacity: '1' },
           '100%': { opacity: '0' },
+        },
+        sheetUp: {
+          '0%':   { transform: 'translateY(100%)' },
+          '100%': { transform: 'translateY(0)' },
+        },
+        sheetDown: {
+          '0%':   { transform: 'translateY(0)' },
+          '100%': { transform: 'translateY(100%)' },
         },
       },
     },
