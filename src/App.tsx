@@ -172,6 +172,7 @@ function AnimatedRoutes({ lg, league, auth, cfb }: AnimatedRoutesProps) {
               freeAgencyMoves={league.freeAgencyMoves}
               scoreCorrections={league.scoreCorrections}
               benchPicks={league.benchPicks}
+              invites={league.invites}
               gameData={cfb.gameData}
               seasonStats={cfb.seasonStats}
               teams={cfb.teams}

@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
-import { Shield, UserPlus, Copy, Check, Trash2, Mail, RotateCcw, AlertTriangle, Loader2, Archive, CalendarClock } from 'lucide-react';
-import type { League, LeagueMember, LeagueRole, SeasonHistoryEntry, TrophySnapshot } from '../../types';
+import { Shield, UserPlus, Copy, Check, Trash2, Mail, RotateCcw, AlertTriangle, Loader2, Archive, CalendarClock, Clock } from 'lucide-react';
+import type { League, LeagueMember, LeagueRole, SeasonHistoryEntry, TrophySnapshot, Invite } from '../../types';
 import { Avatar } from '../ui/Avatar';
 import { Toggle } from '../ui/Toggle';
 
@@ -8,6 +8,7 @@ interface Props {
   league: League;
   currentUserId: string;
   members: LeagueMember[];
+  invites: Invite[];
   finalStandings: SeasonHistoryEntry[];
   trophySnapshot: TrophySnapshot;
   onSendInvite: (email: string) => Promise<{ token?: string; emailSent?: boolean; error?: string }>;
@@ -32,7 +33,7 @@ function isoToLocalInput(iso: string | null): string {
 }
 
 export function MembersTab({
-  league, currentUserId, members, finalStandings, trophySnapshot,
+  league, currentUserId, members, invites, finalStandings, trophySnapshot,
   onSendInvite, onUpdateWeek, onUpdateDraftSchedule, onUpdateMemberRole, onRemoveMember, onResetDraft, onDeleteLeague, onEndSeason,
 }: Props) {
   const [inviteEmail, setEmail] = useState('');
@@ -40,6 +41,7 @@ export function MembersTab({
   const [invitedTo, setInvitedTo] = useState('');
   const [emailSent, setEmailSent] = useState(false);
   const [copied, setCopied]     = useState(false);
+  const [copiedInviteId, setCopiedInviteId] = useState<string | null>(null);
   const [inviting, setInviting] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [resetError, setResetError] = useState('');
@@ -146,6 +148,15 @@ export function MembersTab({
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const copyInviteLink = (invite: Invite) => {
+    // Matches the canonical domain invite links are always generated on now
+    // (see handleInvite above) — the app is reachable at more than one
+    // domain, but only this one is allowlisted for auth redirects.
+    navigator.clipboard.writeText(`https://gridironglory.app/join/${invite.token}`);
+    setCopiedInviteId(invite.id);
+    setTimeout(() => setCopiedInviteId(null), 2000);
+  };
+
   const handleConfirmReset = async () => {
     setResetting(true);
     setResetError('');
@@ -217,6 +228,44 @@ export function MembersTab({
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Sent Invites */}
+      {invites.length > 0 && (
+        <div className="card divide-y divide-turf-800">
+          <div className="flex items-center gap-2 px-5 py-3">
+            <Clock className="w-4 h-4 text-turf-400" />
+            <h3 className="font-medium text-white text-sm">Sent Invites</h3>
+          </div>
+          {invites.map(invite => (
+            <div key={invite.id} className="flex items-center gap-3 px-5 py-3">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-white truncate">{invite.invited_email}</p>
+                <p className="text-xs text-turf-500">
+                  Sent {new Date(invite.created_at).toLocaleDateString()}
+                </p>
+              </div>
+              {invite.accepted ? (
+                <span className="badge-green text-xs flex-shrink-0">Accepted</span>
+              ) : (
+                <>
+                  <span className="badge-gray text-xs flex-shrink-0">Pending</span>
+                  <button
+                    onClick={() => copyInviteLink(invite)}
+                    className="btn-secondary btn-sm flex-shrink-0"
+                    title="Copy invite link"
+                  >
+                    {copiedInviteId === invite.id ? (
+                      <Check className="w-3.5 h-3.5 text-field-400" />
+                    ) : (
+                      <Copy className="w-3.5 h-3.5" />
+                    )}
+                  </button>
+                </>
+              )}
+            </div>
+          ))}
         </div>
       )}
 

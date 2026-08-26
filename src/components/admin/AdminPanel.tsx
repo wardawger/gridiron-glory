@@ -3,7 +3,7 @@ import { Shield, UserPlus, Settings, Gift } from 'lucide-react';
 import type {
   League, LeagueMember, ManualBonus, DraftPick, SpreadPick, FreeAgencyMove,
   ScoringSettings, LeagueRole, CaptainPick, GameData, TeamSeasonStats, SeasonHistoryEntry, CfbTeam,
-  TrophySnapshot, ScoreCorrection, BenchPick,
+  TrophySnapshot, ScoreCorrection, BenchPick, Invite,
 } from '../../types';
 import { buildLeaderboard } from '../../services/scoring';
 import { computeTrophies } from '../../services/trophies';
@@ -23,6 +23,7 @@ interface Props {
   freeAgencyMoves: FreeAgencyMove[];
   scoreCorrections: ScoreCorrection[];
   benchPicks: BenchPick[];
+  invites: Invite[];
   gameData: GameData;
   seasonStats: Map<string, TeamSeasonStats>;
   teams: CfbTeam[];
@@ -49,7 +50,7 @@ type Tab = 'members' | 'scoring' | 'adjustments';
 
 export function AdminPanel({
   league, currentUserId, members, draftPicks, captainPicks, manualBonuses, spreadPicks, freeAgencyMoves, scoreCorrections,
-  benchPicks, gameData, seasonStats, teams, isCommissioner,
+  benchPicks, invites, gameData, seasonStats, teams, isCommissioner,
   onSendInvite, onUpdateWeek, onUpdateScoring, onUpdateDraftSchedule, onAddBonus, onRemoveBonus, onAddCorrection, onRemoveCorrection,
   onResetDraft, onDeleteLeague,
   onEndSeason, onOverrideSpread, onClearSpreadOverride, onUpdateMemberRole, onRemoveMember,
@@ -130,6 +131,7 @@ export function AdminPanel({
           league={league}
           currentUserId={currentUserId}
           members={members}
+          invites={invites}
           finalStandings={finalStandings}
           trophySnapshot={trophySnapshot}
           onSendInvite={onSendInvite}

@@ -5,7 +5,7 @@ import { supabase } from '../../lib/supabase';
 import type {
   League, LeagueMember, DraftPick, CaptainPick,
   ManualBonus, SpreadPick, FreeAgencyMove, LeagueRole, AvatarType,
-  SeasonHistory, SeasonHistoryEntry, WaiverClaim, TrophySnapshot, ScoreCorrection, BenchPick,
+  SeasonHistory, SeasonHistoryEntry, WaiverClaim, TrophySnapshot, ScoreCorrection, BenchPick, Invite,
 } from '../../types';
 import { DEFAULT_SCORING } from '../../types';
 import { currentRosters } from '../../services/roster';
@@ -31,6 +31,7 @@ export function useLeagueCore(user: User | null) {
   const [waiverClaims, setWaiverClaims] = useState<WaiverClaim[]>([]);
   const [scoreCorrections, setScoreCorrections] = useState<ScoreCorrection[]>([]);
   const [benchPicks, setBenchPicks]     = useState<BenchPick[]>([]);
+  const [invites, setInvites]           = useState<Invite[]>([]);
   const [seasonHistory, setSeasonHistory] = useState<SeasonHistory[]>([]);
   const [loading, setLoading]           = useState(true);
   const [error, setError]               = useState<string | null>(null);
@@ -104,7 +105,7 @@ export function useLeagueCore(user: User | null) {
   }, [user]);
 
   const loadLeagueData = useCallback(async (leagueId: string) => {
-    const [membersRes, picksRes, captainRes, bonusRes, spreadRes, faRes, waiverRes, correctionRes, benchRes, historyRes] = await Promise.all([
+    const [membersRes, picksRes, captainRes, bonusRes, spreadRes, faRes, waiverRes, correctionRes, benchRes, invitesRes, historyRes] = await Promise.all([
       supabase.from('league_members').select('*').eq('league_id', leagueId),
       supabase.from('draft_picks').select('*').eq('league_id', leagueId).order('pick_number'),
       supabase.from('captain_picks').select('*').eq('league_id', leagueId),
@@ -114,6 +115,9 @@ export function useLeagueCore(user: User | null) {
       supabase.from('waiver_claims').select('*').eq('league_id', leagueId),
       supabase.from('score_corrections').select('*').eq('league_id', leagueId),
       supabase.from('bench_picks').select('*').eq('league_id', leagueId),
+      // Empty for a non-commissioner — RLS scopes SELECT to commissioners
+      // only, so this is a silent no-op rather than an error for members.
+      supabase.from('invites').select('*').eq('league_id', leagueId).order('created_at', { ascending: false }),
       supabase.from('season_history').select('*').eq('league_id', leagueId).order('archived_at', { ascending: false }),
     ]);
 
@@ -126,6 +130,7 @@ export function useLeagueCore(user: User | null) {
     if (waiverRes.data)     setWaiverClaims(waiverRes.data);
     if (correctionRes.data) setScoreCorrections(correctionRes.data);
     if (benchRes.data)      setBenchPicks(benchRes.data);
+    if (invitesRes.data)    setInvites(invitesRes.data);
     if (historyRes.data)    setSeasonHistory(historyRes.data);
   }, []);
 
@@ -149,6 +154,7 @@ export function useLeagueCore(user: User | null) {
     setWaiverClaims([]);
     setScoreCorrections([]);
     setBenchPicks([]);
+    setInvites([]);
     setSeasonHistory([]);
   };
 
@@ -320,6 +326,7 @@ export function useLeagueCore(user: User | null) {
       .single();
     if (error) return { error: error.message };
     posthog.capture('league_invite_created');
+    setInvites(prev => [data as Invite, ...prev]);
 
     // Best-effort — the invite row (and its shareable /join/:token link)
     // already exists regardless of whether the email actually sends, so a
@@ -695,7 +702,7 @@ export function useLeagueCore(user: User | null) {
   return {
     // Public state
     league, allLeagues, allMemberships, selectedLeagueId,
-    members, draftPicks, captainPicks, manualBonuses, spreadPicks, freeAgencyMoves, waiverClaims, scoreCorrections, benchPicks, seasonHistory,
+    members, draftPicks, captainPicks, manualBonuses, spreadPicks, freeAgencyMoves, waiverClaims, scoreCorrections, benchPicks, invites, seasonHistory,
     rosters, myMembership, isCommissioner, loading, error,
     // Public actions
     switchLeague, createLeague, sendInvite, startDraft, makeDraftPick, resetDraft, deleteLeague, endSeason,

@@ -46,7 +46,7 @@ export function useLeague(user: User | null) {
     members: core.members, draftPicks: core.draftPicks, captainPicks: core.captainPicks,
     manualBonuses: core.manualBonuses, spreadPicks: core.spreadPicks,
     freeAgencyMoves: core.freeAgencyMoves, waiverClaims: core.waiverClaims,
-    scoreCorrections: core.scoreCorrections, benchPicks: core.benchPicks, seasonHistory: core.seasonHistory,
+    scoreCorrections: core.scoreCorrections, benchPicks: core.benchPicks, invites: core.invites, seasonHistory: core.seasonHistory,
     rosters: core.rosters, myMembership: core.myMembership, isCommissioner: core.isCommissioner,
     loading: core.loading, error: core.error,
     switchLeague: core.switchLeague, createLeague: core.createLeague, sendInvite: core.sendInvite,
