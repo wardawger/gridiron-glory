@@ -9,8 +9,20 @@ import { TeamLogo } from '../ui/TeamLogo';
 import { TriviaCard } from '../ui/TriviaCard';
 import { WeatherBadge } from '../ui/WeatherBadge';
 import { fireDraftCompleteConfetti } from '../../lib/confetti';
+import ncaaLogo from '../../assets/ncaa-logo.webp';
 
 const WEEKS = Array.from({ length: 16 }, (_, i) => i); // weeks 0–15
+
+// Same ESPN conference-logo CDN already trusted elsewhere in the app (Draft
+// Recap's conference breakdown) — CFBD has no conference logo data of its
+// own. G5/non-P4 gets the NCAA's own mark, same as everywhere else that
+// combined bucket needs a stand-in identity.
+const CONFERENCE_LOGO: Record<string, string> = {
+  'SEC':     'https://a.espncdn.com/i/teamlogos/ncaa_conf/500/sec.png',
+  'Big Ten': 'https://a.espncdn.com/i/teamlogos/ncaa_conf/500/big_ten.png',
+  'Big 12':  'https://a.espncdn.com/i/teamlogos/ncaa_conf/500/big_12.png',
+  'ACC':     'https://a.espncdn.com/i/teamlogos/ncaa_conf/500/acc.png',
+};
 
 function formatGameDate(startDate: string | null | undefined, startTimeTbd: boolean): { date: string; time: string } {
   if (!startDate) return { date: 'TBD', time: 'TBD' };
@@ -188,6 +200,26 @@ export function DraftRoom({
     [myPicks]
   );
   const g5Configured = scoring.g5_conf_min > 0 || scoring.g5_conf_max < 99;
+
+  // Same conference-count shape as myConfCounts/myG5Count above, but for
+  // whichever member is selected in the mobile Rosters tab (defaults to
+  // the current user) — a compact "count/max" readout, not the full
+  // Draft Recap breakdown, per-conference min/max included only via color.
+  const rosterViewPicks = useMemo(
+    () => draftPicks.filter(p => p.user_id === rosterViewUserId),
+    [draftPicks, rosterViewUserId]
+  );
+  const rosterViewConfCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    rosterViewPicks.forEach(p => {
+      counts[p.team_conference] = (counts[p.team_conference] ?? 0) + 1;
+    });
+    return counts;
+  }, [rosterViewPicks]);
+  const rosterViewG5Count = useMemo(
+    () => rosterViewPicks.filter(p => !isP4Conference(p.team_conference)).length,
+    [rosterViewPicks]
+  );
 
   // Categories (P4 conference names, or the 'G5' sentinel for the combined
   // non-P4 bucket) still short of their minimum, and how many more each
@@ -891,6 +923,45 @@ export function DraftRoom({
                 ))}
               </select>
               <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-turf-500 pointer-events-none" />
+            </div>
+
+            {/* Conference summary — count/max per category, colored the same
+                way the on-the-clock conference tracker above already is. */}
+            <div className={`grid gap-1.5 ${g5Configured ? 'grid-cols-5' : 'grid-cols-4'}`}>
+              {(P4_CONF_LIST as readonly string[]).map(conf => {
+                const count = rosterViewConfCounts[conf] ?? 0;
+                const atMax = count >= scoring.p4_conf_max;
+                const atMin = count >= scoring.p4_conf_min;
+                return (
+                  <div
+                    key={conf}
+                    className={`flex flex-col items-center gap-1.5 py-3 rounded-lg border ${
+                      atMax ? 'bg-red-900/30 border-red-800/50 text-red-300' :
+                      atMin ? 'bg-field-900/30 border-field-800/50 text-field-400' :
+                      'bg-turf-800 border-turf-700 text-turf-300'
+                    }`}
+                  >
+                    <TeamLogo src={CONFERENCE_LOGO[conf]} alt={`${conf} logo`} fallbackName={conf} size={32} />
+                    <span className="text-xs font-mono">{count}/{scoring.p4_conf_max}</span>
+                  </div>
+                );
+              })}
+              {g5Configured && (() => {
+                const atMax = rosterViewG5Count >= scoring.g5_conf_max;
+                const atMin = rosterViewG5Count >= scoring.g5_conf_min;
+                return (
+                  <div
+                    className={`flex flex-col items-center gap-1.5 py-3 rounded-lg border ${
+                      atMax ? 'bg-red-900/30 border-red-800/50 text-red-300' :
+                      atMin ? 'bg-field-900/30 border-field-800/50 text-field-400' :
+                      'bg-turf-800 border-turf-700 text-turf-300'
+                    }`}
+                  >
+                    <TeamLogo src={ncaaLogo} alt="G5 logo" fallbackName="G5" size={32} />
+                    <span className="text-xs font-mono">{rosterViewG5Count}/{scoring.g5_conf_max}</span>
+                  </div>
+                );
+              })()}
             </div>
 
             <div className="space-y-1.5">
