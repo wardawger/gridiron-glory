@@ -107,7 +107,12 @@ export default async (req) => {
     return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers });
   }
 
-  const origin  = req.headers.get('origin') || process.env.SITE_URL || '';
+  // Hardcoded rather than the request's origin header — the app answers on
+  // more than one domain, but Google SSO sign-in only ever lands back on the
+  // domain allowlisted in Supabase's Auth settings, so an emailed link built
+  // from a different domain loses the invite's pending state (localStorage
+  // is per-origin) the moment SSO redirects away and back.
+  const origin  = process.env.SITE_URL || 'https://gridironglory.app';
   const joinUrl = `${origin}/join/${invite.token}`;
   const html = buildInviteEmailHtml({
     leagueName: invite.leagues?.name ?? 'a Gridiron Glory league',

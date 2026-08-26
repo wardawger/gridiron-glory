@@ -7,6 +7,17 @@ const posthogConfigured = Boolean(
   import.meta.env.VITE_POSTHOG_KEY && import.meta.env.VITE_POSTHOG_HOST,
 );
 
+// The app is reachable at more than one domain (the original Netlify
+// subdomain, plus this custom domain), but Supabase's OAuth/email redirects
+// only land on whichever URL is in its project's Redirect URLs allowlist —
+// requesting window.location.origin silently falls back to that allowlisted
+// Site URL when the current domain isn't on it, landing the user on a
+// completely different origin (and losing anything stored in localStorage
+// under the domain they started on, like a pending invite token). Hardcoding
+// the canonical domain here keeps every auth redirect landing somewhere
+// that's actually allowlisted, regardless of which domain the user started on.
+const CANONICAL_ORIGIN = 'https://gridironglory.app';
+
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -83,7 +94,7 @@ export function useAuth() {
   const signInWithGoogle = async () => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: window.location.origin },
+      options: { redirectTo: CANONICAL_ORIGIN },
     });
     return error;
   };
@@ -92,7 +103,7 @@ export function useAuth() {
 
   const resetPasswordForEmail = async (email: string) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: `${CANONICAL_ORIGIN}/reset-password`,
     });
     return error;
   };

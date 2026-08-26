@@ -126,7 +126,12 @@ export function MembersTab({
     setInviting(true);
     const result = await onSendInvite(sentTo);
     if (result.token) {
-      const link = `${window.location.origin}/join/${result.token}`;
+      // Hardcoded rather than window.location.origin — the app answers on
+      // more than one domain, but Google-SSO sign-in only ever lands back
+      // on the domain allowlisted in Supabase's Auth settings, so a link
+      // built from a different domain loses the invite's pending state
+      // (localStorage is per-origin) the moment SSO redirects away and back.
+      const link = `https://gridironglory.app/join/${result.token}`;
       setLink(link);
       setInvitedTo(sentTo);
       setEmailSent(!!result.emailSent);
