@@ -315,6 +315,25 @@ export default function App() {
 
   const lg = league.league;
 
+  // Same reasoning as the no-league branch above, extended to a user who
+  // already belongs to a different league: without this render-time check,
+  // recovering a pending invite here depended entirely on the useEffect
+  // above firing a hard reload at the right moment — a real gap for anyone
+  // signing in via an OAuth round-trip (Google), since that always lands
+  // back on this already-has-a-league branch with a fresh auth.user, and a
+  // race between this effect and useLeagueCore's own load could let the
+  // user settle into their existing league's Home page before the redirect
+  // ever fires. Checking here instead makes the redirect happen the moment
+  // this branch would otherwise render, no timing dependency involved.
+  const pendingInviteWithLeague = localStorage.getItem('pending_invite');
+  if (pendingInviteWithLeague && !window.location.pathname.startsWith('/join/')) {
+    return (
+      <BrowserRouter>
+        <Navigate to={`/join/${pendingInviteWithLeague}`} replace />
+      </BrowserRouter>
+    );
+  }
+
   return (
     <BrowserRouter>
       <div className="min-h-dvh flex flex-col">
