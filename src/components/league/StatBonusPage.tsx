@@ -44,8 +44,13 @@ export function StatBonusPage({ league, members, rosters, seasonStats }: Props) 
             {confChampComplete ? 'Locked In' : 'Live Preview ◎'}
           </span>
         </div>
+        <p className={`text-xs text-turf-500 pt-3 border-t border-turf-800 ${confChampComplete ? 'mt-3' : 'mt-2'}`}>
+          Ranks are computed only among drafted teams that have a value for that stat this season — a team missing
+          data (e.g. too early in the season, or a stat CFBD hasn't published for it yet) is left out of the count
+          entirely, so "bottom" ranks can land short of your full roster size rather than at the very end of it.
+        </p>
         {!confChampComplete && (
-          <p className="text-xs text-turf-500 mt-3 pt-3 border-t border-turf-800">
+          <p className="text-xs text-turf-500 mt-2">
             These stand today, but can still move until conference championship week — they lock in permanently after that.
           </p>
         )}
