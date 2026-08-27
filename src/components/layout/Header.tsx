@@ -101,7 +101,7 @@ export function Header({
         <div className="flex items-center justify-between h-14">
 
           {/* Logo + League Switcher */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
             <Link to="/" className="flex items-center gap-2 group flex-shrink-0">
               <div className="w-7 h-7 rounded bg-field-500 flex items-center justify-center">
                 <span className="font-display text-turf-950 text-sm leading-none">G</span>
@@ -109,12 +109,12 @@ export function Header({
             </Link>
 
             {/* League picker */}
-            <div className="relative" ref={pickerRef}>
+            <div className="relative min-w-0" ref={pickerRef}>
               <button
                 onClick={() => setShowLeaguePicker(p => !p)}
-                className="flex items-center gap-1 group px-2 py-1 rounded-lg hover:bg-turf-800 transition-colors"
+                className="flex items-center gap-1 group px-2 py-1 rounded-lg hover:bg-turf-800 transition-colors min-w-0 max-w-full"
               >
-                <span className="font-display text-lg tracking-wider text-white group-hover:text-field-400 transition-colors truncate max-w-[160px] sm:max-w-xs">
+                <span className="font-display text-lg tracking-wider text-white group-hover:text-field-400 transition-colors truncate min-w-0 max-w-[160px] sm:max-w-xs">
                   {league?.name ?? 'GRIDIRON GLORY'}
                 </span>
                 {allLeagues.length > 1 && (
@@ -242,7 +242,7 @@ export function Header({
           </nav>
 
           {/* Right side */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
             <button
               onClick={onRefresh}
               disabled={isRefreshing}
