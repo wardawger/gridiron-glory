@@ -533,6 +533,7 @@ export async function fetchSpreads(
   teams: CfbTeam[],
   year: number,
   week: number,
+  gameData: GameData = {},
   seasonType = 'regular',
 ): Promise<SpreadData> {
   const result: SpreadData = {};
@@ -546,7 +547,6 @@ export async function fetchSpreads(
 
     // Build name→id map for matching
     const nameToId = new Map(teams.map(t => [t.name.toLowerCase(), t.id]));
-    const idToTeam = new Map(teams.map(t => [t.id, t]));
 
     for (const game of data) {
       const homeTeam = (game.homeTeam ?? game.home_team ?? '').toLowerCase();
@@ -555,6 +555,18 @@ export async function fetchSpreads(
       const awayId   = nameToId.get(awayTeam) ?? null;
 
       if (!homeId && !awayId) continue;
+
+      // CFBD's /lines feed has occasionally carried a stray extra entry for
+      // a team on a week it isn't actually playing (e.g. a mismatched/stale
+      // matchup) alongside its real game. Matching purely by team name let
+      // whichever entry appeared first in the response silently claim that
+      // team's spread — cross-checking against gameData's opponent_id (its
+      // actual scheduled opponent that week, from the real /games schedule)
+      // rejects any line that doesn't belong to the team's real matchup.
+      const homeOpponentId = gameData[homeId ?? '']?.[week]?.opponent_id;
+      const awayOpponentId = gameData[awayId ?? '']?.[week]?.opponent_id;
+      const homeMatches = homeId && (!homeOpponentId || homeOpponentId === awayId);
+      const awayMatches = awayId && (!awayOpponentId || awayOpponentId === homeId);
 
       const lines: any[] = game.lines ?? [];
       if (!lines.length) continue;
@@ -574,8 +586,8 @@ export async function fetchSpreads(
       const rawSpread = parseFloat(line.spread ?? line.homeSpread ?? line.formattedSpread ?? '0');
       if (isNaN(rawSpread)) continue;
 
-      if (homeId && result[homeId] === null) result[homeId] = rawSpread;
-      if (awayId && result[awayId] === null) result[awayId] = -rawSpread; // flip for away
+      if (homeMatches && result[homeId!] === null) result[homeId!] = rawSpread;
+      if (awayMatches && result[awayId!] === null) result[awayId!] = -rawSpread; // flip for away
     }
   } catch (e) {
     console.warn('[CFBD] fetchSpreads failed:', e);

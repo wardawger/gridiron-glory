@@ -110,7 +110,7 @@ export function useCfbData(enabled = true): CfbState {
     try {
       const now = new Date();
       const year = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
-      const data = await fetchSpreads(teams, year, week);
+      const data = await fetchSpreads(teams, year, week, gameData);
       setSpreadData(prev => ({ ...prev, [week]: data }));
     } catch (e) {
       console.warn('[CFB] Failed to fetch spreads:', e);
