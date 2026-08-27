@@ -1101,17 +1101,11 @@ export function RosterView({
 
         {/* ── FULL SCHEDULE VIEW ── */}
         {scoring.spread_enabled && (
-          <div className={`flex items-center justify-between px-1 ${viewPanelClass('schedule')}`}>
+          <div className={`px-1 ${viewPanelClass('schedule')}`}>
             <p className="text-xs text-turf-500 flex items-center gap-1.5">
               <Coins className="w-3.5 h-3.5 flex-shrink-0" />
               Spread picks available — click opponent logo to view scoring, use team row to pick spreads
             </p>
-            <button
-              onClick={() => onRefreshSpreads(currentWeek)}
-              className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
-            >
-              Refresh lines
-            </button>
           </div>
         )}
 

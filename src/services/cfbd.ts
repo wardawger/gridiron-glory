@@ -130,8 +130,14 @@ export async function fetchSeasonData(teams: CfbTeam[]): Promise<GameData> {
     : null;
 
   const getRankAtWeek = (school: string, week: number): number | null => {
+    // Carry the most recent published poll forward rather than requiring an
+    // exact week match — a future week's opponent (e.g. week 6, before that
+    // week's games happen) has no poll of its own yet, but is still ranked
+    // right now under whatever the latest available poll says (preseason,
+    // most commonly, early in the year). Requiring week === poll.week left
+    // every future opponent unranked until its own week's poll existed.
     const weekData = rankHistoryIsCurrentYear
-      ? rankHistory.find((w: any) => w.week === week)
+      ? [...rankHistory].filter((w: any) => w.week <= week).sort((a: any, b: any) => b.week - a.week)[0]
       : fallbackLatestWeek;
     if (!weekData) return null;
     const poll = weekData.polls?.find((p: any) =>
