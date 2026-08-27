@@ -427,6 +427,7 @@ export function DraftRoom({
     const isBlocked = !!block;
     const byes = byeWeeksByTeam.get(team.id) ?? [];
     const fpiRank = teamRatings.get(team.id)?.fpi_rank ?? null;
+    const apRank = apRankByTeam.get(team.id) ?? null;
     const isQueued = queuedTeamIds.includes(team.id);
 
     return (
@@ -457,11 +458,18 @@ export function DraftRoom({
             </p>
             {isBlocked && <p className="text-xs text-red-400 truncate mt-0.5">{block}</p>}
           </div>
-          {fpiRank != null && (
-            <span className="text-xs font-mono text-field-400 bg-field-900/30 border border-field-800/50 px-1.5 py-0.5 rounded flex-shrink-0">
-              FPI #{fpiRank}
-            </span>
-          )}
+          <div className="flex flex-col items-end gap-1 flex-shrink-0">
+            {apRank != null && (
+              <span className="text-xs font-mono text-amber-400 bg-amber-900/30 border border-amber-800/50 px-1.5 py-0.5 rounded">
+                AP #{apRank}
+              </span>
+            )}
+            {fpiRank != null && (
+              <span className="text-xs font-mono text-field-400 bg-field-900/30 border border-field-800/50 px-1.5 py-0.5 rounded">
+                FPI #{fpiRank}
+              </span>
+            )}
+          </div>
         </button>
 
         <button
@@ -771,6 +779,7 @@ export function DraftRoom({
               const isBlocked = !!block;
               const byes = byeWeeksByTeam.get(team.id) ?? [];
               const fpiRank = teamRatings.get(team.id)?.fpi_rank ?? null;
+              const apRank = apRankByTeam.get(team.id) ?? null;
 
               const card = (
                 <button
@@ -793,6 +802,11 @@ export function DraftRoom({
                     </p>
                     <p className="text-xs text-turf-500">{team.conference}</p>
                     <div className="flex items-center gap-2 mt-0.5">
+                      {apRank != null && (
+                        <span className="text-xs font-mono text-amber-400 bg-amber-900/30 border border-amber-800/50 px-1.5 rounded flex-shrink-0">
+                          AP #{apRank}
+                        </span>
+                      )}
                       {fpiRank != null && (
                         <span className="text-xs font-mono text-field-400 bg-field-900/30 border border-field-800/50 px-1.5 rounded flex-shrink-0">
                           FPI #{fpiRank}
