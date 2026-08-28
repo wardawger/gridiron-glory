@@ -9,6 +9,7 @@ import { TeamLogo } from '../ui/TeamLogo';
 import { TriviaCard } from '../ui/TriviaCard';
 import { WeatherBadge } from '../ui/WeatherBadge';
 import { fireDraftCompleteConfetti } from '../../lib/confetti';
+import { useDraftPresence } from '../../hooks/useDraftPresence';
 import ncaaLogo from '../../assets/ncaa-logo.webp';
 
 const WEEKS = Array.from({ length: 16 }, (_, i) => i); // weeks 0–15
@@ -102,12 +103,14 @@ export function DraftRoom({
   onStartDraft, onMakePick,
 }: Props) {
   const [searchParams] = useSearchParams();
+  const myDisplayName = members.find(m => m.user_id === userId)?.display_name;
+  const online = useDraftPresence(league.id, userId, myDisplayName);
   const [search, setSearch]     = useState('');
   // Seeded once from a `?conference=` link (e.g. the Draft Recap conference
   // breakdown tiles) — a one-time preset, not kept in sync with the URL
   // afterward, so changing the dropdown doesn't fight the address bar.
   const [confFilter, setConf]   = useState(() => searchParams.get('conference') ?? 'ALL');
-  const [sortBy, setSortBy]     = useState<'name' | 'fpi' | 'ap' | 'offense' | 'defense' | 'sos'>('name');
+  const [sortBy, setSortBy]     = useState<'name' | 'fpi' | 'ap' | 'offense' | 'defense' | 'sos'>('ap');
   const [picking, setPicking]   = useState(false);
   const [lastPick, setLastPick] = useState<string | null>(null);
   const [pickError, setPickError] = useState('');
@@ -333,10 +336,21 @@ export function DraftRoom({
       const aRank = getRank(a);
       const bRank = getRank(b);
       // Teams without a published rank sort to the end, not to the top.
-      if (aRank == null && bRank == null) return a.name.localeCompare(b.name);
-      if (aRank == null) return 1;
-      if (bRank == null) return -1;
-      return aRank - bRank;
+      if (aRank != null && bRank != null) return aRank - bRank;
+      if (aRank != null) return -1;
+      if (bRank != null) return 1;
+      // Both unranked by the primary metric — when sorting by AP, fall back
+      // to FPI rank (still a meaningful strength signal for teams outside
+      // the Top 25) before finally alphabetizing; other sort modes just
+      // alphabetize ties as before.
+      if (sortBy === 'ap') {
+        const aFpi = teamRatings.get(a.id)?.fpi_rank;
+        const bFpi = teamRatings.get(b.id)?.fpi_rank;
+        if (aFpi != null && bFpi != null) return aFpi - bFpi;
+        if (aFpi != null) return -1;
+        if (bFpi != null) return 1;
+      }
+      return a.name.localeCompare(b.name);
     });
   }, [teams, pickedTeamIds, search, confFilter, sortBy, teamRatings, apRankByTeam, scoring.excluded_conferences]);
 
@@ -521,11 +535,20 @@ export function DraftRoom({
 
         {isCommissioner && (
           <div className="card p-5 text-left space-y-4">
-            <p className="text-sm font-medium text-turf-300">Draft Order (use arrows to rearrange)</p>
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-turf-300">Draft Order (use arrows to rearrange)</p>
+              <span className="text-xs text-turf-500 flex-shrink-0">
+                {draftOrder.filter(uid => online.has(uid)).length}/{draftOrder.length} in the room
+              </span>
+            </div>
             <div className="space-y-2">
               {draftOrder.map((uid, i) => (
                 <div key={uid} className="card-inner flex items-center gap-3 px-3 py-2">
                   <span className="font-mono text-sm text-turf-500 w-4">{i + 1}</span>
+                  <span
+                    className={`w-2 h-2 rounded-full flex-shrink-0 ${online.has(uid) ? 'bg-field-400' : 'bg-turf-700'}`}
+                    title={online.has(uid) ? `${getMemberName(uid)} is in the Draft Room` : `${getMemberName(uid)} isn't here yet`}
+                  />
                   <span className="text-white text-sm flex-1">{getMemberName(uid)}</span>
                   <div className="flex gap-1">
                     <button
@@ -638,6 +661,21 @@ export function DraftRoom({
           <p className="text-xs text-turf-500">Round</p>
           <p className="font-mono font-bold text-white">{Math.ceil(currentPick / league.draft_order.length)}</p>
         </div>
+      </div>
+
+      {/* Who's actually in the Draft Room right now (Supabase Presence),
+          not just who's a league member — separate from draft turn order. */}
+      <div className="flex items-center gap-2 flex-wrap px-1 -mt-2">
+        <Users className="w-3.5 h-3.5 text-turf-600 flex-shrink-0" />
+        <span className="text-xs text-turf-500">
+          {members.filter(m => online.has(m.user_id)).length}/{members.length} in the room:
+        </span>
+        {members.map(m => (
+          <span key={m.user_id} className="inline-flex items-center gap-1 text-xs">
+            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${online.has(m.user_id) ? 'bg-field-400' : 'bg-turf-700'}`} />
+            <span className={online.has(m.user_id) ? 'text-turf-300' : 'text-turf-600'}>{getMemberName(m.user_id)}</span>
+          </span>
+        ))}
       </div>
 
       {/* Conference tracker */}
