@@ -8,6 +8,7 @@ import { normalizeScoring } from '../../types';
 import { calcWeeklyScore } from '../../services/scoring';
 import { rosterAtWeek } from '../../services/roster';
 import { useLiveScoreboard } from '../../hooks/useLiveScoreboard';
+import { findLiveStatus, teamNameMatches } from '../../services/cfbd';
 import { TeamLogo } from '../ui/TeamLogo';
 import { Avatar } from '../ui/Avatar';
 
@@ -82,8 +83,8 @@ function MatchupCard({ row, teamsById, isMe, live }: { row: Row; teamsById: Map<
   // period+clock — CFBD's /scoreboard also lists scheduled/final games, and
   // `game.completed` (from the separate /games endpoint) already covers final.
   const isLive = !game.completed && live?.status === 'in_progress' && live.period != null && live.clock != null;
-  const myTeamHasBall = isLive && live!.possession != null && live!.possession!.toLowerCase() === b.team_name.toLowerCase();
-  const opponentHasBall = isLive && live!.possession != null && live!.possession!.toLowerCase() === game.opponent.toLowerCase();
+  const myTeamHasBall = isLive && teamNameMatches(live!.possession, b.team_name);
+  const opponentHasBall = isLive && teamNameMatches(live!.possession, game.opponent);
 
   return (
     <div className={`card p-4 space-y-3 ${isMe ? 'border-field-500/50 bg-field-950/10' : ''}`}>
@@ -318,9 +319,8 @@ export function ScoreboardPage({
                   <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 p-4 pt-0 border-t border-turf-800">
                     {rows.map(row => {
                       const game = row.breakdown.game!;
-                      const live = liveScoreboard.get(row.breakdown.team_name.toLowerCase())
-                        ?? liveScoreboard.get(game.opponent.toLowerCase())
-                        ?? null;
+                      const live = findLiveStatus(liveScoreboard, row.breakdown.team_name)
+                        ?? findLiveStatus(liveScoreboard, game.opponent);
                       return (
                         <MatchupCard key={row.breakdown.team_id} row={row} teamsById={teamsById} isMe={isMe} live={live} />
                       );

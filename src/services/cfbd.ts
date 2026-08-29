@@ -603,17 +603,19 @@ export async function fetchSpreads(
 }
 
 // Live in-game state — CFBD's Patreon-tier-only /scoreboard endpoint.
-// Confirmed against CFBD's published OpenAPI spec (api-docs.json): response
-// is a bare ScoreboardGame[] array, camelCase, with status/period/clock/
-// situation/possession as flat top-level fields (not nested), status is one
-// of 'scheduled' | 'in_progress' | 'completed', and homeTeam/awayTeam are
-// always objects ({ id, name, ... }) — never bare strings. Keyed by
-// lowercased team name (not team_id — team ids aren't guaranteed to line up
-// with this app's own /teams/fbs ids) so both sides of a game can be looked
-// up the same way GameResult already is elsewhere in this app. The proxy
-// gives this endpoint its own much shorter cache TTL (see cfbd-proxy.mjs)
-// since a game clock changing every second would otherwise sit behind the
-// shared 30-minute window everything else uses.
+// Confirmed both against CFBD's published OpenAPI spec AND a real cached
+// response pulled from this app's own cfbd_cache table during a live
+// Week 0 slate (2026-08-29): homeTeam.name/awayTeam.name come back as full
+// mascot names (e.g. "Florida State Seminoles"), NOT the school-only names
+// this app uses everywhere else ("Florida State", from /teams/fbs). And
+// `possession` is a bare side indicator — literally the string "home" or
+// "away" — not a team name, despite what the OpenAPI schema's field name
+// implies. Both of those were confirmed wrong in the first version of this
+// function (which assumed possession was a team name and matched map keys
+// by exact school name), so this resolves possession to an actual mascot
+// name at parse time here, and callers match team names with a prefix
+// check (see findLiveStatus / teamNameMatches below) instead of exact
+// equality, since a school-only name is always a prefix of the mascot name.
 export async function fetchScoreboard(): Promise<Map<string, LiveGameStatus>> {
   const map = new Map<string, LiveGameStatus>();
   try {
@@ -636,16 +638,20 @@ export async function fetchScoreboard(): Promise<Map<string, LiveGameStatus>> {
     }
 
     for (const g of data) {
+      const homeName = typeof g.homeTeam?.name === 'string' ? g.homeTeam.name : null;
+      const awayName = typeof g.awayTeam?.name === 'string' ? g.awayTeam.name : null;
+
+      const possessionSide = typeof g.possession === 'string' ? g.possession.toLowerCase() : null;
+      const possessionTeam = possessionSide === 'home' ? homeName : possessionSide === 'away' ? awayName : null;
+
       const status: LiveGameStatus = {
         status:     typeof g.status === 'string' ? g.status : 'scheduled',
         period:     typeof g.period === 'number' ? g.period : null,
         clock:      typeof g.clock === 'string' ? g.clock : null,
         situation:  typeof g.situation === 'string' ? g.situation : null,
-        possession: typeof g.possession === 'string' ? g.possession : null,
+        possession: possessionTeam,
       };
 
-      const homeName = typeof g.homeTeam?.name === 'string' ? g.homeTeam.name : null;
-      const awayName = typeof g.awayTeam?.name === 'string' ? g.awayTeam.name : null;
       if (homeName) map.set(homeName.toLowerCase(), status);
       if (awayName) map.set(awayName.toLowerCase(), status);
     }
@@ -653,4 +659,22 @@ export async function fetchScoreboard(): Promise<Map<string, LiveGameStatus>> {
     console.warn('[CFBD] fetchScoreboard failed:', e);
   }
   return map;
+}
+
+// fetchScoreboard's map is keyed by full mascot name ("Florida State
+// Seminoles"), but this app's own team names are school-only ("Florida
+// State") — a school name is always a prefix of its mascot name, so match
+// on that instead of exact equality.
+export function findLiveStatus(live: Map<string, LiveGameStatus>, teamName: string): LiveGameStatus | null {
+  const needle = teamName.toLowerCase();
+  for (const [key, status] of live) {
+    if (key.startsWith(needle)) return status;
+  }
+  return null;
+}
+
+// Same prefix relationship applies to a resolved possession team name
+// (also a full mascot name) against this app's school-only names.
+export function teamNameMatches(liveName: string | null, shortName: string): boolean {
+  return liveName != null && liveName.toLowerCase().startsWith(shortName.toLowerCase());
 }
