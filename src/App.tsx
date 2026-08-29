@@ -11,6 +11,11 @@ import { JoinPage }         from './pages/JoinPage';
 import { PrivacyPage }      from './pages/PrivacyPage';
 import { Loader2 }          from 'lucide-react';
 import { ErrorBoundary }    from './components/ErrorBoundary';
+import {
+  HomePageSkeleton, RosterPageSkeleton, AccountPageSkeleton, DraftRoomSkeleton, AdminPanelSkeleton,
+  RankingsPageSkeleton, DraftRecapPageSkeleton, LeagueSettingsPageSkeleton, TrophyCasePageSkeleton,
+  FreeAgencyPageSkeleton, StatBonusPageSkeleton,
+} from './components/ui/Skeletons';
 
 // Lazy-loaded: only reachable once a user is authenticated with a league
 // selected, so deferring them keeps the pre-auth/onboarding bundle small.
@@ -28,7 +33,23 @@ const TrophyCasePage     = lazy(() => import('./components/league/TrophyCasePage
 const FreeAgencyPage     = lazy(() => import('./components/league/FreeAgencyPage').then(m => ({ default: m.FreeAgencyPage })));
 const StatBonusPage      = lazy(() => import('./components/league/StatBonusPage').then(m => ({ default: m.StatBonusPage })));
 
-function RouteFallback() {
+// Matched against the current path so the Suspense fallback mirrors the
+// destination page's own layout (header/list/grid shapes) instead of a
+// single generic spinner shown for every route — only visible for the
+// brief window that route's lazy JS chunk is downloading/parsing, since
+// this app's data is already loaded by the time a route renders.
+function RouteFallback({ pathname }: { pathname: string }) {
+  if (pathname === '/roster' || pathname.startsWith('/roster/')) return <RosterPageSkeleton />;
+  if (pathname === '/account') return <AccountPageSkeleton />;
+  if (pathname === '/draft') return <DraftRoomSkeleton />;
+  if (pathname === '/admin') return <AdminPanelSkeleton />;
+  if (pathname === '/rankings') return <RankingsPageSkeleton />;
+  if (pathname === '/draft-recap') return <DraftRecapPageSkeleton />;
+  if (pathname === '/league-settings') return <LeagueSettingsPageSkeleton />;
+  if (pathname === '/league-history') return <TrophyCasePageSkeleton />;
+  if (pathname === '/free-agency') return <FreeAgencyPageSkeleton />;
+  if (pathname === '/stat-bonuses') return <StatBonusPageSkeleton />;
+  if (pathname === '/') return <HomePageSkeleton />;
   return (
     <div className="flex items-center justify-center py-20">
       <Loader2 className="w-6 h-6 animate-spin text-turf-500" />
@@ -72,7 +93,7 @@ function AnimatedRoutes({ lg, league, auth, cfb }: AnimatedRoutesProps) {
 
   return (
     <div className={routeExiting ? 'animate-content-fade-out' : 'animate-content-fade-in'}>
-      <Suspense fallback={<RouteFallback />}>
+      <Suspense fallback={<RouteFallback pathname={displayedLocation.pathname} />}>
         <Routes location={displayedLocation}>
           <Route path="/" element={
             <HomePage
