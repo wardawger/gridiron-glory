@@ -602,49 +602,52 @@ export async function fetchSpreads(
   return result;
 }
 
-// Live in-game state — CFBD's Patreon-tier-only /scoreboard endpoint, which
-// only returns games currently in progress (empty outside live windows).
-// Keyed by lowercased team name (not team_id — the scoreboard response
-// isn't guaranteed to carry CFBD's numeric team ids) so both the home and
-// away side of a game can be looked up the same way GameResult already is
-// elsewhere in this app (by opponent name). The proxy gives this endpoint
-// its own much shorter cache TTL (see cfbd-proxy.mjs) since a game clock
-// changing every second would otherwise sit behind the shared 30-minute
-// window everything else uses.
-//
-// Field names below are best-effort, based on CFBD's community client
-// libraries (cfbd-python/cfbfastR) rather than a directly-fetched OpenAPI
-// spec — worth a real verification pass against a live response on the
-// next gameday, since CFBD's own docs weren't reachable while building
-// this.
+// Live in-game state — CFBD's Patreon-tier-only /scoreboard endpoint.
+// Confirmed against CFBD's published OpenAPI spec (api-docs.json): response
+// is a bare ScoreboardGame[] array, camelCase, with status/period/clock/
+// situation/possession as flat top-level fields (not nested), status is one
+// of 'scheduled' | 'in_progress' | 'completed', and homeTeam/awayTeam are
+// always objects ({ id, name, ... }) — never bare strings. Keyed by
+// lowercased team name (not team_id — team ids aren't guaranteed to line up
+// with this app's own /teams/fbs ids) so both sides of a game can be looked
+// up the same way GameResult already is elsewhere in this app. The proxy
+// gives this endpoint its own much shorter cache TTL (see cfbd-proxy.mjs)
+// since a game clock changing every second would otherwise sit behind the
+// shared 30-minute window everything else uses.
 export async function fetchScoreboard(): Promise<Map<string, LiveGameStatus>> {
   const map = new Map<string, LiveGameStatus>();
   try {
+    // `classification` defaults to 'fbs' server-side even when omitted, and
+    // CFBD has no single value covering both fbs+fcs — so a drafted FBS
+    // team's game against an FCS "buy game" opponent may or may not appear
+    // here depending on how CFBD tags that game internally. Left as the
+    // (equivalent) explicit default rather than a fix, since omitting it
+    // changes nothing; this is a known gap, not something this app can
+    // route around from a single scoreboard call.
     const res = await cfbdFetch('/scoreboard', { classification: 'fbs' });
-    if (!res.ok) return map;
+    if (!res.ok) {
+      console.warn('[CFBD] /scoreboard returned', res.status, await res.text().catch(() => ''));
+      return map;
+    }
     const data = await res.json();
-    if (!Array.isArray(data)) return map;
+    if (!Array.isArray(data)) {
+      console.warn('[CFBD] /scoreboard returned unexpected shape:', data);
+      return map;
+    }
 
     for (const g of data) {
-      const clockRaw = g.clock ?? g.gameClock ?? null;
-      const clock = typeof clockRaw === 'string'
-        ? clockRaw
-        : (clockRaw && typeof clockRaw === 'object'
-          ? `${clockRaw.minutes ?? 0}:${String(clockRaw.seconds ?? 0).padStart(2, '0')}`
-          : null);
-
       const status: LiveGameStatus = {
-        status:     g.status ?? g.gameStatus ?? 'scheduled',
-        period:     typeof g.period === 'number' ? g.period : (typeof g.quarter === 'number' ? g.quarter : null),
-        clock,
-        situation:  g.situation ?? g.down_distance ?? null,
-        possession: g.possession ?? g.possessionTeam ?? null,
+        status:     typeof g.status === 'string' ? g.status : 'scheduled',
+        period:     typeof g.period === 'number' ? g.period : null,
+        clock:      typeof g.clock === 'string' ? g.clock : null,
+        situation:  typeof g.situation === 'string' ? g.situation : null,
+        possession: typeof g.possession === 'string' ? g.possession : null,
       };
 
-      const homeName = g.homeTeam ?? g.home_team ?? g.home?.name ?? g.home?.team ?? null;
-      const awayName = g.awayTeam ?? g.away_team ?? g.away?.name ?? g.away?.team ?? null;
-      if (homeName) map.set(String(homeName).toLowerCase(), status);
-      if (awayName) map.set(String(awayName).toLowerCase(), status);
+      const homeName = typeof g.homeTeam?.name === 'string' ? g.homeTeam.name : null;
+      const awayName = typeof g.awayTeam?.name === 'string' ? g.awayTeam.name : null;
+      if (homeName) map.set(homeName.toLowerCase(), status);
+      if (awayName) map.set(awayName.toLowerCase(), status);
     }
   } catch (e) {
     console.warn('[CFBD] fetchScoreboard failed:', e);

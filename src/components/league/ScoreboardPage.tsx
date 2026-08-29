@@ -81,7 +81,7 @@ function MatchupCard({ row, teamsById, isMe, live }: { row: Row; teamsById: Map<
   // Only trust `live` as an in-progress signal once it actually carries a
   // period+clock — CFBD's /scoreboard also lists scheduled/final games, and
   // `game.completed` (from the separate /games endpoint) already covers final.
-  const isLive = !game.completed && live != null && live.period != null && live.clock != null;
+  const isLive = !game.completed && live?.status === 'in_progress' && live.period != null && live.clock != null;
   const myTeamHasBall = isLive && live!.possession != null && live!.possession!.toLowerCase() === b.team_name.toLowerCase();
   const opponentHasBall = isLive && live!.possession != null && live!.possession!.toLowerCase() === game.opponent.toLowerCase();
 
