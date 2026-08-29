@@ -300,3 +300,42 @@ export function StatBonusPageSkeleton() {
     </div>
   );
 }
+
+function MatchupCardSkeleton() {
+  return (
+    <div className="card p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Circle size={20} />
+          <Bar className="h-2.5 w-20" />
+        </div>
+      </div>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-col items-center gap-1.5 flex-1">
+          <Circle size={36} />
+          <Bar className="h-2.5 w-16" />
+        </div>
+        <Bar className="h-2.5 w-5 flex-shrink-0" />
+        <div className="flex flex-col items-center gap-1.5 flex-1">
+          <Circle size={36} />
+          <Bar className="h-2.5 w-16" />
+        </div>
+      </div>
+      <div className="pt-2 border-t border-turf-800 flex items-center justify-between">
+        <Bar className="h-2.5 w-16" />
+        <Bar className="h-5 w-10" />
+      </div>
+    </div>
+  );
+}
+
+export function ScoreboardPageSkeleton() {
+  return (
+    <div className={PAGE_PADDING}>
+      <HeaderCardSkeleton />
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+        {Array.from({ length: 6 }, (_, i) => <MatchupCardSkeleton key={i} />)}
+      </div>
+    </div>
+  );
+}

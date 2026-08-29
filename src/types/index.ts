@@ -532,6 +532,17 @@ export interface SpreadPick {
 // null means no line available for that team this week
 export type SpreadData = Record<string, number | null>;
 
+// Live in-game state from CFBD's Patreon-only /scoreboard endpoint —
+// distinct from GameResult (which only knows "not yet played" vs "final").
+// Only populated for games currently in progress; empty/absent otherwise.
+export interface LiveGameStatus {
+  status: string;              // e.g. 'scheduled' | 'in_progress' | 'final'
+  period: number | null;       // quarter (1-4, 5+ for OT)
+  clock: string | null;        // time remaining in the period, e.g. "9:24"
+  situation: string | null;    // down & distance text, e.g. "1st & 10"
+  possession: string | null;   // team name currently with the ball
+}
+
 export interface APRanking {
   rank: number;
   team_name: string;

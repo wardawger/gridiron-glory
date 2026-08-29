@@ -14,7 +14,7 @@ import { ErrorBoundary }    from './components/ErrorBoundary';
 import {
   HomePageSkeleton, RosterPageSkeleton, AccountPageSkeleton, DraftRoomSkeleton, AdminPanelSkeleton,
   RankingsPageSkeleton, DraftRecapPageSkeleton, LeagueSettingsPageSkeleton, TrophyCasePageSkeleton,
-  FreeAgencyPageSkeleton, StatBonusPageSkeleton,
+  FreeAgencyPageSkeleton, StatBonusPageSkeleton, ScoreboardPageSkeleton,
 } from './components/ui/Skeletons';
 
 // Lazy-loaded: only reachable once a user is authenticated with a league
@@ -32,6 +32,7 @@ const LeagueSettingsPage = lazy(() => import('./components/league/LeagueSettings
 const TrophyCasePage     = lazy(() => import('./components/league/TrophyCasePage').then(m => ({ default: m.TrophyCasePage })));
 const FreeAgencyPage     = lazy(() => import('./components/league/FreeAgencyPage').then(m => ({ default: m.FreeAgencyPage })));
 const StatBonusPage      = lazy(() => import('./components/league/StatBonusPage').then(m => ({ default: m.StatBonusPage })));
+const ScoreboardPage     = lazy(() => import('./components/league/ScoreboardPage').then(m => ({ default: m.ScoreboardPage })));
 
 // Matched against the current path so the Suspense fallback mirrors the
 // destination page's own layout (header/list/grid shapes) instead of a
@@ -49,6 +50,7 @@ function RouteFallback({ pathname }: { pathname: string }) {
   if (pathname === '/league-history') return <TrophyCasePageSkeleton />;
   if (pathname === '/free-agency') return <FreeAgencyPageSkeleton />;
   if (pathname === '/stat-bonuses') return <StatBonusPageSkeleton />;
+  if (pathname === '/scoreboard') return <ScoreboardPageSkeleton />;
   if (pathname === '/') return <HomePageSkeleton />;
   return (
     <div className="flex items-center justify-center py-20">
@@ -151,6 +153,22 @@ function AnimatedRoutes({ lg, league, auth, cfb }: AnimatedRoutesProps) {
               members={league.members}
               rosters={league.rosters}
               seasonStats={cfb.seasonStats}
+            />
+          } />
+          <Route path="/scoreboard" element={
+            <ScoreboardPage
+              league={lg}
+              members={league.members}
+              draftPicks={league.draftPicks}
+              captainPicks={league.captainPicks}
+              gameData={cfb.gameData}
+              spreadPicks={league.spreadPicks}
+              freeAgencyMoves={league.freeAgencyMoves}
+              scoreCorrections={league.scoreCorrections}
+              benchPicks={league.benchPicks}
+              rankings={cfb.rankings}
+              teams={cfb.teams}
+              currentUserId={auth.user!.id}
             />
           } />
           <Route path="/free-agency" element={

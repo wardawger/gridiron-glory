@@ -32,9 +32,22 @@ const CFBD_BASE   = 'https://api.collegefootballdata.com';
 // window apart.
 const CACHE_TTL_H = 0.5; // hours before cache entry is considered stale
 
+// /scoreboard is CFBD's live in-game endpoint (period/clock/possession) —
+// sitting behind the same 30-minute window as everything else would make
+// "live" data effectively static for half an hour at a time. 20 seconds
+// keeps it close to real-time without hammering CFBD on every render;
+// actual request volume is bounded by how long users keep the Scoreboard
+// page open during an actual live window, not by this app's normal
+// 30-minute background refresh cycle.
+const LIVE_TTL_H  = 20 / 3600;
+
+function ttlForPath(cfbdPath) {
+  return cfbdPath === '/scoreboard' ? LIVE_TTL_H : CACHE_TTL_H;
+}
+
 // ── Supabase helpers (plain REST, no SDK needed) ─────────────────────────────
 
-async function cacheGet(supabaseUrl, serviceKey, cacheKey) {
+async function cacheGet(supabaseUrl, serviceKey, cacheKey, ttlHours) {
   try {
     const res = await fetch(
       `${supabaseUrl}/rest/v1/cfbd_cache?cache_key=eq.${encodeURIComponent(cacheKey)}&select=data,fetched_at`,
@@ -44,7 +57,7 @@ async function cacheGet(supabaseUrl, serviceKey, cacheKey) {
     const rows = await res.json();
     if (!rows.length) return null;
     const ageHours = (Date.now() - new Date(rows[0].fetched_at).getTime()) / 36e5;
-    if (ageHours > CACHE_TTL_H) return null;
+    if (ageHours > ttlHours) return null;
     return rows[0].data;
   } catch { return null; }
 }
@@ -122,10 +135,11 @@ export default async (req) => {
 
   const cfbdUrl  = `${CFBD_BASE}${cfbdPath}?${forwardParams.toString()}`;
   const cacheKey = `${cfbdPath}?${forwardParams.toString()}`;
+  const ttlHours = ttlForPath(cfbdPath);
 
   // ── 1. Try Supabase cache ────────────────────────────────────────────────
   if (supabaseUrl && serviceKey) {
-    const cached = await cacheGet(supabaseUrl, serviceKey, cacheKey);
+    const cached = await cacheGet(supabaseUrl, serviceKey, cacheKey, ttlHours);
     if (cached !== null) {
       console.log('[cfbd-proxy] CACHE HIT:', cacheKey);
       return new Response(JSON.stringify(cached), { status: 200, headers: corsHeaders });
