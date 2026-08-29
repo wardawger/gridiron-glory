@@ -181,6 +181,7 @@ function AnimatedRoutes({ lg, league, auth, cfb }: AnimatedRoutesProps) {
               onUpdateWeek={league.updateWeek}
               onUpdateScoring={league.updateScoring}
               onUpdateDraftSchedule={league.updateDraftSchedule}
+              onUpdateMaxTeams={league.updateMaxTeams}
               onAddBonus={league.addManualBonus}
               onRemoveBonus={league.removeManualBonus}
               onAddCorrection={league.addScoreCorrection}

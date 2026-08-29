@@ -570,6 +570,27 @@ export function useLeagueCore(user: User | null) {
     return {};
   };
 
+  // Roster size only makes sense to change before anyone's drafted — pick
+  // numbers, round math, and existing rosters all assume a fixed size once
+  // picks exist. Guarded client-side (draft_status === 'pending'); if bench
+  // is enabled with starters+bench already summed to the old max, the
+  // leagues.bench_counts_valid CHECK constraint rejects this update until
+  // those are adjusted to match the new total — surfaced as an error rather
+  // than silently applied.
+  const updateMaxTeams = async (maxTeams: number): Promise<{ error?: string }> => {
+    if (!league) return { error: 'No league' };
+    if (league.draft_status !== 'pending') return { error: 'Roster size can only be changed before the draft starts' };
+    const { data, error } = await supabase
+      .from('leagues')
+      .update({ max_teams_per_user: maxTeams })
+      .eq('id', league.id)
+      .select()
+      .single();
+    if (error) return { error: error.message };
+    if (data) setAllLeagues(prev => prev.map(l => l.id === league.id ? data as League : l));
+    return {};
+  };
+
   const updateScoring = async (scoring: League['scoring']) => {
     if (!league) return;
     const { error } = await supabase.from('leagues').update({ scoring }).eq('id', league.id);
@@ -706,7 +727,7 @@ export function useLeagueCore(user: User | null) {
     rosters, myMembership, isCommissioner, loading, error,
     // Public actions
     switchLeague, createLeague, sendInvite, startDraft, makeDraftPick, resetDraft, deleteLeague, endSeason,
-    updateWeek, updateScoring, updateDraftSchedule, removeFromRoster,
+    updateWeek, updateScoring, updateDraftSchedule, updateMaxTeams, removeFromRoster,
     updateDisplayName, updateAvatar, updateMemberRole, removeMember,
     reload: () => loadAllLeagues(true),
     // Setters + refs consumed by the domain action-factory hooks

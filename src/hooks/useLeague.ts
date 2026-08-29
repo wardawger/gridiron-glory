@@ -56,6 +56,7 @@ export function useLeague(user: User | null) {
     setSpreadPick, removeSpreadPick, overrideSpreadResult, clearSpreadOverride,
     swapBench, ensureBenchSeeded,
     updateWeek: core.updateWeek, updateScoring: core.updateScoring, updateDraftSchedule: core.updateDraftSchedule,
+    updateMaxTeams: core.updateMaxTeams,
     removeFromRoster: core.removeFromRoster,
     makeFreeAgencyMove, submitWaiverClaim,
     updateDisplayName: core.updateDisplayName, updateAvatar: core.updateAvatar, updateMemberRole: core.updateMemberRole,

@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Shield, UserPlus, Copy, Check, Trash2, Mail, RotateCcw, AlertTriangle, Loader2, Archive, CalendarClock, Clock } from 'lucide-react';
+import { Shield, UserPlus, Copy, Check, Trash2, Mail, RotateCcw, AlertTriangle, Loader2, Archive, CalendarClock, Clock, Users } from 'lucide-react';
 import type { League, LeagueMember, LeagueRole, SeasonHistoryEntry, TrophySnapshot, Invite } from '../../types';
 import { Avatar } from '../ui/Avatar';
 import { Toggle } from '../ui/Toggle';
@@ -14,6 +14,7 @@ interface Props {
   onSendInvite: (email: string) => Promise<{ token?: string; emailSent?: boolean; error?: string }>;
   onUpdateWeek: (week: number) => void;
   onUpdateDraftSchedule: (scheduledAt: string | null) => Promise<{ error?: string }>;
+  onUpdateMaxTeams: (maxTeams: number) => Promise<{ error?: string }>;
   onUpdateMemberRole: (userId: string, role: LeagueRole) => Promise<{ error?: string }>;
   onRemoveMember: (userId: string) => Promise<{ error?: string }>;
   onResetDraft: () => Promise<{ error?: string }>;
@@ -34,7 +35,7 @@ function isoToLocalInput(iso: string | null): string {
 
 export function MembersTab({
   league, currentUserId, members, invites, finalStandings, trophySnapshot,
-  onSendInvite, onUpdateWeek, onUpdateDraftSchedule, onUpdateMemberRole, onRemoveMember, onResetDraft, onDeleteLeague, onEndSeason,
+  onSendInvite, onUpdateWeek, onUpdateDraftSchedule, onUpdateMaxTeams, onUpdateMemberRole, onRemoveMember, onResetDraft, onDeleteLeague, onEndSeason,
 }: Props) {
   const [inviteEmail, setEmail] = useState('');
   const [inviteLink, setLink]   = useState('');
@@ -87,6 +88,21 @@ export function MembersTab({
     if (result.error) setScheduleError(result.error);
     else setDraftSchedule('');
     setSavingSchedule(false);
+  };
+
+  const [maxTeams, setMaxTeams] = useState(league.max_teams_per_user);
+  const [savingMaxTeams, setSavingMaxTeams] = useState(false);
+  const [maxTeamsError, setMaxTeamsError] = useState('');
+  const [maxTeamsSaved, setMaxTeamsSaved] = useState(false);
+
+  const handleSaveMaxTeams = async () => {
+    setSavingMaxTeams(true);
+    setMaxTeamsError('');
+    setMaxTeamsSaved(false);
+    const result = await onUpdateMaxTeams(maxTeams);
+    if (result.error) setMaxTeamsError(result.error);
+    else setMaxTeamsSaved(true);
+    setSavingMaxTeams(false);
   };
 
   const handleEndSeason = async () => {
@@ -367,6 +383,49 @@ export function MembersTab({
           </div>
           {scheduleError && (
             <p className="text-xs text-red-300">{scheduleError}</p>
+          )}
+        </div>
+      )}
+
+      {/* Roster size — only changeable before the draft starts, same
+          visibility rule as Draft Schedule above: pick numbers, round math,
+          and existing rosters all assume a fixed size once picks exist. */}
+      {league.draft_status === 'pending' && (
+        <div className="card p-5 space-y-3">
+          <div className="flex items-center gap-2 mb-1">
+            <Users className="w-4 h-4 text-field-400" />
+            <h3 className="font-medium text-white">Roster Size</h3>
+          </div>
+          <p className="text-xs text-turf-400">
+            Teams each player drafts. If Bench is enabled in Scoring, its Starters + Bench counts must be
+            updated to match whatever you set here before saving.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="relative flex-1">
+              <select
+                className="input appearance-none"
+                value={maxTeams}
+                onChange={e => { setMaxTeams(Number(e.target.value)); setMaxTeamsSaved(false); }}
+              >
+                {[5,6,7,8,9,10,12,15].map(n => (
+                  <option key={n} value={n}>{n} teams</option>
+                ))}
+              </select>
+            </div>
+            <button
+              onClick={handleSaveMaxTeams}
+              disabled={savingMaxTeams || maxTeams === league.max_teams_per_user}
+              className="btn-primary btn-sm flex-shrink-0"
+            >
+              {savingMaxTeams && <Loader2 className="w-4 h-4 animate-spin" />}
+              Save
+            </button>
+          </div>
+          {maxTeamsError && (
+            <p className="text-xs text-red-300">{maxTeamsError}</p>
+          )}
+          {maxTeamsSaved && !maxTeamsError && (
+            <p className="text-xs text-field-400">Roster size updated.</p>
           )}
         </div>
       )}
