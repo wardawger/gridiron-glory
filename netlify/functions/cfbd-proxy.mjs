@@ -2,7 +2,7 @@
 //
 // Server-side proxy for CFBD API requests. Solves two problems:
 //   1. CORS — browser can't call CFBD directly from Netlify domain
-//   2. Quota — caches responses in Supabase for 24h to conserve monthly calls
+//   2. Quota — caches responses in Supabase to conserve monthly calls
 //
 // Required Netlify env vars (Site Settings → Environment Variables):
 //   CFBD_KEY             — your CFBD API bearer token
@@ -19,7 +19,18 @@
 import { verifyUser } from './lib/verifyUser.mjs';
 
 const CFBD_BASE   = 'https://api.collegefootballdata.com';
-const CACHE_TTL_H = 24; // hours before cache entry is considered stale
+// 30 minutes — matches useCfbData.ts's own client-side refresh interval, so
+// caching any shorter buys nothing (nothing re-asks sooner than that
+// anyway). This is a single shared cache across every user of the app (the
+// cache key has no per-user/per-league component), so the ~13 distinct CFBD
+// endpoints this app calls per refresh cycle work out to roughly
+// 13 endpoints × 48 refreshes/day × 30 days ≈ 18,720 requests/month against
+// a 30,000/month Tier 2 CFBD budget — comfortable headroom left for the
+// separate on-demand spread-line lookups. This also fixes stat bonuses
+// visibly lagging behind game results as a side effect: every endpoint now
+// shares the same freshness ceiling, so they can never drift more than this
+// window apart.
+const CACHE_TTL_H = 0.5; // hours before cache entry is considered stale
 
 // ── Supabase helpers (plain REST, no SDK needed) ─────────────────────────────
 
