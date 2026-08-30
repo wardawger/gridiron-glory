@@ -1050,7 +1050,7 @@ export function DraftRoom({
       >
         <div className="grid grid-cols-4">
           {([
-            { id: 'players', label: 'Players', icon: Search, count: 0 },
+            { id: 'players', label: 'Teams', icon: Search, count: 0 },
             { id: 'queue',   label: 'Queue',   icon: Star,   count: queuedTeamIds.length },
             { id: 'rosters', label: 'Rosters', icon: Users,  count: 0 },
             { id: 'board',   label: 'Board',   icon: LayoutGrid, count: 0 },
