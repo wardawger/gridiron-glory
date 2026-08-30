@@ -616,6 +616,17 @@ export async function fetchSpreads(
 // name at parse time here, and callers match team names with a prefix
 // check (see findLiveStatus / teamNameMatches below) instead of exact
 // equality, since a school-only name is always a prefix of the mascot name.
+function statusPriority(status: string): number {
+  return status === 'in_progress' ? 2 : status === 'completed' ? 1 : 0;
+}
+
+function setIfHigherPriority(map: Map<string, LiveGameStatus>, key: string, status: LiveGameStatus): void {
+  const existing = map.get(key);
+  if (!existing || statusPriority(status.status) >= statusPriority(existing.status)) {
+    map.set(key, status);
+  }
+}
+
 export async function fetchScoreboard(): Promise<Map<string, LiveGameStatus>> {
   const map = new Map<string, LiveGameStatus>();
   try {
@@ -650,10 +661,19 @@ export async function fetchScoreboard(): Promise<Map<string, LiveGameStatus>> {
         clock:      typeof g.clock === 'string' ? g.clock : null,
         situation:  typeof g.situation === 'string' ? g.situation : null,
         possession: possessionTeam,
+        home_points: typeof g.homeTeam?.points === 'number' ? g.homeTeam.points : null,
+        away_points: typeof g.awayTeam?.points === 'number' ? g.awayTeam.points : null,
       };
 
-      if (homeName) map.set(homeName.toLowerCase(), status);
-      if (awayName) map.set(awayName.toLowerCase(), status);
+      // /scoreboard returns every game for the classification, not just
+      // today's — a team already listed for its NEXT week's game (still
+      // 'scheduled') collides on the same map key as its live game today.
+      // Without a priority check, whichever entry happens to come later in
+      // the array wins, which silently overwrote real in_progress/completed
+      // status with a future 'scheduled' placeholder. in_progress always
+      // wins, then completed, then scheduled.
+      if (homeName) setIfHigherPriority(map, homeName.toLowerCase(), status);
+      if (awayName) setIfHigherPriority(map, awayName.toLowerCase(), status);
     }
   } catch (e) {
     console.warn('[CFBD] fetchScoreboard failed:', e);

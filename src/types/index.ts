@@ -536,11 +536,18 @@ export type SpreadData = Record<string, number | null>;
 // distinct from GameResult (which only knows "not yet played" vs "final").
 // Only populated for games currently in progress; empty/absent otherwise.
 export interface LiveGameStatus {
-  status: string;              // e.g. 'scheduled' | 'in_progress' | 'final'
+  status: string;              // 'scheduled' | 'in_progress' | 'completed'
   period: number | null;       // quarter (1-4, 5+ for OT)
   clock: string | null;        // time remaining in the period, e.g. "9:24"
   situation: string | null;    // down & distance text, e.g. "1st & 10"
   possession: string | null;   // team name currently with the ball
+  // Carried so a game that finished can show its final score immediately —
+  // this app's own /games endpoint (GameResult.completed/home_score/
+  // away_score) sits behind a 30-minute cache and can lag well behind a
+  // game's real completion, leaving the scoreboard stuck showing pre-game
+  // info for up to 30 minutes after the final whistle otherwise.
+  home_points: number | null;
+  away_points: number | null;
 }
 
 export interface APRanking {
