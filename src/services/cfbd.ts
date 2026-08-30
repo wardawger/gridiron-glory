@@ -391,26 +391,21 @@ export async function fetchSeasonStats(teams: CfbTeam[]): Promise<Map<string, Te
   };
 
   try {
-    const [passingRes, rushingRes, defensiveRes] = await Promise.all([
-      cfbdFetch('/stats/season', { year, statType: 'passing' }).then(r => r.ok ? r.json() : []),
+    const [rushingRes, defensiveRes, playerRes] = await Promise.all([
       cfbdFetch('/stats/season', { year, statType: 'rushing' }).then(r => r.ok ? r.json() : []),
       cfbdFetch('/stats/season', { year, statType: 'defensive' }).then(r => r.ok ? r.json() : []),
+      cfbdFetch('/stats/player/season', { year }).then(r => r.ok ? r.json() : []),
     ]);
 
-    const qbrMap   = new Map<string, number>();
-    const recTdMap = new Map<string, number>();
-    passingRes.forEach((s: any) => {
-      const id = resolveId(s.team);
-      if (!id) return;
-      if (s.statName === 'passer_rating') qbrMap.set(id, s.stat ?? 0);
-      if (s.statName === 'receivingTDs')  recTdMap.set(id, s.stat ?? 0);
-    });
-
+    // CFBD's team-level /stats/season entries carry the number in
+    // `statValue`, not `stat` — confirmed against a real cached response
+    // (e.g. { team: "NC State", statName: "rushingTDs", statValue: 1 }).
+    // Reading `s.stat` silently produced 0 for every team here.
     const rushTdMap = new Map<string, number>();
     rushingRes.forEach((s: any) => {
       const id = resolveId(s.team);
       if (!id) return;
-      if (s.statName === 'rushingTDs') rushTdMap.set(id, s.stat ?? 0);
+      if (s.statName === 'rushingTDs') rushTdMap.set(id, s.statValue ?? 0);
     });
 
     const intMap  = new Map<string, number>();
@@ -418,8 +413,53 @@ export async function fetchSeasonStats(teams: CfbTeam[]): Promise<Map<string, Te
     defensiveRes.forEach((s: any) => {
       const id = resolveId(s.team);
       if (!id) return;
-      if (s.statName === 'interceptions') intMap.set(id, s.stat ?? 0);
-      if (s.statName === 'sacks')         sackMap.set(id, s.stat ?? 0);
+      if (s.statName === 'interceptions') intMap.set(id, s.statValue ?? 0);
+      if (s.statName === 'sacks')         sackMap.set(id, s.statValue ?? 0);
+    });
+
+    // QBR/Receiving TDs: CFBD's team-level /stats/season has no passer
+    // rating or receiving-TD field at all — confirmed by inspecting a real
+    // response, neither exists there under any name. Both are only
+    // published per-player, so this computes them itself from
+    // /stats/player/season (field is `stat`, a numeric string, here —
+    // different from the team-level endpoint's `statValue`).
+    //
+    // QBR is the standard NCAA passer-efficiency formula, summed across
+    // every passing-category entry on a team (not filtered to QB — a rare
+    // trick-play pass from a non-QB is still real team passing production):
+    //   (8.4 × yards + 330 × TD + 100 × completions − 200 × INT) / attempts
+    //
+    // Receiving TDs is summed only across WR-position players, per league
+    // request, rather than every pass-catcher (RB/TE included).
+    type PassTotals = { completions: number; attempts: number; yards: number; td: number; int: number };
+    const passTotals = new Map<string, PassTotals>();
+    const recTdMap = new Map<string, number>();
+
+    playerRes.forEach((p: any) => {
+      const id = resolveId(p.team);
+      if (!id) return;
+      const value = parseFloat(p.stat);
+      if (isNaN(value)) return;
+
+      if (p.category === 'passing') {
+        const totals = passTotals.get(id) ?? { completions: 0, attempts: 0, yards: 0, td: 0, int: 0 };
+        if (p.statType === 'COMPLETIONS') totals.completions += value;
+        if (p.statType === 'ATT')         totals.attempts += value;
+        if (p.statType === 'YDS')         totals.yards += value;
+        if (p.statType === 'TD')          totals.td += value;
+        if (p.statType === 'INT')         totals.int += value;
+        passTotals.set(id, totals);
+      }
+
+      if (p.category === 'receiving' && p.position === 'WR' && p.statType === 'TD') {
+        recTdMap.set(id, (recTdMap.get(id) ?? 0) + value);
+      }
+    });
+
+    const qbrMap = new Map<string, number>();
+    passTotals.forEach((t, id) => {
+      if (t.attempts <= 0) return;
+      qbrMap.set(id, (8.4 * t.yards + 330 * t.td + 100 * t.completions - 200 * t.int) / t.attempts);
     });
 
     const allIds = new Set([
