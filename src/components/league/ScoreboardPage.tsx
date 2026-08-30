@@ -418,7 +418,7 @@ export function ScoreboardPage({
                   }`}
                 >
                   <div className="overflow-hidden">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 p-4 pt-0 border-t border-turf-800">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 p-4 border-t border-turf-800">
                       {rows.map(row => {
                         const game = row.breakdown.game!;
                         const live = findLiveStatus(liveScoreboard, row.breakdown.team_name)
