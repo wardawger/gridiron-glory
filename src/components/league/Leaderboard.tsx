@@ -628,7 +628,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                   <div className="h-72 animate-radar-in" style={{ transformOrigin: 'center' }}>
                     <ResponsiveContainer width="100%" height="100%">
                       <RadarChart data={radarData} margin={{ top: 8, right: 24, left: 24, bottom: 8 }}>
-                        <PolarGrid stroke="#30363d" />
+                        <PolarGrid stroke="#495057" />
                         <PolarAngleAxis dataKey="metric" tick={{ fill: '#6c757d', fontSize: 11 }} />
                         <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
                         <Tooltip
