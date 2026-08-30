@@ -46,6 +46,13 @@ function ordinal(period: number): string {
   return ['', '1st', '2nd', '3rd', '4th'][period] ?? `${period}th`;
 }
 
+// CFBD reports halftime as period 2 with the clock run all the way down
+// to 0, rather than a distinct status — a real "2nd · 0:00" line reads as
+// if the game just froze, so it's called out by name instead.
+function isHalftime(period: number, clock: string): boolean {
+  return period === 2 && /^0?0:00$/.test(clock);
+}
+
 // Possession indicator — a small football rather than a plain dot, styled
 // after a typical scorebug football glyph (flat oval, seam + laces).
 // Uses only currentColor (set via the caller's text-* class, kept green
@@ -205,9 +212,9 @@ function MatchupCard({ row, teamsById, isMe, live }: { row: Row; teamsById: Map<
           <div className="flex flex-col items-center gap-0.5">
             <span className="flex items-center gap-1.5 font-medium text-field-400">
               <span className="w-1.5 h-1.5 rounded-full bg-field-400 animate-pulse flex-shrink-0" aria-hidden="true" />
-              {ordinal(live!.period!)} &middot; {live!.clock}
+              {isHalftime(live!.period!, live!.clock!) ? 'Halftime' : `${ordinal(live!.period!)} · ${live!.clock}`}
             </span>
-            {live!.situation && <span className="text-turf-500">{live!.situation}</span>}
+            {!isHalftime(live!.period!, live!.clock!) && live!.situation && <span className="text-turf-500">{live!.situation}</span>}
           </div>
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-turf-400">This week</span>
