@@ -46,20 +46,20 @@ function ordinal(period: number): string {
   return ['', '1st', '2nd', '3rd', '4th'][period] ?? `${period}th`;
 }
 
-// Possession indicator — a small football rather than a plain dot, per
-// request. Uses only currentColor (set via the caller's text-* class) plus
-// the existing turf-950 token for the laces, so no new palette is added.
+// Possession indicator — a small football rather than a plain dot, styled
+// after a typical scorebug football glyph (flat oval, seam + laces).
+// Uses only currentColor (set via the caller's text-* class, kept green
+// per request) plus the existing turf-950 token for the laces, so no new
+// palette is added.
 function FootballIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 16 16" className={className} aria-hidden="true">
-      <g transform="rotate(-40 8 8)">
-        <ellipse cx="8" cy="8" rx="7" ry="4" fill="currentColor" />
-        <g className="text-turf-950" stroke="currentColor" strokeWidth="0.6" strokeLinecap="round">
-          <line x1="4.5" y1="8" x2="11.5" y2="8" />
-          <line x1="6" y1="6.8" x2="6" y2="9.2" />
-          <line x1="8" y1="6.8" x2="8" y2="9.2" />
-          <line x1="10" y1="6.8" x2="10" y2="9.2" />
-        </g>
+      <ellipse cx="8" cy="8" rx="7" ry="4.2" fill="currentColor" />
+      <g className="text-turf-950" stroke="currentColor" strokeWidth="0.6" strokeLinecap="round">
+        <line x1="2.4" y1="8" x2="13.6" y2="8" />
+        <line x1="6.4" y1="6.9" x2="6.4" y2="9.1" />
+        <line x1="8" y1="6.7" x2="8" y2="9.3" />
+        <line x1="9.6" y1="6.9" x2="9.6" y2="9.1" />
       </g>
     </svg>
   );
@@ -141,29 +141,30 @@ function MatchupCard({ row, teamsById, isMe, live }: { row: Row; teamsById: Map<
         </div>
       )}
 
-      {/* Matchup — stacked rows so a possession indicator can sit next to
-          whichever team currently has the ball, ESPN-scorebug style. */}
-      <div className="space-y-1.5">
-        <div className="flex items-center gap-2">
+      {/* Matchup — bordered, divided rows (ESPN-scorebug style) so the two
+          teams and their scores line up in a consistent table-like grid
+          rather than free-floating flex rows. */}
+      <div className="rounded-lg border border-turf-800 divide-y divide-turf-800 overflow-hidden">
+        <div className="flex items-center gap-2 px-2.5 py-2">
           <TeamLogo src={team?.logo} alt={b.team_name} fallbackName={b.team_name} size={28} />
-          <span className="text-sm font-medium text-white truncate flex-1 min-w-0 flex items-center gap-1.5">
+          <span className="text-sm font-medium text-white truncate flex-1 min-w-0">
             {b.team_name}
-            {myTeamHasBall && <FootballIcon className="w-3 h-3 text-field-400 flex-shrink-0" />}
           </span>
+          {myTeamHasBall && <FootballIcon className="w-3.5 h-3.5 text-field-400 flex-shrink-0" />}
           {showScore && (
-            <span className="font-mono text-base font-bold text-white flex-shrink-0">
+            <span className="font-mono text-base font-bold text-white flex-shrink-0 w-6 text-right">
               {myScore}
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 px-2.5 py-2">
           <TeamLogo src={game.opponent_logo} alt={game.opponent} fallbackName={game.opponent} size={28} />
-          <span className="text-sm text-turf-400 truncate flex-1 min-w-0 flex items-center gap-1.5">
+          <span className="text-sm text-turf-400 truncate flex-1 min-w-0">
             {game.opponent_rank ? `#${game.opponent_rank} ` : ''}{game.opponent}
-            {opponentHasBall && <FootballIcon className="w-3 h-3 text-field-400 flex-shrink-0" />}
           </span>
+          {opponentHasBall && <FootballIcon className="w-3.5 h-3.5 text-field-400 flex-shrink-0" />}
           {showScore && (
-            <span className="font-mono text-base font-bold text-turf-500 flex-shrink-0">
+            <span className="font-mono text-base font-bold text-turf-500 flex-shrink-0 w-6 text-right">
               {oppScore}
             </span>
           )}
