@@ -131,18 +131,18 @@ function MatchupCard({ row, teamsById, isMe, live }: { row: Row; teamsById: Map<
   const displayResult = game.completed ? game.result : liveResult;
   const categories = activeCategories(displayResult, game.opponent_rank, game.is_g5_opponent);
 
-  return (
-    <div className={`relative card p-4 space-y-3 ${isMe ? 'border-field-500/50 bg-field-950/10' : ''}`}>
-      {b.is_captain && (
-        // Positioned out of normal flow so it doesn't push the score table
-        // below down — previously sat in its own row above the table,
-        // which meant a captained card's table started lower than its
-        // siblings' in the same grid row.
-        <span className="badge-gold text-xs absolute -top-2.5 right-3">
-          <Star className="w-2.5 h-2.5 fill-current" /> Captain ×2
-        </span>
-      )}
+  // Shown next to "This week" rather than floating over the card — sitting
+  // in its own row above the score table previously pushed a captained
+  // card's table down relative to its non-captained siblings in the same
+  // grid row.
+  const captainBadge = b.is_captain && (
+    <span className="badge-gold text-xs">
+      <Star className="w-2.5 h-2.5 fill-current" /> Captain ×2
+    </span>
+  );
 
+  return (
+    <div className={`card p-4 space-y-3 ${isMe ? 'border-field-500/50 bg-field-950/10' : ''}`}>
       {/* Matchup — bordered, divided rows (ESPN-scorebug style) so the two
           teams and their scores line up in a consistent table-like grid
           rather than free-floating flex rows. */}
@@ -175,12 +175,25 @@ function MatchupCard({ row, teamsById, isMe, live }: { row: Row; teamsById: Map<
 
       {/* Status */}
       {isLive ? (
-        <div className="text-xs pt-1 border-t border-turf-800 flex flex-col items-center gap-0.5">
-          <span className="flex items-center gap-1.5 font-medium text-field-400">
-            <span className="w-1.5 h-1.5 rounded-full bg-field-400 animate-pulse flex-shrink-0" />
-            {ordinal(live!.period!)} &middot; {live!.clock}
-          </span>
-          {live!.situation && <span className="text-turf-500">{live!.situation}</span>}
+        <div className="text-xs pt-1 border-t border-turf-800 space-y-2">
+          <div className="flex flex-col items-center gap-0.5">
+            <span className="flex items-center gap-1.5 font-medium text-field-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-field-400 animate-pulse flex-shrink-0" />
+              {ordinal(live!.period!)} &middot; {live!.clock}
+            </span>
+            {live!.situation && <span className="text-turf-500">{live!.situation}</span>}
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-turf-400">This week</span>
+            <div className="flex items-center gap-1.5">
+              {captainBadge}
+              <span className={`font-mono font-bold text-lg ${
+                b.points > 0 ? 'text-field-400' : b.points < 0 ? 'text-red-300' : 'text-turf-500'
+              }`}>
+                {b.points > 0 ? '+' : ''}{b.points}
+              </span>
+            </div>
+          </div>
         </div>
       ) : !showFinal ? (
         <div className="text-xs text-turf-500 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 pt-1 border-t border-turf-800">
@@ -229,15 +242,18 @@ function MatchupCard({ row, teamsById, isMe, live }: { row: Row; teamsById: Map<
           </div>
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-turf-400">This week</span>
-            {justFinished ? (
-              <span className="text-xs text-turf-500">Points pending</span>
-            ) : (
-              <span className={`font-mono font-bold text-lg ${
-                b.points > 0 ? 'text-field-400' : b.points < 0 ? 'text-red-300' : 'text-turf-500'
-              }`}>
-                {b.points > 0 ? '+' : ''}{b.points}
-              </span>
-            )}
+            <div className="flex items-center gap-1.5">
+              {captainBadge}
+              {justFinished ? (
+                <span className="text-xs text-turf-500">Points pending</span>
+              ) : (
+                <span className={`font-mono font-bold text-lg ${
+                  b.points > 0 ? 'text-field-400' : b.points < 0 ? 'text-red-300' : 'text-turf-500'
+                }`}>
+                  {b.points > 0 ? '+' : ''}{b.points}
+                </span>
+              )}
+            </div>
           </div>
         </div>
       )}
