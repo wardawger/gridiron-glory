@@ -93,6 +93,21 @@ function AnimatedRoutes({ lg, league, auth, cfb }: AnimatedRoutesProps) {
     if (routeTimeout.current) clearTimeout(routeTimeout.current);
   }, []);
 
+  // True only during the very first cfb data fetch, never on the 30-minute
+  // auto-refresh or a manual Refresh click (both also set cfb.loading, but
+  // by then cfb.teams is already populated) — gating a full skeleton swap
+  // on cfb.loading alone would flash it over perfectly good on-screen data
+  // every 30 minutes. Pages whose content is entirely derived from cfb data
+  // (teams/gameData/rankings/etc.) render a real "0 results" state when
+  // that data is still empty, indistinguishable from a genuine empty state
+  // (e.g. Scoreboard's "No active teams have a game this week", Stat
+  // Bonuses' "No season stats available yet") — this swaps in the route's
+  // own skeleton for that window instead. HomePage is the one exception:
+  // it already takes a `cfbLoading` prop and shows an inline "loading live
+  // game data" banner without blanking the page, since its leaderboard has
+  // real member entries regardless of cfb data readiness.
+  const cfbInitialLoading = cfb.loading && cfb.teams.length === 0;
+
   return (
     <div className={routeExiting ? 'animate-content-fade-out' : 'animate-content-fade-in'}>
       <Suspense fallback={<RouteFallback pathname={displayedLocation.pathname} />}>
@@ -116,9 +131,9 @@ function AnimatedRoutes({ lg, league, auth, cfb }: AnimatedRoutesProps) {
               cfbLoading={cfb.loading}
             />
           } />
-          <Route path="/roster"         element={<RosterPage league={lg} members={league.members} draftPicks={league.draftPicks} captainPicks={league.captainPicks} gameData={cfb.gameData} spreadData={cfb.spreadData} spreadPicks={league.spreadPicks} freeAgencyMoves={league.freeAgencyMoves} scoreCorrections={league.scoreCorrections} benchPicks={league.benchPicks} userId={auth.user!.id} onSetCaptain={league.setCaptain} onSetSpread={league.setSpreadPick} onRemoveSpread={league.removeSpreadPick} onRefreshSpreads={cfb.refreshSpreads} onSwapBench={league.swapBench} onEnsureBenchSeeded={league.ensureBenchSeeded} />} />
-          <Route path="/roster/:userId" element={<RosterPage league={lg} members={league.members} draftPicks={league.draftPicks} captainPicks={league.captainPicks} gameData={cfb.gameData} spreadData={cfb.spreadData} spreadPicks={league.spreadPicks} freeAgencyMoves={league.freeAgencyMoves} scoreCorrections={league.scoreCorrections} benchPicks={league.benchPicks} userId={auth.user!.id} onSetCaptain={league.setCaptain} onSetSpread={league.setSpreadPick} onRemoveSpread={league.removeSpreadPick} onRefreshSpreads={cfb.refreshSpreads} onSwapBench={league.swapBench} onEnsureBenchSeeded={league.ensureBenchSeeded} />} />
-          <Route path="/rankings" element={<RankingsPage rankings={cfb.rankings} teams={cfb.teams} records={cfb.records} />} />
+          <Route path="/roster"         element={cfbInitialLoading ? <RosterPageSkeleton /> : <RosterPage league={lg} members={league.members} draftPicks={league.draftPicks} captainPicks={league.captainPicks} gameData={cfb.gameData} spreadData={cfb.spreadData} spreadPicks={league.spreadPicks} freeAgencyMoves={league.freeAgencyMoves} scoreCorrections={league.scoreCorrections} benchPicks={league.benchPicks} userId={auth.user!.id} onSetCaptain={league.setCaptain} onSetSpread={league.setSpreadPick} onRemoveSpread={league.removeSpreadPick} onRefreshSpreads={cfb.refreshSpreads} onSwapBench={league.swapBench} onEnsureBenchSeeded={league.ensureBenchSeeded} />} />
+          <Route path="/roster/:userId" element={cfbInitialLoading ? <RosterPageSkeleton /> : <RosterPage league={lg} members={league.members} draftPicks={league.draftPicks} captainPicks={league.captainPicks} gameData={cfb.gameData} spreadData={cfb.spreadData} spreadPicks={league.spreadPicks} freeAgencyMoves={league.freeAgencyMoves} scoreCorrections={league.scoreCorrections} benchPicks={league.benchPicks} userId={auth.user!.id} onSetCaptain={league.setCaptain} onSetSpread={league.setSpreadPick} onRemoveSpread={league.removeSpreadPick} onRefreshSpreads={cfb.refreshSpreads} onSwapBench={league.swapBench} onEnsureBenchSeeded={league.ensureBenchSeeded} />} />
+          <Route path="/rankings" element={cfbInitialLoading ? <RankingsPageSkeleton /> : <RankingsPage rankings={cfb.rankings} teams={cfb.teams} records={cfb.records} />} />
           <Route path="/account" element={
             <AccountPage
               auth={auth}
@@ -134,70 +149,80 @@ function AnimatedRoutes({ lg, league, auth, cfb }: AnimatedRoutesProps) {
           <Route path="/draft-recap" element={<DraftRecapPage league={lg} members={league.members} draftPicks={league.draftPicks} teams={cfb.teams} />} />
           <Route path="/league-settings" element={<LeagueSettingsPage league={lg} members={league.members} />} />
           <Route path="/league-history" element={
-            <TrophyCasePage
-              league={lg}
-              seasonHistory={league.seasonHistory}
-              members={league.members}
-              draftPicks={league.draftPicks}
-              captainPicks={league.captainPicks}
-              spreadPicks={league.spreadPicks}
-              freeAgencyMoves={league.freeAgencyMoves}
-              manualBonuses={league.manualBonuses}
-              gameData={cfb.gameData}
-              scoreCorrections={league.scoreCorrections}
-            />
+            cfbInitialLoading ? <TrophyCasePageSkeleton /> : (
+              <TrophyCasePage
+                league={lg}
+                seasonHistory={league.seasonHistory}
+                members={league.members}
+                draftPicks={league.draftPicks}
+                captainPicks={league.captainPicks}
+                spreadPicks={league.spreadPicks}
+                freeAgencyMoves={league.freeAgencyMoves}
+                manualBonuses={league.manualBonuses}
+                gameData={cfb.gameData}
+                scoreCorrections={league.scoreCorrections}
+              />
+            )
           } />
           <Route path="/stat-bonuses" element={
-            <StatBonusPage
-              league={lg}
-              members={league.members}
-              rosters={league.rosters}
-              seasonStats={cfb.seasonStats}
-            />
+            cfbInitialLoading ? <StatBonusPageSkeleton /> : (
+              <StatBonusPage
+                league={lg}
+                members={league.members}
+                rosters={league.rosters}
+                seasonStats={cfb.seasonStats}
+              />
+            )
           } />
           <Route path="/scoreboard" element={
-            <ScoreboardPage
-              league={lg}
-              members={league.members}
-              draftPicks={league.draftPicks}
-              captainPicks={league.captainPicks}
-              gameData={cfb.gameData}
-              spreadPicks={league.spreadPicks}
-              freeAgencyMoves={league.freeAgencyMoves}
-              scoreCorrections={league.scoreCorrections}
-              benchPicks={league.benchPicks}
-              rankings={cfb.rankings}
-              teams={cfb.teams}
-              currentUserId={auth.user!.id}
-            />
+            cfbInitialLoading ? <ScoreboardPageSkeleton /> : (
+              <ScoreboardPage
+                league={lg}
+                members={league.members}
+                draftPicks={league.draftPicks}
+                captainPicks={league.captainPicks}
+                gameData={cfb.gameData}
+                spreadPicks={league.spreadPicks}
+                freeAgencyMoves={league.freeAgencyMoves}
+                scoreCorrections={league.scoreCorrections}
+                benchPicks={league.benchPicks}
+                rankings={cfb.rankings}
+                teams={cfb.teams}
+                currentUserId={auth.user!.id}
+              />
+            )
           } />
           <Route path="/free-agency" element={
-            <FreeAgencyPage
-              league={lg}
-              members={league.members}
-              draftPicks={league.draftPicks}
-              freeAgencyMoves={league.freeAgencyMoves}
-              waiverClaims={league.waiverClaims}
-              teams={cfb.teams}
-              userId={auth.user!.id}
-              onMakeMove={league.makeFreeAgencyMove}
-              onSubmitClaim={league.submitWaiverClaim}
-            />
+            cfbInitialLoading ? <FreeAgencyPageSkeleton /> : (
+              <FreeAgencyPage
+                league={lg}
+                members={league.members}
+                draftPicks={league.draftPicks}
+                freeAgencyMoves={league.freeAgencyMoves}
+                waiverClaims={league.waiverClaims}
+                teams={cfb.teams}
+                userId={auth.user!.id}
+                onMakeMove={league.makeFreeAgencyMove}
+                onSubmitClaim={league.submitWaiverClaim}
+              />
+            )
           } />
           <Route path="/draft"          element={
-            <DraftRoom
-              league={lg}
-              members={league.members}
-              draftPicks={league.draftPicks}
-              teams={cfb.teams}
-              gameData={cfb.gameData}
-              teamRatings={cfb.teamRatings}
-              rankings={cfb.rankings}
-              userId={auth.user!.id}
-              isCommissioner={league.isCommissioner}
-              onStartDraft={league.startDraft}
-              onMakePick={league.makeDraftPick}
-            />
+            cfbInitialLoading ? <DraftRoomSkeleton /> : (
+              <DraftRoom
+                league={lg}
+                members={league.members}
+                draftPicks={league.draftPicks}
+                teams={cfb.teams}
+                gameData={cfb.gameData}
+                teamRatings={cfb.teamRatings}
+                rankings={cfb.rankings}
+                userId={auth.user!.id}
+                isCommissioner={league.isCommissioner}
+                onStartDraft={league.startDraft}
+                onMakePick={league.makeDraftPick}
+              />
+            )
           } />
           <Route path="/admin"          element={
             <AdminPanel

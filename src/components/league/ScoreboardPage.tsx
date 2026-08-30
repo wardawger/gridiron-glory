@@ -161,11 +161,11 @@ function MatchupCard({ row, teamsById, isMe, live }: { row: Row; teamsById: Map<
           teams and their scores line up in a consistent table-like grid
           rather than free-floating flex rows. */}
       <div className="rounded-lg border border-turf-800 divide-y divide-turf-800 overflow-hidden">
-        <div className="flex items-center gap-2 px-2.5 py-2">
+        <div className={`flex items-center gap-2 px-2.5 py-2 ${
+          displayResult === 'W' ? 'bg-field-900/30' : displayResult === 'L' ? 'bg-red-950/30' : ''
+        }`}>
           <TeamLogo src={team?.logo} alt={b.team_name} fallbackName={b.team_name} size={28} />
-          <span className={`text-sm font-medium truncate flex-1 min-w-0 ${
-            displayResult === 'W' ? 'text-field-400' : displayResult === 'L' ? 'text-red-300' : 'text-white'
-          }`}>
+          <span className="text-sm font-medium text-white truncate flex-1 min-w-0">
             {b.team_name}
           </span>
           {myTeamHasBall && (
