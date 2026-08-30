@@ -132,13 +132,15 @@ function MatchupCard({ row, teamsById, isMe, live }: { row: Row; teamsById: Map<
   const categories = activeCategories(displayResult, game.opponent_rank, game.is_g5_opponent);
 
   return (
-    <div className={`card p-4 space-y-3 ${isMe ? 'border-field-500/50 bg-field-950/10' : ''}`}>
+    <div className={`relative card p-4 space-y-3 ${isMe ? 'border-field-500/50 bg-field-950/10' : ''}`}>
       {b.is_captain && (
-        <div className="flex justify-end">
-          <span className="badge-gold text-xs">
-            <Star className="w-2.5 h-2.5 fill-current" /> Captain ×2
-          </span>
-        </div>
+        // Positioned out of normal flow so it doesn't push the score table
+        // below down — previously sat in its own row above the table,
+        // which meant a captained card's table started lower than its
+        // siblings' in the same grid row.
+        <span className="badge-gold text-xs absolute -top-2.5 right-3">
+          <Star className="w-2.5 h-2.5 fill-current" /> Captain ×2
+        </span>
       )}
 
       {/* Matchup — bordered, divided rows (ESPN-scorebug style) so the two
