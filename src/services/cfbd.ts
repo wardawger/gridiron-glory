@@ -381,14 +381,14 @@ export async function fetchSeasonStats(teams: CfbTeam[]): Promise<Map<string, Te
   const nameToId = new Map(teams.map(t => [t.name.toLowerCase(), t.id]));
   const map = new Map<string, TeamSeasonStats>();
 
-  const resolveId = (school: string): string | null => {
-    const exact = nameToId.get(school.toLowerCase());
-    if (exact) return exact;
-    for (const [name, id] of nameToId.entries()) {
-      if (name.includes(school.toLowerCase()) || school.toLowerCase().includes(name)) return id;
-    }
-    return null;
-  };
+  // Exact match only — a substring-containment fallback here previously
+  // matched any "<FBS team> State"-style FCS opponent onto the shorter FBS
+  // team's own id (confirmed live: a South Carolina State player's stats
+  // got attributed to South Carolina, since "South Carolina State".includes
+  // ("south carolina") is true). A team not in this app's own FBS list
+  // should resolve to nothing, not to whichever unrelated team's name
+  // happens to be a prefix of it.
+  const resolveId = (school: string): string | null => nameToId.get(school.toLowerCase()) ?? null;
 
   try {
     const [rushingRes, defensiveRes, playerRes] = await Promise.all([
@@ -497,14 +497,14 @@ export async function fetchTeamRatings(teams: CfbTeam[], gameData: GameData): Pr
   const nameToId = new Map(teams.map(t => [t.name.toLowerCase(), t.id]));
   const map = new Map<string, TeamRatings>();
 
-  const resolveId = (school: string): string | null => {
-    const exact = nameToId.get(school.toLowerCase());
-    if (exact) return exact;
-    for (const [name, id] of nameToId.entries()) {
-      if (name.includes(school.toLowerCase()) || school.toLowerCase().includes(name)) return id;
-    }
-    return null;
-  };
+  // Exact match only — a substring-containment fallback here previously
+  // matched any "<FBS team> State"-style FCS opponent onto the shorter FBS
+  // team's own id (confirmed live: a South Carolina State player's stats
+  // got attributed to South Carolina, since "South Carolina State".includes
+  // ("south carolina") is true). A team not in this app's own FBS list
+  // should resolve to nothing, not to whichever unrelated team's name
+  // happens to be a prefix of it.
+  const resolveId = (school: string): string | null => nameToId.get(school.toLowerCase()) ?? null;
 
   try {
     const [fpiRes, spRes] = await Promise.all([
