@@ -90,6 +90,17 @@ export default async (req) => {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'authorization, content-type',
+    // Netlify's own edge/CDN cache sits in front of this function and, by
+    // default, keys purely on URL (its `Vary` behavior doesn't account for
+    // the Authorization header) — so without an explicit directive here, a
+    // response cached at one edge node for one user's request can get
+    // served back to every other request hitting that same URL, completely
+    // bypassing the per-path TTL this proxy already enforces via Supabase
+    // (see ttlForPath). That silently pinned stale /scoreboard responses at
+    // some edge nodes far longer than its intended 20-second freshness
+    // window. Our own cache is the only one that should ever apply here.
+    'Cache-Control': 'no-store',
+    'Netlify-CDN-Cache-Control': 'no-store',
   };
 
   if (req.method === 'OPTIONS') {
