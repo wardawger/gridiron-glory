@@ -134,15 +134,29 @@ function MatchupCard({ row, teamsById, isMe, live }: { row: Row; teamsById: Map<
   // Shown next to "This week" rather than floating over the card — sitting
   // in its own row above the score table previously pushed a captained
   // card's table down relative to its non-captained siblings in the same
-  // grid row.
+  // grid row. text-amber-300 (vs. .badge-gold's own text-amber-400)
+  // brightens the pill's own text-on-fill contrast — scoped to this one
+  // instance rather than the shared .badge-gold class, since that class is
+  // reused as-is on Draft/Free Agency/Roster pages this critique didn't
+  // touch.
   const captainBadge = b.is_captain && (
-    <span className="badge-gold text-xs">
-      <Star className="w-2.5 h-2.5 fill-current" /> Captain ×2
+    <span className="badge-gold text-xs text-amber-300" aria-label="Captain, doubles points">
+      <Star className="w-2.5 h-2.5 fill-current" aria-hidden="true" /> Captain ×2
     </span>
   );
 
+  // Captain status gets the card-wide gold wash (mirrors RosterView's own
+  // captain treatment, giving the badge a "home" instead of being the only
+  // amber pixel on an otherwise green/red/gray card) and takes precedence
+  // over the plain "this is your team" green tint when a card is both.
+  const cardTint = b.is_captain
+    ? 'border-amber-800/50 bg-amber-950/20'
+    : isMe
+      ? 'border-field-500/50 bg-field-950/10'
+      : '';
+
   return (
-    <div className={`card p-4 space-y-3 ${isMe ? 'border-field-500/50 bg-field-950/10' : ''}`}>
+    <div className={`card p-4 space-y-3 ${cardTint}`}>
       {/* Matchup — bordered, divided rows (ESPN-scorebug style) so the two
           teams and their scores line up in a consistent table-like grid
           rather than free-floating flex rows. */}
@@ -152,7 +166,12 @@ function MatchupCard({ row, teamsById, isMe, live }: { row: Row; teamsById: Map<
           <span className="text-sm font-medium text-white truncate flex-1 min-w-0">
             {b.team_name}
           </span>
-          {myTeamHasBall && <FootballIcon className="w-3.5 h-3.5 text-field-400 flex-shrink-0" />}
+          {myTeamHasBall && (
+            <>
+              <FootballIcon className="w-3.5 h-3.5 text-field-400 flex-shrink-0" />
+              <span className="sr-only">Has possession</span>
+            </>
+          )}
           {showScore && (
             <span className="font-mono text-base font-bold text-white flex-shrink-0 w-6 text-right">
               {myScore}
@@ -164,7 +183,12 @@ function MatchupCard({ row, teamsById, isMe, live }: { row: Row; teamsById: Map<
           <span className="text-sm text-turf-400 truncate flex-1 min-w-0">
             {game.opponent_rank ? `#${game.opponent_rank} ` : ''}{game.opponent}
           </span>
-          {opponentHasBall && <FootballIcon className="w-3.5 h-3.5 text-field-400 flex-shrink-0" />}
+          {opponentHasBall && (
+            <>
+              <FootballIcon className="w-3.5 h-3.5 text-field-400 flex-shrink-0" />
+              <span className="sr-only">Has possession</span>
+            </>
+          )}
           {showScore && (
             <span className="font-mono text-base font-bold text-turf-500 flex-shrink-0 w-6 text-right">
               {oppScore}
@@ -175,10 +199,10 @@ function MatchupCard({ row, teamsById, isMe, live }: { row: Row; teamsById: Map<
 
       {/* Status */}
       {isLive ? (
-        <div className="text-xs pt-1 border-t border-turf-800 space-y-2">
+        <div className="text-xs pt-1 border-t border-turf-800 space-y-2" aria-live="polite" aria-atomic="true">
           <div className="flex flex-col items-center gap-0.5">
             <span className="flex items-center gap-1.5 font-medium text-field-400">
-              <span className="w-1.5 h-1.5 rounded-full bg-field-400 animate-pulse flex-shrink-0" />
+              <span className="w-1.5 h-1.5 rounded-full bg-field-400 animate-pulse flex-shrink-0" aria-hidden="true" />
               {ordinal(live!.period!)} &middot; {live!.clock}
             </span>
             {live!.situation && <span className="text-turf-500">{live!.situation}</span>}
