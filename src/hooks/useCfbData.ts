@@ -55,9 +55,18 @@ export function useCfbData(enabled = true): CfbState {
   useEffect(() => {
     if (!enabled) {
       // Not an error state and not perpetually "loading" — there's just
-      // nothing to fetch until someone signs in.
+      // nothing to fetch until someone signs in. Deliberately does NOT set
+      // hasLoadedOnce here (it used to, and that was a real bug): the only
+      // consumer of hasLoadedOnce (App.tsx's route gating) is never even
+      // mounted while `enabled` is false, since that only happens before
+      // auth.user exists at the very top of App(). But `enabled` can also
+      // flip false→true again later — e.g. a Supabase token-refresh event
+      // that leaves auth.user momentarily falsy — and marking hasLoadedOnce
+      // true here unconditionally meant that later flicker permanently
+      // "spent" the flag before a real fetch ever ran, leaving pages
+      // rendering against still-empty data indefinitely once the real load
+      // path resumed underneath it.
       setLoading(false);
-      setHasLoadedOnce(true);
       return;
     }
     let cancelled = false;
