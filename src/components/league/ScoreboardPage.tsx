@@ -404,21 +404,32 @@ export function ScoreboardPage({
                   }`}>
                     {weekPoints > 0 ? '+' : ''}{weekPoints}
                   </span>
-                  <ChevronDown className={`w-4 h-4 text-turf-500 flex-shrink-0 transition-transform ${isCollapsed ? '' : 'rotate-180'}`} />
+                  <ChevronDown className={`w-4 h-4 text-turf-500 flex-shrink-0 transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none ${isCollapsed ? '' : 'rotate-180'}`} />
                 </button>
 
-                {!isCollapsed && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 p-4 pt-0 border-t border-turf-800">
-                    {rows.map(row => {
-                      const game = row.breakdown.game!;
-                      const live = findLiveStatus(liveScoreboard, row.breakdown.team_name)
-                        ?? findLiveStatus(liveScoreboard, game.opponent);
-                      return (
-                        <MatchupCard key={row.breakdown.team_id} row={row} teamsById={teamsById} isMe={isMe} live={live} />
-                      );
-                    })}
+                {/* Grid-rows 0fr/1fr collapse trick — animates from a real
+                    (not hardcoded) content height without touching height
+                    directly, which layout-shifts on ordinary `height`
+                    transitions. Always rendered so the transition can play
+                    in both directions; overflow-hidden clips it at 0fr. */}
+                <div
+                  className={`grid transition-[grid-template-rows] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none ${
+                    isCollapsed ? 'grid-rows-[0fr]' : 'grid-rows-[1fr]'
+                  }`}
+                >
+                  <div className="overflow-hidden">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 p-4 pt-0 border-t border-turf-800">
+                      {rows.map(row => {
+                        const game = row.breakdown.game!;
+                        const live = findLiveStatus(liveScoreboard, row.breakdown.team_name)
+                          ?? findLiveStatus(liveScoreboard, game.opponent);
+                        return (
+                          <MatchupCard key={row.breakdown.team_id} row={row} teamsById={teamsById} isMe={isMe} live={live} />
+                        );
+                      })}
+                    </div>
                   </div>
-                )}
+                </div>
               </div>
             );
           })}
