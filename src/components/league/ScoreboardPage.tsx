@@ -46,6 +46,25 @@ function ordinal(period: number): string {
   return ['', '1st', '2nd', '3rd', '4th'][period] ?? `${period}th`;
 }
 
+// Possession indicator — a small football rather than a plain dot, per
+// request. Uses only currentColor (set via the caller's text-* class) plus
+// the existing turf-950 token for the laces, so no new palette is added.
+function FootballIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" className={className} aria-hidden="true">
+      <g transform="rotate(-40 8 8)">
+        <ellipse cx="8" cy="8" rx="7" ry="4" fill="currentColor" />
+        <g className="text-turf-950" stroke="currentColor" strokeWidth="0.6" strokeLinecap="round">
+          <line x1="4.5" y1="8" x2="11.5" y2="8" />
+          <line x1="6" y1="6.8" x2="6" y2="9.2" />
+          <line x1="8" y1="6.8" x2="8" y2="9.2" />
+          <line x1="10" y1="6.8" x2="10" y2="9.2" />
+        </g>
+      </g>
+    </svg>
+  );
+}
+
 // Qualifying scoring categories for this game — shown as pills rather than
 // exact per-line point values, since a captain's ×2 multiplier and any
 // spread points would otherwise make reconstructing each line's individual
@@ -93,16 +112,22 @@ function MatchupCard({ row, teamsById, isMe, live }: { row: Row; teamsById: Map<
   // this only fixes what's displayed.
   const justFinished = !game.completed && live?.status === 'completed'
     && live.home_points != null && live.away_points != null;
+  // While in-progress, the running score comes from the live endpoint too —
+  // game.home_score/away_score (from /games) stay null until the game is
+  // fully final.
+  const liveMyPoints = isHome ? live?.home_points ?? null : live?.away_points ?? null;
+  const liveOppPoints = isHome ? live?.away_points ?? null : live?.home_points ?? null;
   const myScore = game.completed
     ? (isHome ? game.home_score : game.away_score)
-    : (justFinished ? (isHome ? live!.home_points : live!.away_points) : null);
+    : ((justFinished || isLive) ? liveMyPoints : null);
   const oppScore = game.completed
     ? (isHome ? game.away_score : game.home_score)
-    : (justFinished ? (isHome ? live!.away_points : live!.home_points) : null);
+    : ((justFinished || isLive) ? liveOppPoints : null);
   const liveResult: 'W' | 'L' | null = justFinished && myScore != null && oppScore != null
     ? (myScore > oppScore ? 'W' : 'L')
     : null;
   const showFinal = game.completed || justFinished;
+  const showScore = showFinal || isLive;
   const displayResult = game.completed ? game.result : liveResult;
   const categories = activeCategories(displayResult, game.opponent_rank, game.is_g5_opponent);
 
@@ -122,10 +147,10 @@ function MatchupCard({ row, teamsById, isMe, live }: { row: Row; teamsById: Map<
         <div className="flex items-center gap-2">
           <TeamLogo src={team?.logo} alt={b.team_name} fallbackName={b.team_name} size={28} />
           <span className="text-sm font-medium text-white truncate flex-1 min-w-0 flex items-center gap-1.5">
-            {myTeamHasBall && <span className="w-1.5 h-1.5 rounded-full bg-field-400 flex-shrink-0" aria-label="Has possession" />}
             {b.team_name}
+            {myTeamHasBall && <FootballIcon className="w-3 h-3 text-field-400 flex-shrink-0" />}
           </span>
-          {showFinal && (
+          {showScore && (
             <span className="font-mono text-base font-bold text-white flex-shrink-0">
               {myScore}
             </span>
@@ -134,10 +159,10 @@ function MatchupCard({ row, teamsById, isMe, live }: { row: Row; teamsById: Map<
         <div className="flex items-center gap-2">
           <TeamLogo src={game.opponent_logo} alt={game.opponent} fallbackName={game.opponent} size={28} />
           <span className="text-sm text-turf-400 truncate flex-1 min-w-0 flex items-center gap-1.5">
-            {opponentHasBall && <span className="w-1.5 h-1.5 rounded-full bg-field-400 flex-shrink-0" aria-label="Has possession" />}
             {game.opponent_rank ? `#${game.opponent_rank} ` : ''}{game.opponent}
+            {opponentHasBall && <FootballIcon className="w-3 h-3 text-field-400 flex-shrink-0" />}
           </span>
-          {showFinal && (
+          {showScore && (
             <span className="font-mono text-base font-bold text-turf-500 flex-shrink-0">
               {oppScore}
             </span>
