@@ -93,20 +93,28 @@ function AnimatedRoutes({ lg, league, auth, cfb }: AnimatedRoutesProps) {
     if (routeTimeout.current) clearTimeout(routeTimeout.current);
   }, []);
 
-  // True only during the very first cfb data fetch, never on the 30-minute
-  // auto-refresh or a manual Refresh click (both also set cfb.loading, but
-  // by then cfb.teams is already populated) — gating a full skeleton swap
-  // on cfb.loading alone would flash it over perfectly good on-screen data
-  // every 30 minutes. Pages whose content is entirely derived from cfb data
-  // (teams/gameData/rankings/etc.) render a real "0 results" state when
-  // that data is still empty, indistinguishable from a genuine empty state
-  // (e.g. Scoreboard's "No active teams have a game this week", Stat
+  // True only until the very first cfb data fetch has fully finished, never
+  // again afterward — not equivalent to `cfb.loading && cfb.teams.length
+  // === 0`, which was the original version of this check and had a real
+  // gap: teams resolves and gets set well before gameData does (they're
+  // sequential fetches inside the hook, not parallel), so there's a window
+  // where teams.length > 0 but gameData is still {}. Gating on teams.length
+  // alone treated that window as "loaded" and let pages render real UI
+  // against still-empty game data — the exact bug this was meant to fix,
+  // just moved earlier. cfb.hasLoadedOnce is a dedicated flag set once,
+  // after the whole first load (including gameData) completes, and never
+  // reset — so later 30-minute auto-refreshes/manual Refresh clicks (which
+  // do flip cfb.loading again) never re-trigger this skeleton over data
+  // that's already on screen. Pages whose content is entirely derived from
+  // cfb data (teams/gameData/rankings/etc.) render a real "0 results" state
+  // when that data is still empty, indistinguishable from a genuine empty
+  // state (e.g. Scoreboard's "No active teams have a game this week", Stat
   // Bonuses' "No season stats available yet") — this swaps in the route's
   // own skeleton for that window instead. HomePage is the one exception:
   // it already takes a `cfbLoading` prop and shows an inline "loading live
   // game data" banner without blanking the page, since its leaderboard has
   // real member entries regardless of cfb data readiness.
-  const cfbInitialLoading = cfb.loading && cfb.teams.length === 0;
+  const cfbInitialLoading = !cfb.hasLoadedOnce;
 
   return (
     <div className={routeExiting ? 'animate-content-fade-out' : 'animate-content-fade-in'}>

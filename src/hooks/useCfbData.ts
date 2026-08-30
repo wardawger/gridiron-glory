@@ -17,6 +17,16 @@ interface CfbState {
   // spreadData[week] = map of teamId → locked spread (null if no line)
   spreadData: Record<number, SpreadData>;
   loading: boolean;
+  // True once the very first load attempt (success or failure) has
+  // finished, and never reset to false afterward — unlike `loading`, which
+  // flips true again on every 30-minute auto-refresh/manual Refresh click.
+  // `teams.length > 0` looks like a same-purpose check but isn't one:
+  // teams resolves and is set well before gameData (they're sequential
+  // fetches, not parallel), so there's a real window where teams is
+  // populated but gameData is still {} — a consumer gating on teams.length
+  // alone would treat that window as "loaded" and render real UI against
+  // still-empty game data.
+  hasLoadedOnce: boolean;
   error: string | null;
   refresh: () => void;
   refreshSpreads: (week: number) => Promise<void>;
@@ -38,6 +48,7 @@ export function useCfbData(enabled = true): CfbState {
   const [teamRatings, setTeamRatings] = useState<Map<string, TeamRatings>>(new Map());
   const [spreadData, setSpreadData]   = useState<Record<number, SpreadData>>({});
   const [loading, setLoading]         = useState(true);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [error, setError]             = useState<string | null>(null);
   const [tick, setTick]               = useState(0);
 
@@ -46,6 +57,7 @@ export function useCfbData(enabled = true): CfbState {
       // Not an error state and not perpetually "loading" — there's just
       // nothing to fetch until someone signs in.
       setLoading(false);
+      setHasLoadedOnce(true);
       return;
     }
     let cancelled = false;
@@ -91,7 +103,10 @@ export function useCfbData(enabled = true): CfbState {
       } catch (e: any) {
         if (!cancelled) setError(e.message ?? 'Failed to load CFB data');
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+          setHasLoadedOnce(true);
+        }
       }
     }
     load();
@@ -119,7 +134,7 @@ export function useCfbData(enabled = true): CfbState {
 
   return {
     teams, gameData, rankings, records, seasonStats, teamRatings, spreadData,
-    loading, error,
+    loading, hasLoadedOnce, error,
     refresh: () => setTick(t => t + 1),
     refreshSpreads,
   };
