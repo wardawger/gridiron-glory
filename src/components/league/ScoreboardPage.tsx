@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react';
-import { LayoutGrid, ChevronDown } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { LayoutGrid, ChevronDown, Star, Search } from 'lucide-react';
 import type {
-  League, LeagueMember, DraftPick, CaptainPick, GameData, SpreadPick, FreeAgencyMove,
+  League, LeagueMember, DraftPick, CaptainPick, GameData, SpreadData, SpreadPick, FreeAgencyMove,
   ScoreCorrection, BenchPick, APRanking, CfbTeam, ScoreBreakdown, LiveGameStatus,
 } from '../../types';
 import { normalizeScoring } from '../../types';
@@ -19,6 +19,7 @@ interface Props {
   draftPicks: DraftPick[];
   captainPicks: CaptainPick[];
   gameData: GameData;
+  spreadData: Record<number, SpreadData>;
   spreadPicks: SpreadPick[];
   freeAgencyMoves: FreeAgencyMove[];
   scoreCorrections: ScoreCorrection[];
@@ -26,6 +27,16 @@ interface Props {
   rankings: APRanking[];
   teams: CfbTeam[];
   currentUserId: string;
+  onRefreshSpreads: (week: number) => Promise<void>;
+}
+
+// Same "+3.5" / "-7" / "EVEN" formatting as GameScoreModal's own local
+// helper — intentionally duplicated (small pure function, no new
+// cross-file coupling) rather than shared.
+function formatSpread(spread: number | null | undefined): string {
+  if (spread == null) return '';
+  if (spread === 0) return 'EVEN';
+  return spread > 0 ? `+${spread}` : `${spread}`;
 }
 
 // A row is one rostered team's week — the same shape calcWeeklyScore has
@@ -159,15 +170,19 @@ interface CardLine {
   rank: number | null;
   ownerLabel: string | null;
   score: number | null;
+  spread: number | null;
   hasBall: boolean;
+  isCaptain: boolean;
   row: Row | null;
 }
 
 function GameCardView({
-  card, teamsById, onDetails,
+  card, teamsById, rankByTeamId, weekSpread, onDetails,
 }: {
   card: GameCard;
   teamsById: Map<string, CfbTeam>;
+  rankByTeamId: Map<string, number>;
+  weekSpread: SpreadData | undefined;
   onDetails: (row: Row) => void;
 }) {
   const primary = card.rows[0];
@@ -182,10 +197,12 @@ function GameCardView({
         key: r.breakdown.team_id,
         teamName: r.breakdown.team_name,
         logo: teamsById.get(r.breakdown.team_id)?.logo,
-        rank: null,
+        rank: rankByTeamId.get(r.breakdown.team_id) ?? null,
         ownerLabel: `${r.member.display_name}'s team`,
         score: r.myScore,
+        spread: weekSpread?.[r.breakdown.team_id] ?? null,
         hasBall: isLive && teamNameMatches(r.live?.possession ?? null, r.breakdown.team_name),
+        isCaptain: r.breakdown.is_captain,
         row: r,
       }))
     : [
@@ -193,20 +210,24 @@ function GameCardView({
           key: primary.breakdown.team_id,
           teamName: primary.breakdown.team_name,
           logo: teamsById.get(primary.breakdown.team_id)?.logo,
-          rank: null,
+          rank: rankByTeamId.get(primary.breakdown.team_id) ?? null,
           ownerLabel: `${primary.member.display_name}'s team`,
           score: primary.myScore,
+          spread: weekSpread?.[primary.breakdown.team_id] ?? null,
           hasBall: isLive && teamNameMatches(live?.possession ?? null, primary.breakdown.team_name),
+          isCaptain: primary.breakdown.is_captain,
           row: primary,
         },
         {
           key: 'opponent',
           teamName: game.opponent,
           logo: game.opponent_logo,
-          rank: game.opponent_rank,
+          rank: rankByTeamId.get(game.opponent_id) ?? game.opponent_rank,
           ownerLabel: null,
           score: primary.oppScore,
+          spread: weekSpread?.[game.opponent_id] ?? null,
           hasBall: isLive && teamNameMatches(live?.possession ?? null, game.opponent),
+          isCaptain: false,
           row: null,
         },
       ];
@@ -267,6 +288,12 @@ function GameCardView({
                 <span className="text-sm font-medium text-white truncate">
                   {line.rank ? `#${line.rank} ` : ''}{line.teamName}
                 </span>
+                {line.isCaptain && (
+                  <>
+                    <Star className="w-3 h-3 text-gold-400 fill-current flex-shrink-0" />
+                    <span className="sr-only">Captain</span>
+                  </>
+                )}
                 {line.hasBall && (
                   <>
                     <FootballIcon className="w-3.5 h-3.5 text-field-400 flex-shrink-0" />
@@ -275,11 +302,15 @@ function GameCardView({
                 )}
               </div>
             </div>
-            {showScore && (
+            {showScore ? (
               <span className={`font-mono text-sm font-bold flex-shrink-0 ${
                 winnerIdx === -1 ? 'text-white' : i === winnerIdx ? 'text-field-400' : 'text-turf-500'
               }`}>
                 {line.score}
+              </span>
+            ) : line.spread != null && (
+              <span className="font-mono text-sm font-medium text-turf-400 flex-shrink-0">
+                {formatSpread(line.spread)}
               </span>
             )}
           </div>
@@ -292,17 +323,30 @@ function GameCardView({
 }
 
 export function ScoreboardPage({
-  league, members, draftPicks, captainPicks, gameData, spreadPicks, freeAgencyMoves,
-  scoreCorrections, benchPicks, rankings, teams, currentUserId,
+  league, members, draftPicks, captainPicks, gameData, spreadData, spreadPicks, freeAgencyMoves,
+  scoreCorrections, benchPicks, rankings, teams, currentUserId, onRefreshSpreads,
 }: Props) {
   const scoring = normalizeScoring(league.scoring);
   const week = league.current_week;
   const teamsById = useMemo(() => new Map(teams.map(t => [t.id, t])), [teams]);
+  const rankByTeamId = useMemo(
+    () => new Map(rankings.filter(r => r.team_id).map(r => [r.team_id!, r.rank])),
+    [rankings]
+  );
   const [tickerCollapsed, setTickerCollapsed] = useState(false);
   const [modalRow, setModalRow] = useState<Row | null>(null);
   // Live polling only runs while this page is mounted (see useLiveScoreboard) —
   // scoped here rather than in the app-wide 30-minute CFBD refresh cycle.
   const liveScoreboard = useLiveScoreboard(true);
+
+  // Same auto-fetch-once-per-week pattern as RosterView — spreads are
+  // fetched on demand rather than baked into the app-wide load cycle.
+  useEffect(() => {
+    if (!scoring.spread_enabled) return;
+    if (spreadData[week] !== undefined) return;
+    onRefreshSpreads(week);
+  }, [scoring.spread_enabled, week, spreadData, onRefreshSpreads]);
+  const weekSpread = spreadData[week];
 
   // One row per active (non-benched) rostered team that has a game this
   // week — bye-week teams and benched teams are excluded entirely, per the
@@ -323,7 +367,7 @@ export function ScoreboardPage({
         const spreadPick = spreadPicks.find(
           p => p.user_id === member.user_id && p.week === week && p.team_id === b.team_id
         ) ?? null;
-        const live = findLiveStatus(liveScoreboard, b.team_name) ?? findLiveStatus(liveScoreboard, b.game!.opponent);
+        const live = findLiveStatus(liveScoreboard, b.team_name, b.game!.opponent);
         const liveState = resolveRowLiveState(b, live);
         rows.push({ member, breakdown: b, spreadPick, live, ...liveState });
       });
@@ -393,6 +437,21 @@ export function ScoreboardPage({
     const max = Math.max(...times);
     return min === max ? fmt(min) : `${fmt(min)} – ${fmt(max)}`;
   }, [matchups]);
+
+  // Filters the card grid only — the ticker keeps showing every manager's
+  // total regardless of search, since it's a standings summary, not a
+  // per-game list.
+  const [search, setSearch] = useState('');
+  const filteredCards = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return cards;
+    return cards.filter(card => {
+      const names = card.rows.length === 2
+        ? card.rows.map(r => r.breakdown.team_name)
+        : [card.rows[0].breakdown.team_name, card.rows[0].breakdown.game!.opponent];
+      return names.some(n => n.toLowerCase().includes(q));
+    });
+  }, [cards, search]);
 
   return (
     <div className="space-y-5 animate-fade-in">
@@ -487,11 +546,25 @@ export function ScoreboardPage({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-            {cards.map(card => (
-              <GameCardView key={card.key} card={card} teamsById={teamsById} onDetails={setModalRow} />
-            ))}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-turf-500" />
+            <input
+              className="input pl-9"
+              placeholder="Search teams…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
           </div>
+
+          {filteredCards.length === 0 ? (
+            <div className="card p-8 text-center text-turf-500 text-sm">No teams match your search.</div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+              {filteredCards.map(card => (
+                <GameCardView key={card.key} card={card} teamsById={teamsById} rankByTeamId={rankByTeamId} weekSpread={weekSpread} onDetails={setModalRow} />
+              ))}
+            </div>
+          )}
         </>
       )}
     </div>

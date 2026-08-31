@@ -1,7 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { Trophy, Users, Shield, BarChart3, LogOut, RefreshCw, Zap, ChevronDown, Plus, History, ArrowLeftRight, Award, Info, ClipboardList, Archive, Menu, X, LayoutGrid } from 'lucide-react';
 import { useState, useRef, useEffect, useMemo } from 'react';
-import type { League, LeagueMember, WaiverClaim } from '../../types';
+import type { League, LeagueMember, WaiverClaim, GameData } from '../../types';
 import { Avatar } from '../ui/Avatar';
 import { getSeenWaiverClaimIds } from '../../lib/waiverSeen';
 
@@ -12,6 +12,7 @@ interface Props {
   displayName: string | undefined;
   userId: string;
   waiverClaims: WaiverClaim[];
+  gameData: GameData;
   onSignOut: () => void;
   onRefresh: () => void;
   isRefreshing: boolean;
@@ -27,8 +28,24 @@ function CountBadge({ count, className = '' }: { count: number; className?: stri
   );
 }
 
+// Pulsing green dot — same "something's live right now" language as the
+// Scoreboard page's own in-progress badge, reused here so the cue reads
+// consistently wherever it shows up.
+function LiveDot({ className = '' }: { className?: string }) {
+  return <span className={`w-1.5 h-1.5 rounded-full bg-field-400 animate-pulse flex-shrink-0 ${className}`} aria-hidden="true" />;
+}
+
+// A game is presumed live once its kickoff has passed and it hasn't been
+// marked completed, for up to ~4.5 hours (covers a normal game plus OT/
+// weather delays) — a lightweight heuristic from schedule data the app
+// already has loaded, rather than polling CFBD's separate rate-limited
+// live endpoint app-wide (that endpoint is deliberately scoped to only run
+// while the Scoreboard page itself is open — see useLiveScoreboard) just to
+// light a nav dot.
+const LIVE_WINDOW_MS = 4.5 * 60 * 60 * 1000;
+
 export function Header({
-  league, allLeagues, myMembership, displayName, userId, waiverClaims,
+  league, allLeagues, myMembership, displayName, userId, waiverClaims, gameData,
   onSignOut, onRefresh, isRefreshing, onSwitchLeague,
 }: Props) {
   const loc = useLocation();
@@ -40,6 +57,26 @@ export function Header({
     const seenIds = getSeenWaiverClaimIds(league.id, userId);
     return waiverClaims.filter(c => c.user_id === userId && c.status !== 'pending' && !seenIds.has(c.id)).length;
   }, [league?.id, userId, waiverClaims, loc.pathname]);
+
+  // Ticks once a minute so `anyGameLive` below stays fresh without needing
+  // per-second precision — this is a nav-dot hint, not a live scoreboard.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const anyGameLive = useMemo(() => {
+    if (!league) return false;
+    const week = league.current_week;
+    for (const teamGames of Object.values(gameData)) {
+      const game = teamGames[week];
+      if (!game || game.completed || !game.start_date) continue;
+      const kickoff = new Date(game.start_date).getTime();
+      if (now >= kickoff && now - kickoff <= LIVE_WINDOW_MS) return true;
+    }
+    return false;
+  }, [gameData, league, now]);
   const [showLeaguePicker, setShowLeaguePicker] = useState(false);
   const [showLeagueInfo, setShowLeagueInfo] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
@@ -82,8 +119,8 @@ export function Header({
       : []),
   ];
 
-  const leagueInfoItems: { to: string; label: string; icon: any; description: string; badge?: number }[] = [
-    { to: '/scoreboard', label: 'Scoreboard', icon: LayoutGrid, description: "This week's matchups" },
+  const leagueInfoItems: { to: string; label: string; icon: any; description: string; badge?: number; live?: boolean }[] = [
+    { to: '/scoreboard', label: 'Scoreboard', icon: LayoutGrid, description: "This week's matchups", live: anyGameLive },
     { to: '/draft-recap', label: 'Draft Recap', icon: History, description: 'Every pick, in order' },
     ...(league?.scoring.stat_bonus_enabled
       ? [{ to: '/stat-bonuses', label: 'Stat Bonuses', icon: Award, description: "Who's earning bonus points" }]
@@ -190,12 +227,13 @@ export function Header({
                 <Info className="w-3.5 h-3.5" />
                 League Info
                 <CountBadge count={unseenWaiverCount} />
+                {anyGameLive && <LiveDot />}
                 <ChevronDown className={`w-3 h-3 transition-transform ${showLeagueInfo ? 'rotate-180' : ''}`} />
               </button>
 
               {showLeagueInfo && (
                 <div className="absolute top-full left-0 mt-1 w-60 card shadow-xl shadow-black/40 overflow-hidden animate-slide-up z-50 p-1.5">
-                  {leagueInfoItems.map(({ to, label, icon: Icon, description, badge }) => {
+                  {leagueInfoItems.map(({ to, label, icon: Icon, description, badge, live }) => {
                     const active = loc.pathname === to;
                     return (
                       <Link
@@ -212,6 +250,7 @@ export function Header({
                         <div className="min-w-0 flex-1">
                           <div className="font-medium flex items-center gap-1.5">
                             {label}
+                            {live && <LiveDot />}
                             <CountBadge count={badge ?? 0} />
                           </div>
                           <div className="text-xs text-turf-500 truncate">{description}</div>
@@ -283,13 +322,16 @@ export function Header({
               >
                 {showMobileMenu ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
                 {!showMobileMenu && (
-                  <CountBadge count={unseenWaiverCount} className="absolute -top-1 -right-1" />
+                  <>
+                    <CountBadge count={unseenWaiverCount} className="absolute -top-1 -right-1" />
+                    {anyGameLive && unseenWaiverCount <= 0 && <LiveDot className="absolute -top-0.5 -right-0.5" />}
+                  </>
                 )}
               </button>
 
               {showMobileMenu && (
                 <div className="absolute top-full right-0 mt-1 w-64 card shadow-xl shadow-black/40 overflow-hidden animate-slide-up z-50 p-1.5 max-h-[70vh] overflow-y-auto">
-                  {[...nav.slice(0, 3), ...leagueInfoItems, ...nav.slice(3)].map(({ to, label, icon: Icon, description, badge }: any) => {
+                  {[...nav.slice(0, 3), ...leagueInfoItems, ...nav.slice(3)].map(({ to, label, icon: Icon, description, badge, live }: any) => {
                     const active = loc.pathname === to;
                     return (
                       <Link
@@ -306,6 +348,7 @@ export function Header({
                         <div className="min-w-0 flex-1">
                           <div className="font-medium flex items-center gap-1.5">
                             {label}
+                            {live && <LiveDot />}
                             <CountBadge count={badge ?? 0} />
                           </div>
                           {description && (

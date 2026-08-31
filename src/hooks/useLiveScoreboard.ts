@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { LiveGameStatus } from '../types';
-import { fetchScoreboard } from '../services/cfbd';
+import { fetchScoreboard, type LiveScoreboardEntry } from '../services/cfbd';
 
 const POLL_MS = 20_000;
 
@@ -8,10 +7,11 @@ const POLL_MS = 20_000;
 // useCfbData's 30-minute background cycle, this hits CFBD's live endpoint
 // on a much faster interval, so it stays scoped to the one page that
 // actually needs it rather than running for every signed-in user all the
-// time. Returns a Map keyed by lowercased team name; empty outside live
+// time. Returns a Map keyed by lowercased team name to that team's entries
+// (usually one, but can be more — see fetchScoreboard); empty outside live
 // windows (CFBD's /scoreboard only returns in-progress games).
-export function useLiveScoreboard(enabled: boolean): Map<string, LiveGameStatus> {
-  const [scoreboard, setScoreboard] = useState<Map<string, LiveGameStatus>>(new Map());
+export function useLiveScoreboard(enabled: boolean): Map<string, LiveScoreboardEntry[]> {
+  const [scoreboard, setScoreboard] = useState<Map<string, LiveScoreboardEntry[]>>(new Map());
 
   useEffect(() => {
     if (!enabled) return;

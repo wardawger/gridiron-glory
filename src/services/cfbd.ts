@@ -660,15 +660,24 @@ function statusPriority(status: string): number {
   return status === 'in_progress' ? 2 : status === 'completed' ? 1 : 0;
 }
 
-function setIfHigherPriority(map: Map<string, LiveGameStatus>, key: string, status: LiveGameStatus): void {
-  const existing = map.get(key);
-  if (!existing || statusPriority(status.status) >= statusPriority(existing.status)) {
-    map.set(key, status);
-  }
+// A team can legitimately appear more than once in a single /scoreboard
+// response — e.g. during the Week 0/Week 1 overlap in late August, a team's
+// just-finished opener and its upcoming Week 1 game are both present at
+// once. Each entry carries the opponent's name so callers can pick the
+// entry for the specific game they're rendering, rather than collapsing to
+// one entry per team and risking a finished game's score leaking onto an
+// unrelated, not-yet-played matchup against a different opponent.
+export interface LiveScoreboardEntry extends LiveGameStatus {
+  opponentName: string;
 }
 
-export async function fetchScoreboard(): Promise<Map<string, LiveGameStatus>> {
-  const map = new Map<string, LiveGameStatus>();
+function addEntry(map: Map<string, LiveScoreboardEntry[]>, key: string, entry: LiveScoreboardEntry): void {
+  const list = map.get(key);
+  if (list) list.push(entry); else map.set(key, [entry]);
+}
+
+export async function fetchScoreboard(): Promise<Map<string, LiveScoreboardEntry[]>> {
+  const map = new Map<string, LiveScoreboardEntry[]>();
   try {
     // `classification` defaults to 'fbs' server-side even when omitted, and
     // CFBD has no single value covering both fbs+fcs — so a drafted FBS
@@ -706,14 +715,12 @@ export async function fetchScoreboard(): Promise<Map<string, LiveGameStatus>> {
       };
 
       // /scoreboard returns every game for the classification, not just
-      // today's — a team already listed for its NEXT week's game (still
-      // 'scheduled') collides on the same map key as its live game today.
-      // Without a priority check, whichever entry happens to come later in
-      // the array wins, which silently overwrote real in_progress/completed
-      // status with a future 'scheduled' placeholder. in_progress always
-      // wins, then completed, then scheduled.
-      if (homeName) setIfHigherPriority(map, homeName.toLowerCase(), status);
-      if (awayName) setIfHigherPriority(map, awayName.toLowerCase(), status);
+      // today's — a team can be listed more than once at once (its
+      // just-finished game and its next game), so every entry is kept
+      // rather than collapsed to one per team; findLiveStatus below
+      // disambiguates by opponent name.
+      if (homeName) addEntry(map, homeName.toLowerCase(), { ...status, opponentName: awayName ?? '' });
+      if (awayName) addEntry(map, awayName.toLowerCase(), { ...status, opponentName: homeName ?? '' });
     }
   } catch (e) {
     console.warn('[CFBD] fetchScoreboard failed:', e);
@@ -724,13 +731,24 @@ export async function fetchScoreboard(): Promise<Map<string, LiveGameStatus>> {
 // fetchScoreboard's map is keyed by full mascot name ("Florida State
 // Seminoles"), but this app's own team names are school-only ("Florida
 // State") — a school name is always a prefix of its mascot name, so match
-// on that instead of exact equality.
-export function findLiveStatus(live: Map<string, LiveGameStatus>, teamName: string): LiveGameStatus | null {
+// on that instead of exact equality. `opponentName` (also school-only) is
+// required to pick the right game when a team has more than one entry in
+// the map at once — without it, a team's already-finished prior game could
+// otherwise win over its real upcoming game via statusPriority.
+export function findLiveStatus(
+  live: Map<string, LiveScoreboardEntry[]>, teamName: string, opponentName: string
+): LiveGameStatus | null {
   const needle = teamName.toLowerCase();
-  for (const [key, status] of live) {
-    if (key.startsWith(needle)) return status;
+  const oppNeedle = opponentName.toLowerCase();
+  let best: LiveScoreboardEntry | null = null;
+  for (const [key, entries] of live) {
+    if (!key.startsWith(needle)) continue;
+    for (const entry of entries) {
+      if (!entry.opponentName.toLowerCase().startsWith(oppNeedle)) continue;
+      if (!best || statusPriority(entry.status) > statusPriority(best.status)) best = entry;
+    }
   }
-  return null;
+  return best;
 }
 
 // Same prefix relationship applies to a resolved possession team name

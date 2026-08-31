@@ -190,6 +190,7 @@ function AnimatedRoutes({ lg, league, auth, cfb }: AnimatedRoutesProps) {
                 draftPicks={league.draftPicks}
                 captainPicks={league.captainPicks}
                 gameData={cfb.gameData}
+                spreadData={cfb.spreadData}
                 spreadPicks={league.spreadPicks}
                 freeAgencyMoves={league.freeAgencyMoves}
                 scoreCorrections={league.scoreCorrections}
@@ -197,6 +198,7 @@ function AnimatedRoutes({ lg, league, auth, cfb }: AnimatedRoutesProps) {
                 rankings={cfb.rankings}
                 teams={cfb.teams}
                 currentUserId={auth.user!.id}
+                onRefreshSpreads={cfb.refreshSpreads}
               />
             )
           } />
@@ -418,6 +420,7 @@ export default function App() {
           displayName={auth.displayName}
           userId={auth.user.id}
           waiverClaims={league.waiverClaims}
+          gameData={cfb.gameData}
           onSignOut={auth.signOut}
           onRefresh={cfb.refresh}
           isRefreshing={cfb.loading}
