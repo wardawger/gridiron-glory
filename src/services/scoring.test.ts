@@ -12,6 +12,7 @@ function makeGame(overrides: Partial<GameResult> = {}): GameResult {
     opponent_id: 'opp-1',
     opponent_rank: null,
     opponent_logo: null,
+    opponent_color: null,
     result: 'W',
     is_g5_opponent: false,
     home_score: 30,

@@ -491,6 +491,7 @@ export interface GameResult {
   opponent_id: string;
   opponent_rank: number | null;
   opponent_logo: string | null;
+  opponent_color: string | null;
   result: 'W' | 'L' | null;
   is_g5_opponent: boolean;
   home_score: number | null;

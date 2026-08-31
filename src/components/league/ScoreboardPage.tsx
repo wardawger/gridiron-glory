@@ -225,7 +225,7 @@ function GameCardView({
           key: 'opponent',
           teamName: game.opponent,
           logo: game.opponent_logo,
-          color: teamsById.get(game.opponent_id)?.color,
+          color: teamsById.get(game.opponent_id)?.color ?? game.opponent_color,
           rank: rankByTeamId.get(game.opponent_id) ?? game.opponent_rank,
           ownerLabel: null,
           score: primary.oppScore,

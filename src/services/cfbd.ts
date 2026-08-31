@@ -147,11 +147,18 @@ export async function fetchSeasonData(teams: CfbTeam[]): Promise<GameData> {
     return entry?.rank ?? null;
   };
 
-  // Build a name→logo map from the FBS teams list for opponent logo lookup
+  // Build a name→{logo,color} map from the FBS teams list for opponent
+  // lookup, below.
   const teamNameToLogo = new Map(teams.map(t => [t.name, t.logo]));
+  const teamNameToColor = new Map(teams.map(t => [t.name, t.color]));
 
-  // Fetch games, media (TV), venues, and weather in parallel
-  const [regGames, postGames, mediaRaw, venuesRaw, weatherRaw] = await Promise.all([
+  // Fetch games, media (TV), venues, weather, and every team CFBD knows
+  // about (not just FBS) in parallel — a drafted FBS team's opponent is
+  // frequently an FCS "buy game" (e.g. Bethune-Cookman, Arkansas-Pine
+  // Bluff), which never appears in the FBS-only `teams` list above, so
+  // those opponents had no logo/color source at all without this. `/teams`
+  // with no classification filter returns every division for the year.
+  const [regGames, postGames, mediaRaw, venuesRaw, weatherRaw, allTeamsRaw] = await Promise.all([
     fetchGames(year, 'regular'),
     fetchGames(year, 'postseason'),
     cfbdFetch('/games/media', { year, seasonType: 'regular' })
@@ -162,7 +169,21 @@ export async function fetchSeasonData(teams: CfbTeam[]): Promise<GameData> {
     // future games simply won't have an entry here yet, which is expected.
     cfbdFetch('/games/weather', { year, seasonType: 'regular' })
       .then(r => r.ok ? r.json() : []).catch(() => []),
+    cfbdFetch('/teams', { year })
+      .then(r => r.ok ? r.json() : []).catch(() => []),
   ]);
+
+  // Fallback source for opponent logo/color when the opponent isn't in the
+  // FBS-only teams list above (FCS and lower-division opponents).
+  if (Array.isArray(allTeamsRaw)) {
+    for (const t of allTeamsRaw) {
+      const name = t.school;
+      if (!name || teamNameToLogo.has(name)) continue; // FBS entry already wins
+      const logo = t.logos?.[0] ?? null;
+      if (logo) teamNameToLogo.set(name, logo);
+      if (t.color) teamNameToColor.set(name, t.color);
+    }
+  }
 
   // Build gameId → TV outlet map
   const mediaMap = new Map<string, string>();
@@ -258,12 +279,14 @@ export async function fetchSeasonData(teams: CfbTeam[]): Promise<GameData> {
       const oppRank    = getRankAtWeek(awayTeam, week);
       const isG5Opp    = away ? away.is_g5 : !P4_CONFERENCES.has(awayConference);
       const oppLogo    = away?.logo ?? teamNameToLogo.get(awayTeam) ?? null;
+      const oppColor   = away?.color ?? teamNameToColor.get(awayTeam) ?? null;
       const oppId      = awayId;
       gameData[home.id][week] = {
         week,
         opponent:        awayTeam,
         opponent_id:     oppId,
         opponent_logo:   oppLogo,
+        opponent_color:  oppColor,
         opponent_rank:   oppRank,
         result:          completed ? (homePoints > awayPoints ? 'W' : 'L') : null,
         is_g5_opponent:  isG5Opp,
@@ -286,12 +309,14 @@ export async function fetchSeasonData(teams: CfbTeam[]): Promise<GameData> {
       const oppRank    = getRankAtWeek(homeTeam, week);
       const isG5Opp    = home ? home.is_g5 : !P4_CONFERENCES.has(homeConference);
       const oppLogo    = home?.logo ?? teamNameToLogo.get(homeTeam) ?? null;
+      const oppColor   = home?.color ?? teamNameToColor.get(homeTeam) ?? null;
       const oppId      = homeId;
       gameData[away.id][week] = {
         week,
         opponent:        homeTeam,
         opponent_id:     oppId,
         opponent_logo:   oppLogo,
+        opponent_color:  oppColor,
         opponent_rank:   oppRank,
         result:          completed ? (awayPoints > homePoints ? 'W' : 'L') : null,
         is_g5_opponent:  isG5Opp,

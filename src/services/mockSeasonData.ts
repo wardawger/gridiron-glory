@@ -141,7 +141,7 @@ export function buildMockSeasonData(teams: CfbTeam[]): {
       const condition = MOCK_CONDITIONS[Math.floor(rand() * MOCK_CONDITIONS.length)];
       const windSpeed = Math.round(rand() * 25);
 
-      const base: Omit<GameResult, 'opponent' | 'opponent_id' | 'opponent_logo' | 'result' | 'is_g5_opponent' | 'is_home'> = {
+      const base: Omit<GameResult, 'opponent' | 'opponent_id' | 'opponent_logo' | 'opponent_color' | 'result' | 'is_g5_opponent' | 'is_home'> = {
         week,
         opponent_rank: null, // backfilled below once rankings exist
         home_score: homeScore,
@@ -162,6 +162,7 @@ export function buildMockSeasonData(teams: CfbTeam[]): {
         opponent: away.name,
         opponent_id: away.id,
         opponent_logo: away.logo,
+        opponent_color: away.color,
         result: homeWon ? 'W' : 'L',
         is_g5_opponent: away.is_g5,
         is_home: true,
@@ -171,6 +172,7 @@ export function buildMockSeasonData(teams: CfbTeam[]): {
         opponent: home.name,
         opponent_id: home.id,
         opponent_logo: home.logo,
+        opponent_color: home.color,
         result: homeWon ? 'L' : 'W',
         is_g5_opponent: home.is_g5,
         is_home: false,
