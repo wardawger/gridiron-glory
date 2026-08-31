@@ -340,12 +340,14 @@ export function ScoreboardPage({
   const liveScoreboard = useLiveScoreboard(true);
 
   // Same auto-fetch-once-per-week pattern as RosterView — spreads are
-  // fetched on demand rather than baked into the app-wide load cycle.
+  // fetched on demand rather than baked into the app-wide load cycle. Shown
+  // here regardless of the league's spread_enabled toggle (unlike
+  // RosterView's spread-picking UI) since this is just an informational
+  // line, not the pick-against-the-spread feature itself.
   useEffect(() => {
-    if (!scoring.spread_enabled) return;
     if (spreadData[week] !== undefined) return;
     onRefreshSpreads(week);
-  }, [scoring.spread_enabled, week, spreadData, onRefreshSpreads]);
+  }, [week, spreadData, onRefreshSpreads]);
   const weekSpread = spreadData[week];
 
   // One row per active (non-benched) rostered team that has a game this
@@ -440,15 +442,17 @@ export function ScoreboardPage({
 
   // Filters the card grid only — the ticker keeps showing every manager's
   // total regardless of search, since it's a standings summary, not a
-  // per-game list.
+  // per-game list. Matches either team name or the owning manager's
+  // display name; the unrostered side of a single-row card has no manager
+  // to match against.
   const [search, setSearch] = useState('');
   const filteredCards = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return cards;
     return cards.filter(card => {
       const names = card.rows.length === 2
-        ? card.rows.map(r => r.breakdown.team_name)
-        : [card.rows[0].breakdown.team_name, card.rows[0].breakdown.game!.opponent];
+        ? card.rows.flatMap(r => [r.breakdown.team_name, r.member.display_name])
+        : [card.rows[0].breakdown.team_name, card.rows[0].member.display_name, card.rows[0].breakdown.game!.opponent];
       return names.some(n => n.toLowerCase().includes(q));
     });
   }, [cards, search]);
@@ -513,8 +517,17 @@ export function ScoreboardPage({
                 <div className="divide-y divide-turf-800 border-t border-turf-800">
                   {standings.map(({ member, points, live }, i) => {
                     const isMe = member.user_id === currentUserId;
+                    const isFiltered = search.trim().toLowerCase() === member.display_name.toLowerCase();
                     return (
-                      <div key={member.user_id} className={`flex items-center gap-2.5 px-4 py-2.5 ${isMe ? 'bg-field-950/10' : ''}`}>
+                      <button
+                        type="button"
+                        key={member.user_id}
+                        onClick={() => setSearch(isFiltered ? '' : member.display_name)}
+                        aria-pressed={isFiltered}
+                        className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-left transition-colors hover:bg-turf-800/40 ${
+                          isFiltered ? 'bg-field-900/30' : isMe ? 'bg-field-950/10' : ''
+                        }`}
+                      >
                         <span className="font-mono text-xs font-bold text-turf-500 w-4 flex-shrink-0">{i + 1}</span>
                         <Avatar
                           displayName={member.display_name}
@@ -524,7 +537,7 @@ export function ScoreboardPage({
                           bgClassName={isMe ? 'bg-field-500' : undefined}
                           textClassName={isMe ? 'text-turf-950' : undefined}
                         />
-                        <span className={`text-sm font-medium truncate flex-1 min-w-0 ${isMe ? 'text-field-400' : 'text-white'}`}>
+                        <span className={`text-sm font-medium truncate flex-1 min-w-0 ${isFiltered || isMe ? 'text-field-400' : 'text-white'}`}>
                           {member.display_name}{isMe ? ' (You)' : ''}
                         </span>
                         {live && (
@@ -538,7 +551,7 @@ export function ScoreboardPage({
                         }`}>
                           {points > 0 ? '+' : ''}{points}
                         </span>
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
@@ -550,7 +563,7 @@ export function ScoreboardPage({
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-turf-500" />
             <input
               className="input pl-9"
-              placeholder="Search teams…"
+              placeholder="Search team or manager…"
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
