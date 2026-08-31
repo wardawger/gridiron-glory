@@ -167,6 +167,7 @@ interface CardLine {
   key: string;
   teamName: string;
   logo: string | null | undefined;
+  color: string | null | undefined;
   rank: number | null;
   ownerLabel: string | null;
   score: number | null;
@@ -197,6 +198,7 @@ function GameCardView({
         key: r.breakdown.team_id,
         teamName: r.breakdown.team_name,
         logo: teamsById.get(r.breakdown.team_id)?.logo,
+        color: teamsById.get(r.breakdown.team_id)?.color,
         rank: rankByTeamId.get(r.breakdown.team_id) ?? null,
         ownerLabel: `${r.member.display_name}'s team`,
         score: r.myScore,
@@ -210,6 +212,7 @@ function GameCardView({
           key: primary.breakdown.team_id,
           teamName: primary.breakdown.team_name,
           logo: teamsById.get(primary.breakdown.team_id)?.logo,
+          color: teamsById.get(primary.breakdown.team_id)?.color,
           rank: rankByTeamId.get(primary.breakdown.team_id) ?? null,
           ownerLabel: `${primary.member.display_name}'s team`,
           score: primary.myScore,
@@ -222,6 +225,7 @@ function GameCardView({
           key: 'opponent',
           teamName: game.opponent,
           logo: game.opponent_logo,
+          color: teamsById.get(game.opponent_id)?.color,
           rank: rankByTeamId.get(game.opponent_id) ?? game.opponent_rank,
           ownerLabel: null,
           score: primary.oppScore,
@@ -266,7 +270,11 @@ function GameCardView({
 
       <div className="rounded-lg border border-turf-800 divide-y divide-turf-800 overflow-hidden">
         {lines.map((line, i) => (
-          <div key={line.key} className="flex items-center gap-2 px-2.5 py-2">
+          <div
+            key={line.key}
+            className="flex items-center gap-2 pl-[7px] pr-2.5 py-2 border-l-[3px]"
+            style={{ borderLeftColor: line.color || 'transparent' }}
+          >
             {showFinal && (
               line.row ? (
                 <button
@@ -281,7 +289,7 @@ function GameCardView({
                 <span className="w-6 h-6 flex-shrink-0" aria-hidden="true" />
               )
             )}
-            <TeamLogo src={line.logo} alt={line.teamName} fallbackName={line.teamName} size={22} />
+            <TeamLogo src={line.logo} alt={line.teamName} fallbackName={line.teamName} size={30} />
             <div className="flex-1 min-w-0">
               <p className="text-[10px] text-turf-500 truncate min-h-[12px]">{line.ownerLabel ?? ' '}</p>
               <div className="flex items-center gap-2 min-w-0">
