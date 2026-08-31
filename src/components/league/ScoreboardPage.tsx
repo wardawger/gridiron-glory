@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { LayoutGrid, Star, TrendingUp, TrendingDown, Coins, Clock, MapPin, Tv, ChevronDown } from 'lucide-react';
+import { LayoutGrid, ChevronDown } from 'lucide-react';
 import type {
   League, LeagueMember, DraftPick, CaptainPick, GameData, SpreadPick, FreeAgencyMove,
   ScoreCorrection, BenchPick, APRanking, CfbTeam, ScoreBreakdown, LiveGameStatus,
@@ -11,6 +11,7 @@ import { useLiveScoreboard } from '../../hooks/useLiveScoreboard';
 import { findLiveStatus, teamNameMatches } from '../../services/cfbd';
 import { TeamLogo } from '../ui/TeamLogo';
 import { Avatar } from '../ui/Avatar';
+import { GameScoreModal } from './GameScoreModal';
 
 interface Props {
   league: League;
@@ -27,7 +28,32 @@ interface Props {
   currentUserId: string;
 }
 
-type Row = { member: LeagueMember; breakdown: ScoreBreakdown; spreadPick: SpreadPick | null };
+// A row is one rostered team's week — the same shape calcWeeklyScore has
+// always produced. `live`/`isLive`/etc. are resolved once here (rather
+// than per-render inside a card) since both the sort order and the
+// "This Week's Points" ticker need them before any card renders.
+type Row = {
+  member: LeagueMember;
+  breakdown: ScoreBreakdown;
+  spreadPick: SpreadPick | null;
+  live: LiveGameStatus | null;
+  isLive: boolean;
+  showFinal: boolean;
+  started: boolean;
+  myScore: number | null;
+  oppScore: number | null;
+  displayResult: 'W' | 'L' | null;
+};
+
+// One real-world game — one or two Rows, depending on whether one or both
+// sides happen to be rostered by different managers in this league.
+type GameCard = {
+  key: string;
+  rows: Row[];
+  startDate: string | null;
+  started: boolean;
+  isLive: boolean;
+};
 
 function formatGameDate(startDate: string | null, startTimeTbd: boolean): { date: string; time: string } {
   if (!startDate) return { date: 'TBD', time: 'TBD' };
@@ -72,43 +98,29 @@ function FootballIcon({ className }: { className?: string }) {
   );
 }
 
-// Qualifying scoring categories for this game — shown as pills rather than
-// exact per-line point values, since a captain's ×2 multiplier and any
-// spread points would otherwise make reconstructing each line's individual
-// contribution error-prone. b.points (from calcWeeklyScore, already
-// authoritative) carries the real total instead.
-function activeCategories(result: 'W' | 'L' | null, opponentRank: number | null, isG5Opponent: boolean): string[] {
-  if (!result) return [];
-  if (result === 'W') {
-    const labels = ['Win'];
-    if (opponentRank != null) labels.push('Beat Ranked');
-    if ((opponentRank ?? 99) <= 15) labels.push('Beat Top 15');
-    if ((opponentRank ?? 99) <= 5) labels.push('Beat Top 5');
-    return labels;
-  }
-  const labels = ['Loss'];
-  if (isG5Opponent) labels.push('Loss to G5');
-  return labels;
+// Final-game detail trigger — a plain "i" glyph (no inner circle of its
+// own; the button's own round border supplies that) so it reads as a
+// quiet, secondary control rather than competing with the score.
+function InfoIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
+      <line x1="12" y1="17" x2="12" y2="10" />
+      <line x1="12" y1="6.5" x2="12.01" y2="6.5" />
+    </svg>
+  );
 }
 
-function MatchupCard({ row, teamsById, isMe, live }: { row: Row; teamsById: Map<string, CfbTeam>; isMe: boolean; live: LiveGameStatus | null }) {
-  const { breakdown: b, spreadPick } = row;
-  const game = b.game!;
-  const team = teamsById.get(b.team_id);
+// Resolves everything about a rostered team's week that depends on the
+// live feed — extracted from the per-card render so the same numbers back
+// both the card grid's sort order and its displayed scores/status.
+function resolveRowLiveState(breakdown: ScoreBreakdown, live: LiveGameStatus | null) {
+  const game = breakdown.game!;
   const isHome = game.is_home;
-  const gameDateInfo = formatGameDate(game.start_date, game.start_time_tbd);
-
-  const spreadOutcome = spreadPick?.result ?? null;
-  const spreadWon = spreadOutcome === null || spreadOutcome === 'push'
-    ? null
-    : (spreadPick!.side === 'cover' ? spreadOutcome === 'covered' : spreadOutcome === 'missed');
 
   // Only trust `live` as an in-progress signal once it actually carries a
   // period+clock — CFBD's /scoreboard also lists scheduled/final games, and
   // `game.completed` (from the separate /games endpoint) already covers final.
   const isLive = !game.completed && live?.status === 'in_progress' && live.period != null && live.clock != null;
-  const myTeamHasBall = isLive && teamNameMatches(live!.possession, b.team_name);
-  const opponentHasBall = isLive && teamNameMatches(live!.possession, game.opponent);
 
   // `game.completed` (from /games, cached up to 30 min) can lag well behind
   // reality — a game that just ended sits with stale pre-game info for up
@@ -119,6 +131,7 @@ function MatchupCard({ row, teamsById, isMe, live }: { row: Row; teamsById: Map<
   // this only fixes what's displayed.
   const justFinished = !game.completed && live?.status === 'completed'
     && live.home_points != null && live.away_points != null;
+
   // While in-progress, the running score comes from the live endpoint too —
   // game.home_score/away_score (from /games) stay null until the game is
   // fully final.
@@ -134,162 +147,146 @@ function MatchupCard({ row, teamsById, isMe, live }: { row: Row; teamsById: Map<
     ? (myScore > oppScore ? 'W' : 'L')
     : null;
   const showFinal = game.completed || justFinished;
-  const showScore = showFinal || isLive;
   const displayResult = game.completed ? game.result : liveResult;
-  const categories = activeCategories(displayResult, game.opponent_rank, game.is_g5_opponent);
 
-  // Shown next to "This week" rather than floating over the card — sitting
-  // in its own row above the score table previously pushed a captained
-  // card's table down relative to its non-captained siblings in the same
-  // grid row. text-amber-300 (vs. .badge-gold's own text-amber-400)
-  // brightens the pill's own text-on-fill contrast — scoped to this one
-  // instance rather than the shared .badge-gold class, since that class is
-  // reused as-is on Draft/Free Agency/Roster pages this critique didn't
-  // touch.
-  const captainBadge = b.is_captain && (
-    <span className="badge-gold text-xs text-amber-300" aria-label="Captain, doubles points">
-      <Star className="w-2.5 h-2.5 fill-current" aria-hidden="true" /> Captain ×2
-    </span>
-  );
+  return { isLive, showFinal, started: isLive || showFinal, myScore, oppScore, displayResult };
+}
 
-  // Captain status gets the card-wide gold wash (mirrors RosterView's own
-  // captain treatment, giving the badge a "home" instead of being the only
-  // amber pixel on an otherwise green/red/gray card) and takes precedence
-  // over the plain "this is your team" green tint when a card is both.
-  const cardTint = b.is_captain
-    ? 'border-amber-800/50 bg-amber-950/20'
-    : isMe
-      ? 'border-field-500/50 bg-field-950/10'
-      : '';
+interface CardLine {
+  key: string;
+  teamName: string;
+  logo: string | null | undefined;
+  rank: number | null;
+  ownerLabel: string | null;
+  score: number | null;
+  hasBall: boolean;
+  row: Row | null;
+}
+
+function GameCardView({
+  card, teamsById, onDetails,
+}: {
+  card: GameCard;
+  teamsById: Map<string, CfbTeam>;
+  onDetails: (row: Row) => void;
+}) {
+  const primary = card.rows[0];
+  const game = primary.breakdown.game!;
+  const isLive = card.isLive;
+  const showFinal = primary.showFinal;
+  const showScore = showFinal || isLive;
+  const live = primary.live;
+
+  const lines: CardLine[] = card.rows.length === 2
+    ? card.rows.map(r => ({
+        key: r.breakdown.team_id,
+        teamName: r.breakdown.team_name,
+        logo: teamsById.get(r.breakdown.team_id)?.logo,
+        rank: null,
+        ownerLabel: `${r.member.display_name}'s team`,
+        score: r.myScore,
+        hasBall: isLive && teamNameMatches(r.live?.possession ?? null, r.breakdown.team_name),
+        row: r,
+      }))
+    : [
+        {
+          key: primary.breakdown.team_id,
+          teamName: primary.breakdown.team_name,
+          logo: teamsById.get(primary.breakdown.team_id)?.logo,
+          rank: null,
+          ownerLabel: `${primary.member.display_name}'s team`,
+          score: primary.myScore,
+          hasBall: isLive && teamNameMatches(live?.possession ?? null, primary.breakdown.team_name),
+          row: primary,
+        },
+        {
+          key: 'opponent',
+          teamName: game.opponent,
+          logo: game.opponent_logo,
+          rank: game.opponent_rank,
+          ownerLabel: null,
+          score: primary.oppScore,
+          hasBall: isLive && teamNameMatches(live?.possession ?? null, game.opponent),
+          row: null,
+        },
+      ];
+
+  // Winning side's score reads green, the other gray — only once the
+  // result is real; a live or upcoming score stays plain white.
+  const scores = lines.map(l => l.score);
+  const winnerIdx = showFinal && scores[0] != null && scores[1] != null && scores[0] !== scores[1]
+    ? (scores[0]! > scores[1]! ? 0 : 1)
+    : -1;
+
+  const gameDateInfo = formatGameDate(game.start_date, game.start_time_tbd);
+  const halftime = isLive && live?.period != null && live?.clock != null && isHalftime(live.period, live.clock);
+  const statusLabel = isLive
+    ? (halftime ? 'Halftime' : `${ordinal(live!.period!)} · ${live!.clock}`)
+    : showFinal ? 'Final' : 'Upcoming';
+  const bottomText = isLive
+    ? (!halftime ? live?.situation ?? null : null)
+    : !showFinal
+      ? `${gameDateInfo.date}${gameDateInfo.time !== 'TBD' ? ` · ${gameDateInfo.time}` : ''}`
+      : null;
 
   return (
-    <div className={`card p-4 space-y-3 ${cardTint}`}>
-      {/* Matchup — bordered, divided rows (ESPN-scorebug style) so the two
-          teams and their scores line up in a consistent table-like grid
-          rather than free-floating flex rows. */}
-      <div className="rounded-lg border border-turf-800 divide-y divide-turf-800 overflow-hidden">
-        <div className={`flex items-center gap-2 px-2.5 py-2 ${
-          displayResult === 'W' ? 'bg-field-900/30' : displayResult === 'L' ? 'bg-red-950/30' : ''
-        }`}>
-          <TeamLogo src={team?.logo} alt={b.team_name} fallbackName={b.team_name} size={28} />
-          <span className="text-sm font-medium text-white truncate flex-1 min-w-0">
-            {b.team_name}
+    <div className={`card p-3 space-y-2 ${isLive ? 'border-field-500/50' : ''}`}>
+      <div className="flex items-center justify-between text-[11px] font-semibold text-turf-500">
+        <span className="truncate">{game.tv ?? '—'}</span>
+        {isLive ? (
+          <span className="flex items-center gap-1.5 text-field-400 flex-shrink-0" aria-live="polite" aria-atomic="true">
+            <span className="w-1.5 h-1.5 rounded-full bg-field-400 animate-pulse flex-shrink-0" aria-hidden="true" />
+            {statusLabel}
           </span>
-          {myTeamHasBall && (
-            <>
-              <FootballIcon className="w-3.5 h-3.5 text-field-400 flex-shrink-0" />
-              <span className="sr-only">Has possession</span>
-            </>
-          )}
-          {showScore && (
-            <span className="font-mono text-base font-bold text-white flex-shrink-0 w-6 text-right">
-              {myScore}
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-2 px-2.5 py-2">
-          <TeamLogo src={game.opponent_logo} alt={game.opponent} fallbackName={game.opponent} size={28} />
-          <span className="text-sm text-turf-400 truncate flex-1 min-w-0">
-            {game.opponent_rank ? `#${game.opponent_rank} ` : ''}{game.opponent}
-          </span>
-          {opponentHasBall && (
-            <>
-              <FootballIcon className="w-3.5 h-3.5 text-field-400 flex-shrink-0" />
-              <span className="sr-only">Has possession</span>
-            </>
-          )}
-          {showScore && (
-            <span className="font-mono text-base font-bold text-turf-500 flex-shrink-0 w-6 text-right">
-              {oppScore}
-            </span>
-          )}
-        </div>
+        ) : (
+          <span className="flex-shrink-0">{statusLabel}</span>
+        )}
       </div>
 
-      {/* Status */}
-      {isLive ? (
-        <div className="text-xs pt-1 border-t border-turf-800 space-y-2" aria-live="polite" aria-atomic="true">
-          <div className="flex flex-col items-center gap-0.5">
-            <span className="flex items-center gap-1.5 font-medium text-field-400">
-              <span className="w-1.5 h-1.5 rounded-full bg-field-400 animate-pulse flex-shrink-0" aria-hidden="true" />
-              {isHalftime(live!.period!, live!.clock!) ? 'Halftime' : `${ordinal(live!.period!)} · ${live!.clock}`}
-            </span>
-            {!isHalftime(live!.period!, live!.clock!) && live!.situation && <span className="text-turf-500">{live!.situation}</span>}
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-turf-400">This week</span>
-            <div className="flex items-center gap-1.5">
-              {captainBadge}
-              <span className={`font-mono font-bold text-lg ${
-                b.points > 0 ? 'text-field-400' : b.points < 0 ? 'text-red-300' : 'text-turf-500'
-              }`}>
-                {b.points > 0 ? '+' : ''}{b.points}
-              </span>
+      <div className="rounded-lg border border-turf-800 divide-y divide-turf-800 overflow-hidden">
+        {lines.map((line, i) => (
+          <div key={line.key} className="flex items-center gap-2 px-2.5 py-2">
+            {showFinal && (
+              line.row ? (
+                <button
+                  type="button"
+                  onClick={() => onDetails(line.row!)}
+                  aria-label={`${line.teamName} scoring details`}
+                  className="w-6 h-6 rounded-full border border-turf-700 text-turf-500 hover:border-field-500 hover:text-field-400 flex items-center justify-center flex-shrink-0 transition-colors"
+                >
+                  <InfoIcon className="w-3.5 h-3.5" />
+                </button>
+              ) : (
+                <span className="w-6 h-6 flex-shrink-0" aria-hidden="true" />
+              )
+            )}
+            <TeamLogo src={line.logo} alt={line.teamName} fallbackName={line.teamName} size={22} />
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] text-turf-500 truncate min-h-[12px]">{line.ownerLabel ?? ' '}</p>
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-sm font-medium text-white truncate">
+                  {line.rank ? `#${line.rank} ` : ''}{line.teamName}
+                </span>
+                {line.hasBall && (
+                  <>
+                    <FootballIcon className="w-3.5 h-3.5 text-field-400 flex-shrink-0" />
+                    <span className="sr-only">Has possession</span>
+                  </>
+                )}
+              </div>
             </div>
-          </div>
-        </div>
-      ) : !showFinal ? (
-        <div className="text-xs text-turf-500 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 pt-1 border-t border-turf-800">
-          <span className="flex items-center gap-1">
-            <Clock className="w-3 h-3 flex-shrink-0" />
-            {gameDateInfo.date}{gameDateInfo.time !== 'TBD' ? ` · ${gameDateInfo.time}` : ''}
-          </span>
-          {game.venue && (
-            <span className="flex items-center gap-1">
-              <MapPin className="w-3 h-3 flex-shrink-0" /> {game.venue}
-            </span>
-          )}
-          {game.tv && (
-            <span className="flex items-center gap-1">
-              <Tv className="w-3 h-3 flex-shrink-0" /> {game.tv}
-            </span>
-          )}
-        </div>
-      ) : (
-        <div className="pt-2 border-t border-turf-800 space-y-2">
-          <div className="flex flex-wrap items-center justify-center gap-1.5">
-            {categories.map(cat => (
-              <span
-                key={cat}
-                className={`text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded border ${
-                  displayResult === 'W'
-                    ? 'border-field-800/50 bg-field-900/30 text-field-400'
-                    : 'border-red-800/50 bg-red-950/30 text-red-300'
-                }`}
-              >
-                {displayResult === 'W' ? <TrendingUp className="w-2.5 h-2.5 inline mr-0.5" /> : <TrendingDown className="w-2.5 h-2.5 inline mr-0.5" />}
-                {cat}
-              </span>
-            ))}
-            {spreadPick && (
-              <span className={`text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded border flex items-center gap-0.5 ${
-                spreadOutcome === 'push' ? 'border-turf-600 bg-turf-800 text-turf-300' :
-                spreadWon ? 'border-field-800/50 bg-field-900/30 text-field-400' :
-                spreadOutcome === null ? 'border-blue-800/50 bg-blue-950/30 text-blue-300' :
-                'border-red-800/50 bg-red-950/30 text-red-300'
+            {showScore && (
+              <span className={`font-mono text-sm font-bold flex-shrink-0 ${
+                winnerIdx === -1 ? 'text-white' : i === winnerIdx ? 'text-field-400' : 'text-turf-500'
               }`}>
-                <Coins className="w-2.5 h-2.5" />
-                {spreadOutcome === null ? 'Spread pending' : spreadOutcome === 'push' ? 'Push' : spreadWon ? 'Covered' : 'Missed'}
+                {line.score}
               </span>
             )}
           </div>
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-turf-400">This week</span>
-            <div className="flex items-center gap-1.5">
-              {captainBadge}
-              {justFinished ? (
-                <span className="text-xs text-turf-500">Points pending</span>
-              ) : (
-                <span className={`font-mono font-bold text-lg ${
-                  b.points > 0 ? 'text-field-400' : b.points < 0 ? 'text-red-300' : 'text-turf-500'
-                }`}>
-                  {b.points > 0 ? '+' : ''}{b.points}
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+        ))}
+      </div>
+
+      {bottomText && <p className="text-center text-[11px] text-turf-500">{bottomText}</p>}
     </div>
   );
 }
@@ -301,19 +298,11 @@ export function ScoreboardPage({
   const scoring = normalizeScoring(league.scoring);
   const week = league.current_week;
   const teamsById = useMemo(() => new Map(teams.map(t => [t.id, t])), [teams]);
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [tickerCollapsed, setTickerCollapsed] = useState(false);
+  const [modalRow, setModalRow] = useState<Row | null>(null);
   // Live polling only runs while this page is mounted (see useLiveScoreboard) —
   // scoped here rather than in the app-wide 30-minute CFBD refresh cycle.
   const liveScoreboard = useLiveScoreboard(true);
-
-  const toggleUser = (userId: string) => {
-    setCollapsed(prev => {
-      const next = new Set(prev);
-      if (next.has(userId)) next.delete(userId);
-      else next.add(userId);
-      return next;
-    });
-  };
 
   // One row per active (non-benched) rostered team that has a game this
   // week — bye-week teams and benched teams are excluded entirely, per the
@@ -334,33 +323,92 @@ export function ScoreboardPage({
         const spreadPick = spreadPicks.find(
           p => p.user_id === member.user_id && p.week === week && p.team_id === b.team_id
         ) ?? null;
-        rows.push({ member, breakdown: b, spreadPick });
+        const live = findLiveStatus(liveScoreboard, b.team_name) ?? findLiveStatus(liveScoreboard, b.game!.opponent);
+        const liveState = resolveRowLiveState(b, live);
+        rows.push({ member, breakdown: b, spreadPick, live, ...liveState });
       });
     });
-    return rows.sort((a, b) => {
-      const aTime = a.breakdown.game?.start_date ? new Date(a.breakdown.game.start_date).getTime() : Infinity;
-      const bTime = b.breakdown.game?.start_date ? new Date(b.breakdown.game.start_date).getTime() : Infinity;
-      return aTime - bTime;
-    });
-  }, [members, draftPicks, freeAgencyMoves, captainPicks, gameData, scoring, spreadPicks, scoreCorrections, benchPicks, week]);
+    return rows;
+  }, [members, draftPicks, freeAgencyMoves, captainPicks, gameData, scoring, spreadPicks, scoreCorrections, benchPicks, week, liveScoreboard]);
 
-  // Grouped by owner, in league-member order, skipping anyone with no
-  // active matchups this week — chronological order within each group is
-  // already set by the sort above.
-  const groups = useMemo(() => {
-    const byUser = new Map<string, Row[]>();
+  // One card per real-world game — two rows merge into a single card
+  // (with a Details trigger on each rostered side) whenever both teams in
+  // a matchup happen to be drafted by different managers in this league,
+  // rather than showing the same game twice from each owner's perspective.
+  // Sorted by kickoff time descending among games that have started (a
+  // game going live always has the most recent kickoff among started
+  // games, so it lands on top automatically; one that's been live longer
+  // sits lower) — finishing doesn't reshuffle anything, since the sort key
+  // is kickoff time, which never changes. Games that haven't kicked off
+  // yet have no "started" timestamp to sort by, so they're appended below
+  // in their own ascending order.
+  const cards = useMemo(() => {
+    const byGame = new Map<string, Row[]>();
     matchups.forEach(row => {
-      const list = byUser.get(row.member.user_id) ?? [];
+      const game = row.breakdown.game!;
+      const key = [row.breakdown.team_id, game.opponent_id].sort().join('-');
+      const list = byGame.get(key) ?? [];
       list.push(row);
-      byUser.set(row.member.user_id, list);
+      byGame.set(key, list);
     });
-    return members
-      .map(member => ({ member, rows: byUser.get(member.user_id) ?? [] }))
-      .filter(g => g.rows.length > 0);
-  }, [matchups, members]);
+
+    const list: GameCard[] = Array.from(byGame.entries()).map(([key, rows]) => ({
+      key,
+      rows,
+      startDate: rows[0].breakdown.game!.start_date,
+      started: rows[0].started,
+      isLive: rows[0].isLive,
+    }));
+
+    const timeVal = (d: string | null) => d ? new Date(d).getTime() : 0;
+    const started = list.filter(c => c.started).sort((a, b) => timeVal(b.startDate) - timeVal(a.startDate));
+    const notStarted = list.filter(c => !c.started).sort((a, b) => timeVal(a.startDate) - timeVal(b.startDate));
+    return [...started, ...notStarted];
+  }, [matchups]);
+
+  // "This Week's Points" ticker — every manager's current total, ranked,
+  // with a live badge for anyone with a game still in progress.
+  const standings = useMemo(() => {
+    const byUser = new Map<string, { member: LeagueMember; points: number; live: boolean }>();
+    matchups.forEach(row => {
+      const cur = byUser.get(row.member.user_id) ?? { member: row.member, points: 0, live: false };
+      cur.points += row.breakdown.points;
+      if (row.isLive) cur.live = true;
+      byUser.set(row.member.user_id, cur);
+    });
+    return Array.from(byUser.values()).sort((a, b) => b.points - a.points);
+  }, [matchups]);
+
+  // The real span of kickoff dates covered by this week's games, rather
+  // than a hardcoded date range — computed from the same data driving
+  // everything else on the page, so it can never drift out of sync.
+  const weekDateRange = useMemo(() => {
+    const times = matchups
+      .map(r => r.breakdown.game?.start_date)
+      .filter((d): d is string => !!d)
+      .map(d => new Date(d).getTime());
+    if (times.length === 0) return null;
+    const fmt = (t: number) => new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const min = Math.min(...times);
+    const max = Math.max(...times);
+    return min === max ? fmt(min) : `${fmt(min)} – ${fmt(max)}`;
+  }, [matchups]);
 
   return (
     <div className="space-y-5 animate-fade-in">
+      {modalRow && (
+        <GameScoreModal
+          game={modalRow.breakdown.game!}
+          teamName={modalRow.breakdown.team_name}
+          teamLogo={teamsById.get(modalRow.breakdown.team_id)?.logo ?? ''}
+          week={week}
+          isCaptain={modalRow.breakdown.is_captain}
+          scoring={scoring}
+          spreadPick={modalRow.spreadPick}
+          onClose={() => setModalRow(null)}
+        />
+      )}
+
       <div className="card p-5">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-field-500 flex items-center justify-center flex-shrink-0">
@@ -369,80 +417,82 @@ export function ScoreboardPage({
           <div>
             <h1 className="font-display text-2xl tracking-wide text-white">Scoreboard</h1>
             <p className="text-turf-500 text-sm">
-              Week {week} · every active team's matchup, {matchups.length} game{matchups.length !== 1 ? 's' : ''}
+              Week {week}{weekDateRange ? ` · ${weekDateRange}` : ''}
             </p>
           </div>
         </div>
       </div>
 
-      {groups.length === 0 ? (
+      {cards.length === 0 ? (
         <div className="card p-12 text-center text-turf-500">
           <LayoutGrid className="w-8 h-8 mx-auto mb-3 text-turf-700" />
           <p>No active teams have a game this week.</p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {groups.map(({ member, rows }) => {
-            const isMe = member.user_id === currentUserId;
-            const isCollapsed = collapsed.has(member.user_id);
-            const weekPoints = rows.reduce((s, r) => s + r.breakdown.points, 0);
-            return (
-              <div key={member.user_id} className="card overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => toggleUser(member.user_id)}
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-turf-800/40 transition-colors"
-                  aria-expanded={!isCollapsed}
-                >
-                  <Avatar
-                    displayName={member.display_name}
-                    avatarType={member.avatar_type}
-                    avatarValue={member.avatar_value}
-                    size={28}
-                    bgClassName={isMe ? 'bg-field-500' : undefined}
-                    textClassName={isMe ? 'text-turf-950' : undefined}
-                  />
-                  <span className={`text-sm font-medium truncate ${isMe ? 'text-field-300' : 'text-white'}`}>
-                    {member.display_name}{isMe ? ' (You)' : ''}
-                  </span>
-                  <span className="text-xs text-turf-500 flex-shrink-0">
-                    {rows.length} game{rows.length !== 1 ? 's' : ''}
-                  </span>
-                  <span className={`font-mono font-bold text-sm flex-shrink-0 ml-auto ${
-                    weekPoints > 0 ? 'text-field-400' : weekPoints < 0 ? 'text-red-300' : 'text-turf-500'
-                  }`}>
-                    {weekPoints > 0 ? '+' : ''}{weekPoints}
-                  </span>
-                  <ChevronDown className={`w-4 h-4 text-turf-500 flex-shrink-0 transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none ${isCollapsed ? '' : 'rotate-180'}`} />
-                </button>
-
-                {/* Grid-rows 0fr/1fr collapse trick — animates from a real
-                    (not hardcoded) content height without touching height
-                    directly, which layout-shifts on ordinary `height`
-                    transitions. Always rendered so the transition can play
-                    in both directions; overflow-hidden clips it at 0fr. */}
-                <div
-                  className={`grid transition-[grid-template-rows] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none ${
-                    isCollapsed ? 'grid-rows-[0fr]' : 'grid-rows-[1fr]'
-                  }`}
-                >
-                  <div className="overflow-hidden">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 p-4 border-t border-turf-800">
-                      {rows.map(row => {
-                        const game = row.breakdown.game!;
-                        const live = findLiveStatus(liveScoreboard, row.breakdown.team_name)
-                          ?? findLiveStatus(liveScoreboard, game.opponent);
-                        return (
-                          <MatchupCard key={row.breakdown.team_id} row={row} teamsById={teamsById} isMe={isMe} live={live} />
-                        );
-                      })}
-                    </div>
-                  </div>
+        <>
+          <div className="card overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setTickerCollapsed(v => !v)}
+              className="w-full flex items-center gap-2 px-4 py-3 hover:bg-turf-800/40 transition-colors"
+              aria-expanded={!tickerCollapsed}
+            >
+              <span className="text-sm font-medium text-white">This Week's Points</span>
+              <ChevronDown className={`w-4 h-4 text-turf-500 flex-shrink-0 ml-auto transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none ${tickerCollapsed ? '' : 'rotate-180'}`} />
+            </button>
+            {/* Grid-rows 0fr/1fr collapse trick — animates from a real (not
+                hardcoded) content height without touching height directly,
+                which layout-shifts on ordinary `height` transitions.
+                Always rendered so the transition can play in both
+                directions; overflow-hidden clips it at 0fr. */}
+            <div
+              className={`grid transition-[grid-template-rows] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none ${
+                tickerCollapsed ? 'grid-rows-[0fr]' : 'grid-rows-[1fr]'
+              }`}
+            >
+              <div className="overflow-hidden">
+                <div className="divide-y divide-turf-800 border-t border-turf-800">
+                  {standings.map(({ member, points, live }, i) => {
+                    const isMe = member.user_id === currentUserId;
+                    return (
+                      <div key={member.user_id} className={`flex items-center gap-2.5 px-4 py-2.5 ${isMe ? 'bg-field-950/10' : ''}`}>
+                        <span className="font-mono text-xs font-bold text-turf-500 w-4 flex-shrink-0">{i + 1}</span>
+                        <Avatar
+                          displayName={member.display_name}
+                          avatarType={member.avatar_type}
+                          avatarValue={member.avatar_value}
+                          size={24}
+                          bgClassName={isMe ? 'bg-field-500' : undefined}
+                          textClassName={isMe ? 'text-turf-950' : undefined}
+                        />
+                        <span className={`text-sm font-medium truncate flex-1 min-w-0 ${isMe ? 'text-field-400' : 'text-white'}`}>
+                          {member.display_name}{isMe ? ' (You)' : ''}
+                        </span>
+                        {live && (
+                          <span className="badge-green text-[9px] uppercase tracking-wide flex-shrink-0">
+                            <span className="w-1 h-1 rounded-full bg-field-400 flex-shrink-0" aria-hidden="true" />
+                            Live
+                          </span>
+                        )}
+                        <span className={`font-mono font-bold text-sm flex-shrink-0 min-w-[28px] text-right ${
+                          points > 0 ? 'text-field-400' : points < 0 ? 'text-red-300' : 'text-turf-500'
+                        }`}>
+                          {points > 0 ? '+' : ''}{points}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
-            );
-          })}
-        </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+            {cards.map(card => (
+              <GameCardView key={card.key} card={card} teamsById={teamsById} onDetails={setModalRow} />
+            ))}
+          </div>
+        </>
       )}
     </div>
   );
