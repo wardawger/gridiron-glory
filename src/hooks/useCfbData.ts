@@ -95,14 +95,18 @@ export function useCfbData(enabled = true): CfbState {
         const t = await fetchFbsTeams();
         if (cancelled) return;
         setTeams(t);
-        const gd = await fetchSeasonData(t);
-        if (cancelled) return;
-        const [rk, rec, stats, ratings] = await Promise.all([
+        // fetchRankings/fetchTeamRecords/fetchSeasonStats don't depend on
+        // gameData — only fetchTeamRatings does — so they run alongside
+        // fetchSeasonData (the heaviest single call) instead of waiting for
+        // it to finish first, which used to serialize the whole load.
+        const [gd, rk, rec, stats] = await Promise.all([
+          fetchSeasonData(t),
           fetchRankings(t),
           fetchTeamRecords(),
           fetchSeasonStats(t),
-          fetchTeamRatings(t, gd),
         ]);
+        if (cancelled) return;
+        const ratings = await fetchTeamRatings(t, gd);
         if (cancelled) return;
         setGameData(gd);
         setRankings(rk);
