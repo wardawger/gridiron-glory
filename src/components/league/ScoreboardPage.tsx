@@ -172,6 +172,7 @@ interface CardLine {
   ownerLabel: string | null;
   score: number | null;
   spread: number | null;
+  isHome: boolean;
   hasBall: boolean;
   isCaptain: boolean;
   row: Row | null;
@@ -203,6 +204,7 @@ function GameCardView({
         ownerLabel: `${r.member.display_name}'s team`,
         score: r.myScore,
         spread: weekSpread?.[r.breakdown.team_id] ?? null,
+        isHome: r.breakdown.game!.is_home,
         hasBall: isLive && teamNameMatches(r.live?.possession ?? null, r.breakdown.team_name),
         isCaptain: r.breakdown.is_captain,
         row: r,
@@ -217,6 +219,7 @@ function GameCardView({
           ownerLabel: `${primary.member.display_name}'s team`,
           score: primary.myScore,
           spread: weekSpread?.[primary.breakdown.team_id] ?? null,
+          isHome: game.is_home,
           hasBall: isLive && teamNameMatches(live?.possession ?? null, primary.breakdown.team_name),
           isCaptain: primary.breakdown.is_captain,
           row: primary,
@@ -230,6 +233,7 @@ function GameCardView({
           ownerLabel: null,
           score: primary.oppScore,
           spread: weekSpread?.[game.opponent_id] ?? null,
+          isHome: !game.is_home,
           hasBall: isLive && teamNameMatches(live?.possession ?? null, game.opponent),
           isCaptain: false,
           row: null,
@@ -294,7 +298,7 @@ function GameCardView({
               <p className="text-[10px] text-turf-500 truncate min-h-[12px]">{line.ownerLabel ?? ' '}</p>
               <div className="flex items-center gap-2 min-w-0">
                 <span className="text-sm font-medium text-white truncate">
-                  {line.rank ? `#${line.rank} ` : ''}{line.teamName}
+                  {line.isHome ? '' : '@ '}{line.rank ? `#${line.rank} ` : ''}{line.teamName}
                 </span>
                 {line.isCaptain && (
                   <>
