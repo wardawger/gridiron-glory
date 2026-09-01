@@ -634,10 +634,17 @@ export async function fetchSpreads(
       // team's spread — cross-checking against gameData's opponent_id (its
       // actual scheduled opponent that week, from the real /games schedule)
       // rejects any line that doesn't belong to the team's real matchup.
+      // `nameToId` only covers the FBS-only `teams` list, so the opposing
+      // side's id is null whenever that opponent is FCS/lower-division (e.g.
+      // Utah vs Idaho) — comparing a real opponent_id against that null
+      // always failed and silently dropped the FBS side's real line too.
+      // Skip the cross-check (trust the name match) whenever the opposing
+      // id can't be resolved at all, rather than treating "unresolvable" the
+      // same as "resolved and mismatched".
       const homeOpponentId = gameData[homeId ?? '']?.[week]?.opponent_id;
       const awayOpponentId = gameData[awayId ?? '']?.[week]?.opponent_id;
-      const homeMatches = homeId && (!homeOpponentId || homeOpponentId === awayId);
-      const awayMatches = awayId && (!awayOpponentId || awayOpponentId === homeId);
+      const homeMatches = homeId && (!homeOpponentId || !awayId || homeOpponentId === awayId);
+      const awayMatches = awayId && (!awayOpponentId || !homeId || awayOpponentId === homeId);
 
       const lines: any[] = game.lines ?? [];
       if (!lines.length) continue;
