@@ -106,13 +106,20 @@ export function useCfbData(enabled = true): CfbState {
           fetchSeasonStats(t),
         ]);
         if (cancelled) return;
-        const ratings = await fetchTeamRatings(t, gd);
-        if (cancelled) return;
         setGameData(gd);
         setRankings(rk);
         setRecords(rec);
         setSeasonStats(stats);
-        setTeamRatings(ratings);
+        // Fetched without blocking hasLoadedOnce/loading below — team
+        // ratings (FPI/SP+) are two more network calls that CFBD's own
+        // response times showed adding another ~600-1000ms sequentially
+        // after everything else, but only Draft Room actually reads them.
+        // Every other page (Scoreboard, Standings, Roster, ...) no longer
+        // waits on a fetch it never uses; Draft Room just sees ratings pop
+        // in a beat after its initial render instead of gating on them.
+        fetchTeamRatings(t, gd)
+          .then(ratings => { if (!cancelled) setTeamRatings(ratings); })
+          .catch(() => { /* ratings are optional enrichment */ });
       } catch (e: any) {
         if (!cancelled) setError(e.message ?? 'Failed to load CFB data');
       } finally {
