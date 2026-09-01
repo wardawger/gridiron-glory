@@ -316,7 +316,7 @@ function GameCardView({
               }`}>
                 {line.score}
               </span>
-            ) : line.spread != null && (
+            ) : line.spread != null && line.spread <= 0 && (
               <span className="font-mono text-sm font-medium text-turf-400 flex-shrink-0">
                 {formatSpread(line.spread)}
               </span>
