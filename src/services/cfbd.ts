@@ -99,6 +99,41 @@ export async function fetchFbsTeams(): Promise<CfbTeam[]> {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
+// fetchSeasonData (opponent-rank lookups) and fetchRankings (the AP Top 25
+// display list) both need this exact same raw poll history, and useCfbData
+// calls them in parallel via Promise.all — without dedup they independently
+// double-hit CFBD's real (quota-metered) /rankings endpoint for identical
+// data on every single page load. The in-flight promise is only held long
+// enough to cover truly-concurrent callers within one load cycle (cleared
+// as soon as it settles), so a later manual/auto refresh still issues a
+// genuinely fresh request rather than replaying stale results forever.
+const rankingsHistoryInFlight = new Map<number, Promise<{ data: any[]; isCurrentYear: boolean }>>();
+
+async function fetchRankingsHistory(year: number): Promise<{ data: any[]; isCurrentYear: boolean }> {
+  const existing = rankingsHistoryInFlight.get(year);
+  if (existing) return existing;
+
+  const promise = (async () => {
+    try {
+      const res = await cfbdFetch('/rankings', { year, seasonType: 'regular' });
+      let data: any[] = res.ok ? await res.json() : [];
+      let isCurrentYear = true;
+      if (!Array.isArray(data) || !data.length) {
+        const res2 = await cfbdFetch('/rankings', { year: year - 1, seasonType: 'regular' });
+        data = res2.ok ? await res2.json() : [];
+        isCurrentYear = false;
+      }
+      return { data: Array.isArray(data) ? data : [], isCurrentYear };
+    } catch {
+      return { data: [], isCurrentYear: true };
+    }
+  })();
+
+  rankingsHistoryInFlight.set(year, promise);
+  promise.finally(() => rankingsHistoryInFlight.delete(year));
+  return promise;
+}
+
 export async function fetchSeasonData(teams: CfbTeam[]): Promise<GameData> {
   const year = getCurrentSeasonYear();
   const teamMap = new Map(teams.map(t => [t.id, t]));
@@ -108,13 +143,9 @@ export async function fetchSeasonData(teams: CfbTeam[]): Promise<GameData> {
   let rankHistory: any[] = [];
   let rankHistoryIsCurrentYear = true;
   try {
-    const rRes = await cfbdFetch('/rankings', { year, seasonType: 'regular' });
-    rankHistory = rRes.ok ? await rRes.json() : [];
-    if (!Array.isArray(rankHistory) || !rankHistory.length) {
-      const rRes2 = await cfbdFetch('/rankings', { year: year - 1, seasonType: 'regular' });
-      rankHistory = rRes2.ok ? await rRes2.json() : [];
-      rankHistoryIsCurrentYear = false;
-    }
+    const result = await fetchRankingsHistory(year);
+    rankHistory = result.data;
+    rankHistoryIsCurrentYear = result.isCurrentYear;
   } catch { /* rankings optional */ }
 
   // When the current season has no polls published yet, we fall back to
@@ -343,12 +374,7 @@ export async function fetchRankings(teams: CfbTeam[]): Promise<APRanking[]> {
   const year = getCurrentSeasonYear();
   let data: any[] = [];
   try {
-    const res = await cfbdFetch('/rankings', { year, seasonType: 'regular' });
-    data = res.ok ? await res.json() : [];
-    if (!Array.isArray(data) || !data.length) {
-      const res2 = await cfbdFetch('/rankings', { year: year - 1, seasonType: 'regular' });
-      data = res2.ok ? await res2.json() : [];
-    }
+    data = (await fetchRankingsHistory(year)).data;
   } catch { return []; }
 
   if (!data.length) return [];
