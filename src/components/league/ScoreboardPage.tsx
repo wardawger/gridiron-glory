@@ -298,7 +298,10 @@ function GameCardView({
               <p className="text-[10px] text-turf-500 truncate min-h-[12px]">{line.ownerLabel ?? ' '}</p>
               <div className="flex items-center gap-2 min-w-0">
                 <span className="text-sm font-medium text-white truncate">
-                  {line.isHome ? '' : '@ '}{line.rank ? `#${line.rank} ` : ''}{line.teamName}
+                  {line.rank ? `#${line.rank} ` : ''}{line.teamName}
+                </span>
+                <span className="text-[10px] text-turf-500 flex-shrink-0">
+                  {line.isHome ? '(Home)' : '(Away)'}
                 </span>
                 {line.isCaptain && (
                   <>
