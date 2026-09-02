@@ -205,10 +205,10 @@ const METRICS: MetricDef[] = [
   {
     id: 'best_pick',
     label: 'Best Pick',
-    polarity: 'higher is better',
+    polarity: null,
     groupStart: true,
-    tooltip: 'Your team that has earned the most fantasy points so far this season.',
-    domain: [-20, 35],
+    tooltip: 'Your team that has earned the most fantasy points so far this season. Shown for context only — it is not scored against the other managers.',
+    domain: null,
     value: a => a.best_pick?.points ?? null,
     display: a => (a.best_pick ? `${shortTeamName(a.best_pick.team_name)} (${signed(a.best_pick.points)})` : '—'),
     logo: a => a.best_pick?.team_logo,
@@ -598,7 +598,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                                 {chartLabel(a.display_name)}
                               </span>
                             </Link>
-                            {isMe && <span className="badge-green text-xs mt-1 mx-auto block w-fit">You</span>}
+                            {isMe && <span className="sr-only"> (you)</span>}
                           </th>
                         );
                       })}
