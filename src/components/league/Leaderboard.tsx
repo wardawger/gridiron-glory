@@ -345,6 +345,8 @@ const ANALYTICS_TABS: AnalyticsTab[] = ['table', 'weekly', 'graphs'];
 
 export function Leaderboard({ entries, currentWeek, userId, confChampComplete, draftPicks, rankings, teams }: Props) {
   const [analyticsTab, setAnalyticsTab] = useState<AnalyticsTab>('table');
+  // null = every manager overlaid, which is how the radar loads.
+  const [radarFocus, setRadarFocus] = useState<string | null>(null);
 
   // Roving arrow-key focus for the analytics tablist (WAI-ARIA tabs pattern).
   const onTabKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>, idx: number) => {
@@ -732,7 +734,6 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                           dataKey={e.user_id}
                           fill={seriesColor(i)}
                           fillOpacity={0.85}
-                          activeBar={{ fillOpacity: 1 }}
                           radius={[3, 3, 0, 0]}
                           maxBarSize={24}
                         />
@@ -754,11 +755,16 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                 {radarData.length === 0 ? (
                   <p className="text-turf-500 text-sm text-center py-8">No ranking data yet</p>
                 ) : (
+                  <>
                   <div
                     className="h-72 animate-radar-in motion-reduce:animate-none"
                     style={{ transformOrigin: 'center' }}
                     role="img"
-                    aria-label="Radar chart comparing each manager's roster on average rank, top-25 rank, best pick, worst pick, and draft value"
+                    aria-label={
+                      radarFocus
+                        ? `Radar chart of ${chartLabel(entries.find(e => e.user_id === radarFocus)?.display_name ?? '')}'s roster across average rank, top-25 rank, best pick, worst pick, and draft value`
+                        : "Radar chart comparing each manager's roster on average rank, top-25 rank, best pick, worst pick, and draft value"
+                    }
                   >
                     <ResponsiveContainer width="100%" height="100%">
                       <RadarChart data={radarData} margin={{ top: 8, right: 24, left: 24, bottom: 8 }}>
@@ -771,22 +777,73 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                           itemStyle={CHART_TOOLTIP_ITEM}
                           formatter={(value: number) => value.toFixed(1)}
                         />
-                        <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} formatter={legendFormatter} />
+                        {/* The picker below doubles as the legend, so a
+                            second one here would just repeat it. */}
                         {entries.map((e, i) => (
-                          <Radar
-                            key={e.user_id}
-                            name={chartLabel(e.display_name)}
-                            dataKey={e.user_id}
-                            stroke={seriesColor(i)}
-                            fill={seriesColor(i)}
-                            fillOpacity={0.12}
-                            strokeWidth={2}
-                            isAnimationActive={false}
-                          />
+                          radarFocus !== null && radarFocus !== e.user_id ? null : (
+                            <Radar
+                              key={e.user_id}
+                              name={chartLabel(e.display_name)}
+                              dataKey={e.user_id}
+                              stroke={seriesColor(i)}
+                              fill={seriesColor(i)}
+                              // A lone shape can carry more fill than six
+                              // stacked on top of each other.
+                              fillOpacity={radarFocus === null ? 0.12 : 0.28}
+                              strokeWidth={2}
+                              isAnimationActive={false}
+                            />
+                          )
                         ))}
                       </RadarChart>
                     </ResponsiveContainer>
                   </div>
+
+                  <div
+                    role="radiogroup"
+                    aria-label="Show radar series"
+                    className="flex flex-wrap items-center justify-center gap-1.5 mt-3"
+                  >
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={radarFocus === null}
+                      onClick={() => setRadarFocus(null)}
+                      className={`px-2.5 py-1 min-h-[28px] rounded-md text-xs font-medium border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-400 ${
+                        radarFocus === null
+                          ? 'border-field-500 bg-field-900/30 text-field-300'
+                          : 'border-turf-700 text-turf-400 hover:text-white hover:border-turf-600'
+                      }`}
+                    >
+                      All
+                    </button>
+                    {entries.map((e, i) => {
+                      const on = radarFocus === e.user_id;
+                      return (
+                        <button
+                          key={e.user_id}
+                          type="button"
+                          role="radio"
+                          aria-checked={on}
+                          // Selecting the current one returns to All, so the
+                          // overlay is always one click away.
+                          onClick={() => setRadarFocus(on ? null : e.user_id)}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 min-h-[28px] rounded-md text-xs font-medium border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-400 ${
+                            on
+                              ? 'border-field-500 bg-field-900/30 text-white'
+                              : 'border-turf-700 text-turf-400 hover:text-white hover:border-turf-600'
+                          }`}
+                        >
+                          <span
+                            className="w-2 h-2 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: seriesColor(i) }}
+                          />
+                          {chartLabel(e.display_name)}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  </>
                 )}
               </div>
 
