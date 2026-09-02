@@ -7,12 +7,14 @@ import {
 } from 'recharts';
 import { Crown, TrendingUp, TrendingDown, Star } from 'lucide-react';
 import type { LeaderboardEntry, DraftPick, APRanking, CfbTeam } from '../../types';
-import { computeAnalytics, heatColor } from '../../services/analytics';
+import { computeAnalytics, scalePosition, tierFor } from '../../services/analytics';
+import type { RosterAnalytics, MetricTier } from '../../services/analytics';
 import { Avatar } from '../ui/Avatar';
 import { TeamLogo } from '../ui/TeamLogo';
 import { InfoTooltip } from '../ui/Tooltip';
 import {
-  PLAYER_COLORS, CHART_TOOLTIP_STYLE, CHART_TOOLTIP_LABEL, CHART_TOOLTIP_ITEM, legendFormatter,
+  seriesColor, CHART_TOOLTIP_STYLE, CHART_TOOLTIP_LABEL, CHART_TOOLTIP_ITEM, legendFormatter,
+  CHART_AXIS_TICK, CHART_GRID, CHART_MUTED, CHART_SURFACE,
 } from '../../lib/chartTheme';
 
 interface Props {
@@ -68,7 +70,7 @@ function TeamLogoDot(props: any) {
 
   const logo = payload?.team_logo as string | undefined;
   if (!logo) {
-    return <circle cx={cx} cy={cy} r={5} fill={fill} stroke="#0d1117" strokeWidth={1} />;
+    return <circle cx={cx} cy={cy} r={5} fill={fill} stroke={CHART_SURFACE} strokeWidth={1} />;
   }
 
   const size = 20;
@@ -111,52 +113,229 @@ const ScatterTooltip = ({ active, payload }: any) => {
 interface MetricTooltipProps {
   label: string;
   tooltip: string;
+  polarity?: string | null;
 }
 
-function MetricLabel({ label, tooltip }: MetricTooltipProps) {
+function MetricLabel({ label, tooltip, polarity }: MetricTooltipProps) {
   return (
-    <div className="inline-flex items-center gap-1.5">
-      <span className="text-turf-300 text-xs font-medium">{label}</span>
-      <InfoTooltip content={tooltip} position="bottom" width="w-56" />
+    <div className="min-w-0">
+      <span className="inline-flex items-center gap-1.5">
+        <span className="text-turf-300 text-xs font-medium">{label}</span>
+        <InfoTooltip content={tooltip} position="bottom" width="w-56" />
+      </span>
+      {polarity && <p className="text-xs text-turf-600 leading-tight">{polarity}</p>}
     </div>
   );
 }
 
-// ── Sub-component: one analytics table row ────────────────────────────────
+// ── Metric definitions ────────────────────────────────────────────────────
 
-interface AnalyticsRowProps {
+// Every metric carries its own absolute [worst, best] domain, so "good" means
+// good on a fixed scale rather than "best of whoever happens to be in this
+// league". The previous relative min-max always painted one manager red and
+// one green even when the spread was 0.3 of an AP rank. Domains match the
+// ones radarData already used.
+//
+// `polarity` is displayed permanently under the label. It used to exist only
+// inside the tooltip, so a reader had to open eleven of them to learn that
+// "+8" is good in one row and bad three rows below.
+interface MetricDef {
+  id: string;
   label: string;
+  polarity: string | null;
   tooltip: string;
-  values: { display: string; color: string; textColor: string; logo?: string; teamName?: string }[];
-  // First row of a metric group — draws the group gap as a border instead
-  // of an empty spacer <tr>, which screen readers would announce as a row.
   groupStart?: boolean;
+  // null = shown for context, deliberately not scored.
+  domain: [number, number] | null;
+  value: (a: RosterAnalytics) => number | null;
+  display: (a: RosterAnalytics) => string;
+  fmtValue: (n: number) => string;
+  logo?: (a: RosterAnalytics) => string | undefined;
+  team?: (a: RosterAnalytics) => string | undefined;
 }
 
-function AnalyticsRow({ label, tooltip, values, groupStart = false }: AnalyticsRowProps) {
+const signed = (n: number) => `${n > 0 ? '+' : ''}${n}`;
+
+const METRICS: MetricDef[] = [
+  {
+    id: 'avg_rank',
+    label: 'Avg AP Rank',
+    polarity: 'lower is better',
+    tooltip: 'Average AP ranking across all your drafted teams. Lower is better — it means your teams are ranked higher overall.',
+    domain: [25, 1],
+    value: a => (a.avg_rank > 0 ? a.avg_rank : null),
+    display: a => (a.avg_rank > 0 ? a.avg_rank.toFixed(1) : '—'),
+    fmtValue: n => n.toFixed(1),
+  },
+  {
+    id: 'top25',
+    label: 'Top 25% Rank',
+    polarity: 'lower is better',
+    tooltip: 'Average AP rank of your top-quartile teams. Shows the strength of your best picks.',
+    domain: [25, 1],
+    value: a => (a.top25_avg > 0 ? a.top25_avg : null),
+    display: a => (a.top25_avg > 0 ? a.top25_avg.toFixed(1) : '—'),
+    fmtValue: n => n.toFixed(1),
+  },
+  {
+    id: 'bot25',
+    label: 'Bottom 25% Rank',
+    polarity: 'lower is better',
+    tooltip: 'Average AP rank of your bottom-quartile teams. Lower numbers here mean even your worst picks are decent.',
+    domain: [25, 1],
+    value: a => (a.bot25_avg > 0 ? a.bot25_avg : null),
+    display: a => (a.bot25_avg > 0 ? a.bot25_avg.toFixed(1) : '—'),
+    fmtValue: n => n.toFixed(1),
+  },
+  {
+    id: 'record',
+    label: 'Win/Loss Record',
+    polarity: 'higher is better',
+    groupStart: true,
+    tooltip: 'Combined win-loss record across every completed game your rostered teams have played this season. Scored on win differential (wins minus losses).',
+    domain: [-6, 6],
+    value: a => (a.wins > 0 || a.losses > 0 ? a.wins - a.losses : null),
+    display: a => (a.wins > 0 || a.losses > 0 ? `${a.wins}-${a.losses}` : '—'),
+    fmtValue: n => `${signed(Number(n.toFixed(1)))} diff`,
+  },
+  {
+    id: 'captain',
+    label: 'Captain Efficiency',
+    polarity: 'higher is better',
+    tooltip: 'How much of the best possible captain bonus you actually captured — 100% means you picked the highest-scoring eligible team as captain every week (ignoring the twice-per-team season limit).',
+    domain: [0, 100],
+    value: a => a.captain_efficiency,
+    display: a => (a.captain_efficiency !== null ? `${a.captain_efficiency}%` : '—'),
+    fmtValue: n => `${Math.round(n)}%`,
+  },
+  {
+    id: 'best_pick',
+    label: 'Best Pick',
+    polarity: 'higher is better',
+    groupStart: true,
+    tooltip: 'Your team that has earned the most fantasy points so far this season.',
+    domain: [-20, 35],
+    value: a => a.best_pick?.points ?? null,
+    display: a => (a.best_pick ? `${shortTeamName(a.best_pick.team_name)} (${signed(a.best_pick.points)})` : '—'),
+    fmtValue: n => `${signed(Number(n.toFixed(1)))} pts`,
+    logo: a => a.best_pick?.team_logo,
+    team: a => a.best_pick?.team_name,
+  },
+  {
+    id: 'worst_pick',
+    label: 'Worst Pick',
+    polarity: null,
+    // Deliberately unscored. Ranking each manager's worst pick against the
+    // others painted somebody's disaster green for being the least bad,
+    // which taught nothing and read as a bug.
+    tooltip: 'Your team that has earned the fewest fantasy points so far this season. Shown for context only — it is not scored against the other managers.',
+    domain: null,
+    value: a => a.worst_pick?.points ?? null,
+    display: a => (a.worst_pick ? `${shortTeamName(a.worst_pick.team_name)} (${signed(a.worst_pick.points)})` : '—'),
+    fmtValue: n => `${signed(Number(n.toFixed(1)))} pts`,
+    logo: a => a.worst_pick?.team_logo,
+    team: a => a.worst_pick?.team_name,
+  },
+  {
+    id: 'best_team',
+    label: 'Best Ranked Team',
+    polarity: null,
+    tooltip: 'Your highest AP-ranked team this week.',
+    domain: null,
+    value: a => a.best_team?.rank ?? null,
+    display: a => (a.best_team ? `${shortTeamName(a.best_team.team_name)} (#${a.best_team.rank})` : '—'),
+    fmtValue: n => `#${Math.round(n)}`,
+    logo: a => a.best_team?.team_logo,
+    team: a => a.best_team?.team_name,
+  },
+  {
+    id: 'worst_team',
+    label: 'Worst Ranked Team',
+    polarity: null,
+    tooltip: 'Your lowest AP-ranked team. Unranked teams are excluded.',
+    domain: null,
+    value: a => a.worst_team?.rank ?? null,
+    display: a => (a.worst_team ? `${shortTeamName(a.worst_team.team_name)} (#${a.worst_team.rank})` : '—'),
+    fmtValue: n => `#${Math.round(n)}`,
+    logo: a => a.worst_team?.team_logo,
+    team: a => a.worst_team?.team_name,
+  },
+  {
+    id: 'ou_pts',
+    label: 'Over/Under Draft Pts',
+    polarity: 'negative is better',
+    groupStart: true,
+    tooltip: 'Sum of (pick number − AP rank) for all your ranked teams. Negative means you drafted better than expected — you got high-ranked teams late.',
+    domain: [30, -30],
+    value: a => a.over_under_pts,
+    display: a => signed(a.over_under_pts),
+    fmtValue: n => signed(Number(n.toFixed(1))),
+  },
+  {
+    id: 'ou_avg',
+    label: 'Over/Under Avg',
+    polarity: 'negative is better',
+    tooltip: 'Average (pick number − AP rank) per ranked team. Negative means you consistently found value picks relative to their AP ranking.',
+    domain: [15, -15],
+    value: a => a.over_under_avg,
+    display: a => signed(a.over_under_avg),
+    fmtValue: n => signed(Number(n.toFixed(1))),
+  },
+];
+
+// Tier is carried by a glyph as well as a color, so the ranking survives
+// colorblindness and screen readers. Colour alone used to be the only signal,
+// and at the old alphas the green and red washes differed by 1.05:1.
+const TIER_GLYPH: Record<MetricTier, string> = { good: '▲', mid: '●', poor: '▼', none: '' };
+const TIER_LABEL: Record<MetricTier, string> = { good: 'strong', mid: 'average', poor: 'weak', none: '' };
+const TIER_TEXT: Record<MetricTier, string> = {
+  good: 'text-field-400', mid: 'text-amber-400', poor: 'text-red-300', none: '',
+};
+const TIER_CELL: Record<MetricTier, string> = {
+  good: 'bg-field-900/20', mid: 'bg-amber-900/15', poor: 'bg-red-950/25', none: '',
+};
+
+// Position of one manager on a metric's fixed scale, with faint ticks for
+// everyone else. Position is a positional encoding rather than a hue, so it
+// reads the same for a colorblind user and shows the real spread: ticks
+// bunched together mean the metric barely separates anyone, which the old
+// three-bucket wash actively concealed.
+function ScaleTrack({ position, others }: { position: number | null; others: number[] }) {
+  if (position === null) return <div className="h-1.5 mt-2" aria-hidden="true" />;
   return (
-    <tr className={`hover:bg-turf-800/20 transition-colors ${groupStart ? 'border-t-[6px] border-t-turf-800/30' : ''}`}>
-      <td className="px-4 py-2.5">
-        <MetricLabel label={label} tooltip={tooltip} />
-      </td>
-      {values.map((v, i) => (
-        <td
+    <div className="relative h-1.5 mt-2 rounded-full bg-turf-800" aria-hidden="true">
+      {others.map((p, i) => (
+        <span
           key={i}
-          className="px-3 py-2.5 text-center font-mono text-xs font-medium text-white"
-          style={{ background: v.color }}
-        >
-          <span
-            className="inline-flex items-center justify-center gap-1.5"
-            style={{ color: v.display === '—' ? '#adb5bd' : undefined }}
-          >
-            {v.logo && v.teamName && (
-              <TeamLogo src={v.logo} alt={v.teamName} fallbackName={v.teamName} size={16} />
-            )}
-            {v.display}
-          </span>
-        </td>
+          className="absolute top-1/2 -translate-y-1/2 w-px h-2 bg-turf-600"
+          style={{ left: `${p * 100}%` }}
+        />
       ))}
-    </tr>
+      <span
+        className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-white ring-2 ring-turf-900"
+        style={{ left: `${position * 100}%` }}
+      />
+    </div>
+  );
+}
+
+// One metric's value as rendered in a cell: optional team logo, the value,
+// and its tier glyph.
+function MetricValue({ metric, a, tier }: { metric: MetricDef; a: RosterAnalytics; tier: MetricTier }) {
+  const text = metric.display(a);
+  const logo = metric.logo?.(a);
+  const team = metric.team?.(a);
+  return (
+    <span className={`inline-flex items-center gap-1.5 ${text === '—' ? 'text-turf-500' : 'text-white'}`}>
+      {logo && team && <TeamLogo src={logo} alt="" fallbackName={team} size={16} />}
+      <span className="tabular-nums">{text}</span>
+      {tier !== 'none' && (
+        <>
+          <span aria-hidden="true" className={TIER_TEXT[tier]}>{TIER_GLYPH[tier]}</span>
+          <span className="sr-only">, {TIER_LABEL[tier]}</span>
+        </>
+      )}
+    </span>
   );
 }
 
@@ -167,6 +346,7 @@ const ANALYTICS_TABS: AnalyticsTab[] = ['table', 'weekly', 'graphs'];
 
 export function Leaderboard({ entries, currentWeek, userId, confChampComplete, draftPicks, rankings, teams }: Props) {
   const [analyticsTab, setAnalyticsTab] = useState<AnalyticsTab>('table');
+  const [tableScope, setTableScope] = useState<'you' | 'everyone'>('you');
 
   // Roving arrow-key focus for the analytics tablist (WAI-ARIA tabs pattern).
   const onTabKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>, idx: number) => {
@@ -256,21 +436,18 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
   const scatterByManager = useMemo(() => {
     return entries.map((e, i) => ({
       name: chartLabel(e.display_name),
-      color: PLAYER_COLORS[i] ?? '#22c55e',
+      color: seriesColor(i),
       data: scatterPoints.filter(p => p.user_id === e.user_id),
     })).filter(m => m.data.length > 0);
   }, [entries, scatterPoints]);
 
-  // Heat map value arrays
-  const avgRankValues   = analytics.map(a => a.avg_rank);
-  const top25Values     = analytics.map(a => a.top25_avg);
-  const bot25Values     = analytics.map(a => a.bot25_avg);
-  const bestPickValues  = analytics.map(a => a.best_pick?.points ?? 0);
-  const worstPickValues = analytics.map(a => a.worst_pick?.points ?? 0);
-  const ouValues        = analytics.map(a => a.over_under_pts);
-  const ouAvgValues     = analytics.map(a => a.over_under_avg);
-  const recordValues    = analytics.map(a => a.wins - a.losses);
-  const captainEffValues = analytics.map(a => a.captain_efficiency ?? 0);
+  // The current user's own analytics row, when they're a member of this
+  // league. Drives the default "You" view; absent for a commissioner who
+  // isn't playing, who falls back to the full matrix.
+  const me = useMemo(
+    () => analytics.find(a => a.user_id === userId) ?? null,
+    [analytics, userId]
+  );
 
   return (
     <div className="space-y-6 animate-fade-in motion-reduce:animate-none">
@@ -287,17 +464,17 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
               <XAxis type="number" hide domain={chartDomain} />
               <YAxis
                 type="category" dataKey="name" width={90}
-                tick={{ fill: '#adb5bd', fontSize: 12, fontFamily: 'DM Sans' }}
+                tick={{ fill: CHART_MUTED, fontSize: 12, fontFamily: 'DM Sans' }}
                 axisLine={false} tickLine={false}
               />
               <Tooltip
                 content={<CustomTooltip />}
                 cursor={{ fill: 'rgba(255,255,255,0.03)' }}
               />
-              <ReferenceLine x={0} stroke="#495057" />
+              <ReferenceLine x={0} stroke={CHART_GRID} />
               <Bar dataKey="points" radius={[0, 4, 4, 0]} maxBarSize={28}>
                 {chartData.map((_, i) => (
-                  <Cell key={i} fill={PLAYER_COLORS[i] ?? '#22c55e'} fillOpacity={i === 0 ? 1 : 0.75} />
+                  <Cell key={i} fill={seriesColor(i)} fillOpacity={i === 0 ? 1 : 0.75} />
                 ))}
               </Bar>
             </BarChart>
@@ -423,165 +600,149 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
 
           {/* ── TABLE VIEW ── */}
           {analyticsTab === 'table' && (
-            <div role="tabpanel" id="analytics-panel-table" aria-labelledby="analytics-tab-table" className="overflow-x-auto">
-              <table className="w-full text-sm" aria-label="Roster analytics by manager">
-                <thead>
-                  <tr className="border-b border-turf-800">
-                    <th scope="col" className="px-4 py-3 text-left text-xs text-turf-500 uppercase tracking-wide font-medium w-44">
-                      Metric
-                    </th>
-                    {analytics.map((a, i) => (
-                      <th
-                        key={a.user_id}
-                        scope="col"
-                        className="px-3 py-3 text-center"
-                      >
-                        <span className="inline-flex items-center gap-1.5 max-w-[9rem]">
-                          <span
-                            className="w-2 h-2 rounded-full flex-shrink-0"
-                            style={{ backgroundColor: PLAYER_COLORS[i] }}
-                          />
-                          <span className="font-sans font-bold text-sm text-white truncate">
-                            {chartLabel(a.display_name)}
-                          </span>
-                        </span>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-turf-800/50">
+            <div role="tabpanel" id="analytics-panel-table" aria-labelledby="analytics-tab-table">
+              <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-turf-800 flex-wrap">
+                <p className="text-xs text-turf-500">
+                  {tableScope === 'you' && me
+                    ? 'Where your roster lands on each measure, against the rest of the league.'
+                    : 'Every manager, side by side.'}
+                </p>
+                <div role="radiogroup" aria-label="Comparison scope" className="flex gap-1 bg-turf-800 p-1 rounded-lg flex-shrink-0">
+                  {([['you', 'You'], ['everyone', 'Everyone']] as const).map(([id, label]) => (
+                    <button
+                      key={id}
+                      type="button"
+                      role="radio"
+                      aria-checked={tableScope === id}
+                      disabled={id === 'you' && !me}
+                      onClick={() => setTableScope(id)}
+                      className={`px-3 py-1.5 min-h-[32px] rounded-md text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-400 disabled:opacity-40 disabled:cursor-not-allowed ${
+                        tableScope === id ? 'bg-field-500 text-turf-950' : 'text-turf-400 hover:text-white'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-                  <AnalyticsRow
-                    label="Avg AP Rank"
-                    tooltip="Average AP ranking across all your drafted teams. Lower is better — it means your teams are ranked higher overall."
-                    values={analytics.map((a, i) => ({
-                      display: a.avg_rank > 0 ? a.avg_rank.toFixed(1) : '—',
-                      color: heatColor(a.avg_rank, avgRankValues.filter(v => v > 0), false),
-                      textColor: PLAYER_COLORS[i],
-                    }))}
-                  />
+              {tableScope === 'you' && me ? (
+                <table className="w-full text-sm" aria-label="Your roster analytics against the league">
+                  <caption className="sr-only">
+                    Each metric with your value, where it sits on that metric's fixed scale, and the league average.
+                  </caption>
+                  <thead>
+                    <tr className="border-b border-turf-800">
+                      <th scope="col" className="px-4 py-3 text-left text-xs text-turf-500 uppercase tracking-wide font-medium">Metric</th>
+                      <th scope="col" className="px-3 py-3 text-left text-xs text-field-400 uppercase tracking-wide font-medium w-[45%]">You</th>
+                      <th scope="col" className="px-4 py-3 text-right text-xs text-turf-500 uppercase tracking-wide font-medium">League avg</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-turf-800/50">
+                    {METRICS.map(m => {
+                      const mine = m.value(me);
+                      const pos = m.domain ? scalePosition(mine, m.domain) : null;
+                      const tier = m.domain ? tierFor(mine, m.domain) : 'none';
+                      const others = m.domain
+                        ? analytics
+                            .filter(a => a.user_id !== me.user_id)
+                            .map(a => scalePosition(m.value(a), m.domain!))
+                            .filter((v): v is number => v !== null)
+                        : [];
+                      const all = analytics
+                        .map(a => m.value(a))
+                        .filter((v): v is number => v !== null);
+                      const avg = all.length ? all.reduce((sum, v) => sum + v, 0) / all.length : null;
+                      return (
+                        <tr key={m.id} className={`hover:bg-turf-800/20 transition-colors ${m.groupStart ? 'border-t-[6px] border-t-turf-800/30' : ''}`}>
+                          <th scope="row" className="px-4 py-3 text-left font-normal align-top">
+                            <MetricLabel label={m.label} tooltip={m.tooltip} polarity={m.polarity} />
+                          </th>
+                          <td className="px-3 py-3 align-top font-mono text-xs font-medium">
+                            <MetricValue metric={m} a={me} tier={tier} />
+                            <ScaleTrack position={pos} others={others} />
+                          </td>
+                          <td className="px-4 py-3 text-right align-top font-mono text-xs text-turf-400 tabular-nums">
+                            {avg !== null ? m.fmtValue(avg) : '—'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              ) : (
+                <div
+                  className="overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-field-400"
+                  tabIndex={0}
+                  aria-label="Roster analytics by manager, scrolls horizontally"
+                >
+                  <table className="w-full text-sm" aria-label="Roster analytics by manager">
+                    <caption className="sr-only">Metrics down the side, managers across the top.</caption>
+                    <thead>
+                      <tr className="border-b border-turf-800">
+                        <th scope="col" className="px-4 py-3 text-left text-xs text-turf-500 uppercase tracking-wide font-medium w-44 sticky left-0 bg-turf-900 z-10 border-r border-turf-800">
+                          Metric
+                        </th>
+                        {analytics.map((a, i) => {
+                          const isMe = a.user_id === userId;
+                          return (
+                            <th
+                              key={a.user_id}
+                              scope="col"
+                              className={`px-3 py-3 text-center ${isMe ? 'bg-field-950/30' : ''}`}
+                            >
+                              <Link
+                                to={`/roster/${a.user_id}`}
+                                className="inline-flex items-center gap-1.5 max-w-[9rem] rounded hover:text-field-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-400"
+                              >
+                                <span
+                                  className="w-2 h-2 rounded-full flex-shrink-0"
+                                  style={{ backgroundColor: seriesColor(i) }}
+                                />
+                                <span className="font-sans font-bold text-sm text-white truncate">
+                                  {chartLabel(a.display_name)}
+                                </span>
+                              </Link>
+                              {isMe && <span className="badge-green text-xs mt-1 mx-auto block w-fit">You</span>}
+                            </th>
+                          );
+                        })}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-turf-800/50">
+                      {METRICS.map(m => (
+                        <tr key={m.id} className={`group hover:bg-turf-800/20 transition-colors ${m.groupStart ? 'border-t-[6px] border-t-turf-800/30' : ''}`}>
+                          <th
+                            scope="row"
+                            className="px-4 py-2.5 text-left font-normal sticky left-0 bg-turf-900 group-hover:bg-turf-800 transition-colors z-10 border-r border-turf-800"
+                          >
+                            <MetricLabel label={m.label} tooltip={m.tooltip} polarity={m.polarity} />
+                          </th>
+                          {analytics.map(a => {
+                            const tier = m.domain ? tierFor(m.value(a), m.domain) : 'none';
+                            const isMe = a.user_id === userId;
+                            return (
+                              <td
+                                key={a.user_id}
+                                className={`px-3 py-2.5 text-center font-mono text-xs font-medium ${TIER_CELL[tier]} ${isMe ? 'ring-1 ring-inset ring-field-800/40' : ''}`}
+                              >
+                                <MetricValue metric={m} a={a} tier={tier} />
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
 
-                  <AnalyticsRow
-                    label="Top 25% Rank"
-                    tooltip="Average AP rank of your top-quartile teams. Shows the strength of your best picks."
-                    values={analytics.map((a, i) => ({
-                      display: a.top25_avg > 0 ? a.top25_avg.toFixed(1) : '—',
-                      color: heatColor(a.top25_avg, top25Values.filter(v => v > 0), false),
-                      textColor: PLAYER_COLORS[i],
-                    }))}
-                  />
-
-                  <AnalyticsRow
-                    label="Bottom 25% Rank"
-                    tooltip="Average AP rank of your bottom-quartile teams. Lower numbers here mean even your worst picks are decent."
-                    values={analytics.map((a, i) => ({
-                      display: a.bot25_avg > 0 ? a.bot25_avg.toFixed(1) : '—',
-                      color: heatColor(a.bot25_avg, bot25Values.filter(v => v > 0), false),
-                      textColor: PLAYER_COLORS[i],
-                    }))}
-                  />
-
-                  <AnalyticsRow
-                    groupStart
-                    label="Win/Loss Record"
-                    tooltip="Combined win-loss record across every completed game your rostered teams have played this season."
-                    values={analytics.map((a, i) => ({
-                      display: (a.wins > 0 || a.losses > 0) ? `${a.wins}-${a.losses}` : '—',
-                      color: heatColor(a.wins - a.losses, recordValues, true),
-                      textColor: PLAYER_COLORS[i],
-                    }))}
-                  />
-
-                  <AnalyticsRow
-                    label="Captain Efficiency"
-                    tooltip="How much of the best possible captain bonus you actually captured — 100% means you picked the highest-scoring eligible team as captain every week (ignoring the twice-per-team season limit)."
-                    values={analytics.map((a, i) => ({
-                      display: a.captain_efficiency !== null ? `${a.captain_efficiency}%` : '—',
-                      color: a.captain_efficiency !== null ? heatColor(a.captain_efficiency, captainEffValues, true) : 'transparent',
-                      textColor: PLAYER_COLORS[i],
-                    }))}
-                  />
-
-                  <AnalyticsRow
-                    groupStart
-                    label="Best Pick"
-                    tooltip="Your team that has earned the most fantasy points so far this season."
-                    values={analytics.map((a, i) => ({
-                      display: a.best_pick
-                        ? `${shortTeamName(a.best_pick.team_name)} (${a.best_pick.points > 0 ? '+' : ''}${a.best_pick.points})`
-                        : '—',
-                      color: heatColor(a.best_pick?.points ?? 0, bestPickValues, true),
-                      textColor: PLAYER_COLORS[i],
-                      logo: a.best_pick?.team_logo,
-                      teamName: a.best_pick?.team_name,
-                    }))}
-                  />
-
-                  <AnalyticsRow
-                    label="Worst Pick"
-                    tooltip="Your team that has earned the fewest fantasy points so far this season."
-                    values={analytics.map((a, i) => ({
-                      display: a.worst_pick
-                        ? `${shortTeamName(a.worst_pick.team_name)} (${a.worst_pick.points > 0 ? '+' : ''}${a.worst_pick.points})`
-                        : '—',
-                      color: heatColor(a.worst_pick?.points ?? 0, worstPickValues, true),
-                      textColor: PLAYER_COLORS[i],
-                      logo: a.worst_pick?.team_logo,
-                      teamName: a.worst_pick?.team_name,
-                    }))}
-                  />
-
-                  <AnalyticsRow
-                    label="Best Ranked Team"
-                    tooltip="Your highest AP-ranked team this week."
-                    values={analytics.map((a, i) => ({
-                      display: a.best_team
-                        ? `${shortTeamName(a.best_team.team_name)} (#${a.best_team.rank})`
-                        : '—',
-                      color: 'transparent',
-                      textColor: PLAYER_COLORS[i],
-                      logo: a.best_team?.team_logo,
-                      teamName: a.best_team?.team_name,
-                    }))}
-                  />
-
-                  <AnalyticsRow
-                    label="Worst Ranked Team"
-                    tooltip="Your lowest AP-ranked team. Unranked teams are excluded."
-                    values={analytics.map((a, i) => ({
-                      display: a.worst_team
-                        ? `${shortTeamName(a.worst_team.team_name)} (#${a.worst_team.rank})`
-                        : '—',
-                      color: 'transparent',
-                      textColor: PLAYER_COLORS[i],
-                      logo: a.worst_team?.team_logo,
-                      teamName: a.worst_team?.team_name,
-                    }))}
-                  />
-
-                  <AnalyticsRow
-                    groupStart
-                    label="Over/Under Draft Pts"
-                    tooltip="Sum of (pick number − AP rank) for all your ranked teams. Negative means you drafted better than expected — you got high-ranked teams late."
-                    values={analytics.map((a, i) => ({
-                      display: `${a.over_under_pts > 0 ? '+' : ''}${a.over_under_pts}`,
-                      color: heatColor(a.over_under_pts, ouValues, false),
-                      textColor: PLAYER_COLORS[i],
-                    }))}
-                  />
-
-                  <AnalyticsRow
-                    label="Over/Under Avg"
-                    tooltip="Average (pick number − AP rank) per ranked team. Negative means you consistently found value picks relative to their AP ranking."
-                    values={analytics.map((a, i) => ({
-                      display: `${a.over_under_avg > 0 ? '+' : ''}${a.over_under_avg}`,
-                      color: heatColor(a.over_under_avg, ouAvgValues, false),
-                      textColor: PLAYER_COLORS[i],
-                    }))}
-                  />
-
-                </tbody>
-              </table>
+              <div className="border-t border-turf-800 px-4 py-3 flex items-center gap-x-4 gap-y-1 text-xs text-turf-500 flex-wrap">
+                <span className="flex items-center gap-1"><span className="text-field-400" aria-hidden="true">▲</span> Strong</span>
+                <span className="flex items-center gap-1"><span className="text-amber-400" aria-hidden="true">●</span> Average</span>
+                <span className="flex items-center gap-1"><span className="text-red-300" aria-hidden="true">▼</span> Weak</span>
+                <span className="text-turf-600">Each metric is judged on its own fixed scale, not ranked against the other managers.</span>
+              </div>
 
               {/* Undrafted top teams */}
               {undrafted.length > 0 && (
@@ -594,11 +755,11 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                       <span key={t.team_id} className="badge-gray text-xs inline-flex items-center gap-1.5">
                         <TeamLogo
                           src={teamsById.get(t.team_id)?.logo}
-                          alt={t.team_name}
+                          alt=""
                           fallbackName={t.team_name}
                           size={16}
                         />
-                        {t.team_name} <span className="text-turf-400">(#{t.rank})</span>
+                        {shortTeamName(t.team_name)} <span className="text-turf-400 tabular-nums">(#{t.rank})</span>
                       </span>
                     ))}
                   </div>
@@ -617,8 +778,8 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                 <div className="h-72" role="img" aria-label={`Bar chart of points scored per week by each manager, weeks 0 through ${currentWeek}`}>
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={weeklyData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
-                      <XAxis dataKey="week" tick={{ fill: '#6c757d', fontSize: 11 }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fill: '#6c757d', fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <XAxis dataKey="week" tick={CHART_AXIS_TICK} axisLine={false} tickLine={false} />
+                      <YAxis tick={CHART_AXIS_TICK} axisLine={false} tickLine={false} />
                       <Tooltip
                         contentStyle={CHART_TOOLTIP_STYLE}
                         labelStyle={CHART_TOOLTIP_LABEL}
@@ -631,7 +792,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                           key={e.user_id}
                           name={chartLabel(e.display_name)}
                           dataKey={e.user_id}
-                          fill={PLAYER_COLORS[i] ?? '#22c55e'}
+                          fill={seriesColor(i)}
                           fillOpacity={0.85}
                           radius={[3, 3, 0, 0]}
                           maxBarSize={24}
@@ -662,8 +823,8 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                   >
                     <ResponsiveContainer width="100%" height="100%">
                       <RadarChart data={radarData} margin={{ top: 8, right: 24, left: 24, bottom: 8 }}>
-                        <PolarGrid stroke="#495057" />
-                        <PolarAngleAxis dataKey="metric" tick={{ fill: '#6c757d', fontSize: 11 }} />
+                        <PolarGrid stroke={CHART_GRID} />
+                        <PolarAngleAxis dataKey="metric" tick={CHART_AXIS_TICK} />
                         <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
                         <Tooltip
                           contentStyle={CHART_TOOLTIP_STYLE}
@@ -677,8 +838,8 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                             key={e.user_id}
                             name={chartLabel(e.display_name)}
                             dataKey={e.user_id}
-                            stroke={PLAYER_COLORS[i] ?? '#22c55e'}
-                            fill={PLAYER_COLORS[i] ?? '#22c55e'}
+                            stroke={seriesColor(i)}
+                            fill={seriesColor(i)}
                             fillOpacity={0.12}
                             strokeWidth={2}
                             isAnimationActive={false}
@@ -700,8 +861,8 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                   <div className="h-72" role="img" aria-label="Line chart of each manager's cumulative points across the season">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={trendData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
-                        <XAxis dataKey="week" tick={{ fill: '#6c757d', fontSize: 11 }} axisLine={false} tickLine={false} />
-                        <YAxis tick={{ fill: '#6c757d', fontSize: 11 }} axisLine={false} tickLine={false} />
+                        <XAxis dataKey="week" tick={CHART_AXIS_TICK} axisLine={false} tickLine={false} />
+                        <YAxis tick={CHART_AXIS_TICK} axisLine={false} tickLine={false} />
                         <Tooltip
                           contentStyle={CHART_TOOLTIP_STYLE}
                           labelStyle={CHART_TOOLTIP_LABEL}
@@ -714,7 +875,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                             type="monotone"
                             name={chartLabel(e.display_name)}
                             dataKey={e.user_id}
-                            stroke={PLAYER_COLORS[i] ?? '#22c55e'}
+                            stroke={seriesColor(i)}
                             strokeWidth={2}
                             dot={{ r: 2 }}
                             activeDot={{ r: 4 }}
@@ -738,15 +899,15 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                       <ScatterChart margin={{ top: 16, right: 24, left: 8, bottom: 8 }}>
                         <XAxis
                           type="number" dataKey="pick_number" name="Pick"
-                          tick={{ fill: '#6c757d', fontSize: 11 }} axisLine={false} tickLine={false}
-                          label={{ value: 'Pick #', position: 'insideBottom', offset: -4, fill: '#6c757d', fontSize: 11 }}
+                          tick={CHART_AXIS_TICK} axisLine={false} tickLine={false}
+                          label={{ value: 'Pick #', position: 'insideBottom', offset: -4, ...CHART_AXIS_TICK }}
                         />
                         <YAxis
                           type="number" dataKey="rank" name="AP Rank" reversed
-                          tick={{ fill: '#6c757d', fontSize: 11 }} axisLine={false} tickLine={false}
-                          label={{ value: 'AP rank', angle: -90, position: 'insideLeft', fill: '#6c757d', fontSize: 11 }}
+                          tick={CHART_AXIS_TICK} axisLine={false} tickLine={false}
+                          label={{ value: 'AP rank', angle: -90, position: 'insideLeft', ...CHART_AXIS_TICK }}
                         />
-                        <Tooltip cursor={{ strokeDasharray: '3 3', stroke: '#495057' }} content={<ScatterTooltip />} />
+                        <Tooltip cursor={{ strokeDasharray: '3 3', stroke: CHART_GRID }} content={<ScatterTooltip />} />
                         <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} formatter={legendFormatter} />
                         {scatterByManager.map(m => (
                           <Scatter key={m.name} name={m.name} data={m.data} fill={m.color} shape={TeamLogoDot} />

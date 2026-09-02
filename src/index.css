@@ -4,17 +4,6 @@
 @tailwind utilities;
 
 @layer base {
-  :root {
-    --field-dark:  #052e16;
-    --field-mid:   #166534;
-    --field-light: #22c55e;
-    --gold:        #f59e0b;
-    --turf-900:    #0d1117;
-    --turf-800:    #161b22;
-    --turf-700:    #21262d;
-    --turf-600:    #30363d;
-  }
-
   * { box-sizing: border-box; }
 
   body {

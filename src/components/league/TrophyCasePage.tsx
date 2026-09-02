@@ -10,7 +10,7 @@ import { TeamLogo } from '../ui/TeamLogo';
 import { computeTrophies } from '../../services/trophies';
 import { TiltCard } from '../amicro/tilt-card';
 import {
-  PLAYER_COLORS, CHART_TOOLTIP_STYLE, CHART_TOOLTIP_LABEL, CHART_TOOLTIP_ITEM,
+  seriesColor, CHART_TOOLTIP_STYLE, CHART_TOOLTIP_LABEL, CHART_TOOLTIP_ITEM,
   CHART_AXIS_TICK, legendFormatter,
 } from '../../lib/chartTheme';
 
@@ -332,7 +332,7 @@ function TrendsSection({ seasonHistory }: { seasonHistory: SeasonHistory[] }) {
                   type="monotone"
                   name={latestNameByUser.get(userId) ?? 'Unknown'}
                   dataKey={userId}
-                  stroke={PLAYER_COLORS[i % PLAYER_COLORS.length]}
+                  stroke={seriesColor(i)}
                   strokeWidth={2}
                   dot={{ r: 2 }}
                   activeDot={{ r: 4 }}

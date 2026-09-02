@@ -235,14 +235,32 @@ export function buildStatBonusBoard(
 }
 
 // Color scale: green (good) → yellow → red (bad), normalized to array
-export function heatColor(value: number, allValues: number[], higherIsBetter: boolean): string {
-  if (allValues.length === 0) return 'transparent';
-  const min = Math.min(...allValues);
-  const max = Math.max(...allValues);
-  if (min === max) return 'rgba(34,197,94,0.15)';
-  const norm = (value - min) / (max - min); // 0 = min, 1 = max
-  const score = higherIsBetter ? norm : 1 - norm; // 1 = best
-  if (score >= 0.67) return 'rgba(34,197,94,0.20)';
-  if (score >= 0.33) return 'rgba(251,191,36,0.18)';
-  return 'rgba(239,68,68,0.20)';
+// Where a value sits inside a metric's own absolute domain, 0 (worst) to
+// 1 (best). Absolute rather than min-max across the current league: relative
+// scaling guaranteed exactly one "red" and one "green" manager no matter how
+// close the real numbers were, so a 0.3 difference in average AP rank
+// rendered as an alarm. It also let a sentinel 0 for "no ranked teams" score
+// above everyone. Domains mirror the ones radarData already uses.
+export type MetricTier = 'good' | 'mid' | 'poor' | 'none';
+
+export function scalePosition(
+  value: number | null | undefined,
+  domain: [number, number],
+): number | null {
+  if (value == null || !Number.isFinite(value)) return null;
+  const [worst, best] = domain;
+  if (worst === best) return null;
+  const pct = (value - worst) / (best - worst);
+  return Math.max(0, Math.min(1, pct));
+}
+
+export function tierFor(
+  value: number | null | undefined,
+  domain: [number, number],
+): MetricTier {
+  const pos = scalePosition(value, domain);
+  if (pos === null) return 'none';
+  if (pos >= 0.67) return 'good';
+  if (pos >= 0.33) return 'mid';
+  return 'poor';
 }

@@ -21,4 +21,12 @@ export const CHART_TOOLTIP_LABEL = { color: '#fff', marginBottom: 4, fontWeight:
 export const CHART_TOOLTIP_ITEM = { color: '#adb5bd' };            // turf-500
 export const CHART_AXIS_TICK = { fill: '#6c757d', fontSize: 11 };  // turf-600
 
+// Series color for manager index i. Wraps, so a league larger than the
+// palette keeps cycling instead of handing every extra manager the same
+// fallback (or, where the caller forgot a fallback, no color at all).
+export const seriesColor = (i: number) => PLAYER_COLORS[i % PLAYER_COLORS.length];
+export const CHART_GRID = '#495057';              // turf-700 — grids, cursors, reference lines
+export const CHART_MUTED = '#adb5bd';             // turf-500 — legend/secondary label text
+export const CHART_SURFACE = '#0d1117';           // turf-950 — page behind the chart
+
 export const legendFormatter = (value: string) => <span style={{ color: '#adb5bd' }}>{value}</span>;
