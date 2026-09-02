@@ -836,23 +836,25 @@ export function RosterView({
           </div>
         )}
 
-        {/* View toggle. The week side is a compact "Week N ▾" menu button
-            centered in its half — only the text/chevron opens the picker,
-            not the whole half-width area — and choosing it also activates
-            the week view. */}
+        {/* View toggle. The week half is split in two: clicking anywhere in
+            the half switches to the week view, while only the centered
+            "Week N ▾" text/chevron additionally opens the week picker. The
+            outer area is a pointer convenience; the inner button is the
+            real control, so keyboard users lose nothing. */}
         <div className="flex gap-1 bg-turf-900 p-1 rounded-xl border border-turf-800">
           <div
-            className={`relative flex-1 flex items-center justify-center rounded-lg transition-colors ${
-              view === 'week' ? 'bg-field-500' : ''
+            className={`relative flex-1 flex items-center justify-center rounded-lg transition-colors cursor-pointer ${
+              view === 'week' ? 'bg-field-500' : 'hover:bg-turf-800/60'
             }`}
             ref={weekMenu.rootRef}
+            onClick={() => selectView('week')}
           >
             <button
               type="button"
               aria-haspopup="menu"
               aria-expanded={weekMenu.open}
               aria-controls="roster-panel-week"
-              onClick={() => { selectView('week'); weekMenu.setOpen(v => !v); }}
+              onClick={e => { e.stopPropagation(); selectView('week'); weekMenu.setOpen(v => !v); }}
               className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-field-400 ${
                 view === 'week' ? 'text-turf-950 hover:bg-field-400' : 'text-turf-400 hover:text-white'
               }`}
