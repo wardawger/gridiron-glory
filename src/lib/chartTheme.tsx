@@ -19,7 +19,7 @@ export const CHART_TOOLTIP_STYLE = {
 };
 export const CHART_TOOLTIP_LABEL = { color: '#fff', marginBottom: 4, fontWeight: 600 };
 export const CHART_TOOLTIP_ITEM = { color: '#adb5bd' };            // turf-500
-export const CHART_AXIS_TICK = { fill: '#6c757d', fontSize: 11 };  // turf-600
+export const CHART_AXIS_TICK = { fill: '#6c757d', fontSize: 12 };  // turf-600 — 12px is the readable floor
 
 // Series color for manager index i. Wraps, so a league larger than the
 // palette keeps cycling instead of handing every extra manager the same

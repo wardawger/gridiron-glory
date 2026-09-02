@@ -358,6 +358,20 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
     }).filter(row => entries.some(e => (row[e.user_id] ?? 0) !== 0));
   }, [entries, currentWeek]);
 
+  // Early in the season only a week or two has scores, and a full-width plot
+  // spreads those few bands across the entire card: bars stay pinned at
+  // maxBarSize while the band around each one grows, so most of the chart is
+  // empty gutter. Cap the plot to the width the bands need and center it.
+  // Left as undefined once there are enough weeks to fill the card on their
+  // own, and it is a max rather than a fixed width, so it can never force
+  // horizontal overflow on a narrow screen.
+  const weeklyPlotMaxWidth = useMemo(() => {
+    const weeks = weeklyData.length;
+    if (weeks === 0 || weeks >= 6) return undefined;
+    const bandWidth = entries.length * 26 + 44; // bars + inter-band breathing room
+    return 64 + weeks * bandWidth;              // 64 ≈ the y-axis gutter
+  }, [weeklyData.length, entries.length]);
+
   // Radar data — normalized against a fixed, real-world domain per metric
   // (roughly what "worst" and "best" actually look like for that stat),
   // not the group's own min/max. Min-max normalization always pins someone
@@ -671,7 +685,12 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
               {weeklyData.length === 0 ? (
                 <p className="text-turf-500 text-sm text-center py-8">No weekly data yet — check back once games are played</p>
               ) : (
-                <div className="h-72" role="img" aria-label={`Bar chart of points scored per week by each manager, weeks 0 through ${currentWeek}`}>
+                <div
+                  className="h-72 mx-auto"
+                  style={{ maxWidth: weeklyPlotMaxWidth }}
+                  role="img"
+                  aria-label={`Bar chart of points scored per week by each manager, across ${weeklyData.length} scored week${weeklyData.length === 1 ? '' : 's'}`}
+                >
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={weeklyData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
                       <XAxis dataKey="week" tick={CHART_AXIS_TICK} axisLine={false} tickLine={false} />
