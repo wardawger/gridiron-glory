@@ -58,9 +58,15 @@ export default {
           '0%': { backgroundPosition: '-200% 0' },
           '100%': { backgroundPosition: '200% 0' },
         },
+        // Uses the standalone `translate` property rather than `transform`.
+        // A transform keyframe replaces the element's whole transform for the
+        // duration, which silently wipes out Tailwind transform utilities —
+        // a menu centered with -translate-x-1/2 would animate in off to one
+        // side and only snap to center once the animation finished.
+        // `translate` composes with `transform` instead of replacing it.
         slideUp: {
-          '0%': { transform: 'translateY(12px)', opacity: '0' },
-          '100%': { transform: 'translateY(0)', opacity: '1' },
+          '0%': { translate: '0 12px', opacity: '0' },
+          '100%': { translate: '0 0', opacity: '1' },
         },
         fadeIn: {
           '0%': { opacity: '0' },
