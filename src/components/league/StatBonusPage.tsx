@@ -5,6 +5,7 @@ import { normalizeScoring } from '../../types';
 import { calcStatRankingBonuses } from '../../services/scoring';
 import { buildStatBonusBoard } from '../../services/analytics';
 import { TeamLogo } from '../ui/TeamLogo';
+import { InfoTooltip } from '../ui/Tooltip';
 
 interface Props {
   league: League;
@@ -12,6 +13,12 @@ interface Props {
   rosters: Map<string, RosterEntry[]>;
   seasonStats: Map<string, TeamSeasonStats>;
 }
+
+// Explains why a “bottom” rank can stop short of the full roster. Lives in
+// a tooltip rather than standing body copy — it answers a question the reader
+// only has once they notice an odd-looking rank.
+const RANKING_NOTE =
+  'Ranks are computed only among drafted teams that have a value for that stat this season — a team missing data (e.g. too early in the season, or a stat CFBD hasn’t published for it yet) is left out of the count entirely, so “bottom” ranks can land short of your full roster size rather than at the very end of it.';
 
 const statFmt = new Intl.NumberFormat(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const signed = (n: number) => `${n > 0 ? '+' : ''}${n}`;
@@ -73,7 +80,10 @@ export function StatBonusPage({ league, members, rosters, seasonStats }: Props) 
               <Award className="w-5 h-5 text-turf-950" aria-hidden="true" />
             </div>
             <div>
-              <h1 className="font-display text-2xl tracking-wide text-white text-balance">Statistical Bonuses</h1>
+              <div className="flex items-center gap-1.5">
+                <h1 className="font-display text-2xl tracking-wide text-white text-balance">Statistical Bonuses</h1>
+                <InfoTooltip content={RANKING_NOTE} position="bottom" width="w-72" />
+              </div>
               <p className="text-turf-500 text-sm">
                 Awarded to whoever owns a top- or bottom-ranked team in each enabled category
               </p>
@@ -87,13 +97,8 @@ export function StatBonusPage({ league, members, rosters, seasonStats }: Props) 
             )}
           </span>
         </div>
-        <p className="text-xs text-turf-500 mt-3 pt-3 border-t border-turf-800">
-          Ranks are computed only among drafted teams that have a value for that stat this season — a team missing
-          data (e.g. too early in the season, or a stat CFBD hasn’t published for it yet) is left out of the count
-          entirely, so “bottom” ranks can land short of your full roster size rather than at the very end of it.
-        </p>
         {!confChampComplete && (
-          <p className="text-xs text-turf-500 mt-2">
+          <p className="text-xs text-turf-500 mt-3 pt-3 border-t border-turf-800">
             These stand today, but can still move until conference championship week — they lock in permanently after that.
           </p>
         )}
