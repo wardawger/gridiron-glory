@@ -1,10 +1,12 @@
-import { useMemo, useState, useEffect, useRef } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Shield, TrendingUp, TrendingDown, Minus, Star, Calendar, List, X, MapPin, Tv, Clock, Coins, ChevronDown, UserCheck, Armchair, Lock } from 'lucide-react';
 import type { RosterEntry, CaptainPick, GameData, ScoringSettings, LeagueMember, WeeklyScore, GameResult, SpreadPick, SpreadData, FreeAgencyMove, DraftPick, ScoreCorrection, BenchPick } from '../../types';
 import { calcWeeklyScore } from '../../services/scoring';
 import { rosterAtWeek, isGameKickedOff } from '../../services/roster';
 import { useTabCrossfade } from '../../hooks/useCrossfade';
+import { useDialog } from '../../hooks/useDialog';
+import { useDropdownMenu } from '../../hooks/useDropdownMenu';
 import { Tooltip } from '../ui/Tooltip';
 import { TeamLogo } from '../ui/TeamLogo';
 import { WeatherBadge } from '../ui/WeatherBadge';
@@ -86,8 +88,13 @@ interface ModalProps {
 
 function ScheduleModal({ team, gameData, captainPicks, userId, currentWeek, onClose }: ModalProps) {
   const teamGames = gameData[team.team_id] ?? {};
+  const panelRef = useDialog(onClose);
 
   const weeks = WEEKS.filter(w => teamGames[w]);
+  // Season year comes from the schedule itself rather than a hardcoded
+  // literal, so this header stays right when next season's data loads.
+  const firstDated = weeks.map(w => teamGames[w]?.start_date).find(Boolean);
+  const seasonYear = firstDated ? new Date(firstDated).getFullYear() : new Date().getFullYear();
   // Weeks 14–15 excluded: week 14 is conference championship week (most
   // teams simply don't play), and week 15 is dead except Army-Navy — not
   // real "off weeks" in the bye-week sense for most teams.
@@ -100,20 +107,26 @@ function ScheduleModal({ team, gameData, captainPicks, userId, currentWeek, onCl
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border border-turf-700 bg-turf-950 shadow-2xl"
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="schedule-modal-title"
+        tabIndex={-1}
+        className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border border-turf-700 bg-turf-950 shadow-2xl focus:outline-none"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
         <div className="sticky top-0 z-10 flex items-center gap-4 border-b border-turf-800 bg-turf-950 px-6 py-4">
           <TeamLogo src={team.team_logo} alt={team.team_name} fallbackName={team.team_name} size={48} />
           <div className="flex-1 min-w-0">
-            <h2 className="font-display text-xl font-bold text-white tracking-wide">{team.team_name}</h2>
-            <p className="text-sm text-turf-400">{team.team_conference} · 2026 Schedule</p>
+            <h2 id="schedule-modal-title" className="font-display text-xl font-bold text-white tracking-wide">{team.team_name}</h2>
+            <p className="text-sm text-turf-400">{team.team_conference} · {seasonYear} Schedule</p>
           </div>
           <button
+            type="button"
             onClick={onClose}
             aria-label="Close"
-            className="rounded-lg border border-turf-700 p-1.5 text-turf-400 hover:border-turf-500 hover:text-white transition-colors"
+            className="rounded-lg border border-turf-700 p-1.5 text-turf-400 hover:border-turf-500 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-400"
           >
             <X className="h-4 w-4" />
           </button>
@@ -151,7 +164,7 @@ function ScheduleModal({ team, gameData, captainPicks, userId, currentWeek, onCl
                     {w === 0 ? 'Wk0' : `Wk ${w}`}
                   </div>
                   {isCaptain && (
-                    <div className="mt-1 text-amber-400 text-xs">★ Cap</div>
+                    <div className="mt-1 text-amber-400 text-xs"><span aria-hidden="true">★ </span>Cap<span className="sr-only">tain</span></div>
                   )}
                 </div>
 
@@ -236,14 +249,22 @@ export function RosterView({
   // without affecting league.current_week (used elsewhere for free agency,
   // standings, and stat bonus lock-in).
   const [selectedWeek, setSelectedWeek] = useState(currentWeek);
-  const [showWeekMenu, setShowWeekMenu] = useState(false);
-  const weekMenuRef = useRef<HTMLDivElement>(null);
-  const [showManagerMenu, setShowManagerMenu] = useState(false);
-  const managerMenuRef = useRef<HTMLDivElement>(null);
+  const weekMenu = useDropdownMenu();
+  const managerMenu = useDropdownMenu();
   const [modalTeam, setModalTeam] = useState<RosterEntry | null>(null);
   const [spreadError, setSpreadError] = useState<string | null>(null);
   const [spreadsLoading, setSpreadsLoading] = useState(false);
   const [benchError, setBenchError] = useState<string | null>(null);
+  // "<week>:<teamId>" of the one bench/spread mutation currently in flight.
+  // Its buttons disable while it runs, so a double-tap can't fire the same
+  // request twice and the user gets immediate feedback before realtime
+  // catches up.
+  const [pendingKey, setPendingKey] = useState<string | null>(null);
+  const runPending = async (key: string, fn: () => Promise<unknown>) => {
+    if (pendingKey) return;
+    setPendingKey(key);
+    try { await fn(); } finally { setPendingKey(null); }
+  };
   // A swap is click-source-then-click-target: selecting a team on one side
   // (starter/bench) then a team on the other side within the same week
   // completes the swap. Scoped to a single week — the Full Schedule grid
@@ -264,22 +285,8 @@ export function RosterView({
     [viewUserId, selectedWeek, draftPicks, freeAgencyMoves]
   );
 
-  // Close the week menu and/or the manager switcher when clicking outside them
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (weekMenuRef.current && !weekMenuRef.current.contains(e.target as Node)) {
-        setShowWeekMenu(false);
-      }
-      if (managerMenuRef.current && !managerMenuRef.current.contains(e.target as Node)) {
-        setShowManagerMenu(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
-
   const goToManager = (targetUserId: string) => {
-    setShowManagerMenu(false);
+    managerMenu.setOpen(false);
     navigate(targetUserId === currentUserId ? '/roster' : `/roster/${targetUserId}`);
   };
 
@@ -315,18 +322,23 @@ export function RosterView({
     onEnsureBenchSeeded(selectedWeek, weekRoster.map(e => e.team_id));
   }, [isOwner, scoring.bench_enabled, selectedWeek, weekRoster, onEnsureBenchSeeded]);
 
+  // Reads swapSource directly rather than inside a functional updater —
+  // React runs updater functions twice in StrictMode, which would fire the
+  // swap request twice.
   const handleSwapClick = (week: number, teamId: string, benchedFlag: boolean) => {
-    if (!onSwapBench) return;
+    if (!onSwapBench || pendingKey) return;
     setBenchError(null);
-    setSwapSource(prev => {
-      if (!prev || prev.week !== week) return { week, teamId, benched: benchedFlag };
-      if (prev.teamId === teamId) return null;
-      if (prev.benched === benchedFlag) return { week, teamId, benched: benchedFlag };
-      const benchTeamId   = prev.benched ? prev.teamId : teamId;
-      const starterTeamId = prev.benched ? teamId : prev.teamId;
-      onSwapBench(week, benchTeamId, starterTeamId).then(r => { if (r.error) setBenchError(r.error); });
-      return null;
-    });
+    const prev = swapSource;
+    if (!prev || prev.week !== week || prev.benched === benchedFlag) {
+      setSwapSource(prev?.teamId === teamId ? null : { week, teamId, benched: benchedFlag });
+      return;
+    }
+    const benchTeamId   = prev.benched ? prev.teamId : teamId;
+    const starterTeamId = prev.benched ? teamId : prev.teamId;
+    setSwapSource(null);
+    runPending(`${week}:${teamId}`, () =>
+      onSwapBench(week, benchTeamId, starterTeamId).then(r => { if (r.error) setBenchError(r.error); })
+    );
   };
 
   // Shared by the Starters/Bench grouped grids (bench enabled) and the flat
@@ -349,12 +361,17 @@ export function RosterView({
     const gameDateInfo = game ? formatGameDate(game.start_date, game.start_time_tbd) : null;
     const benchKickedOff = isGameKickedOff((game as any)?.start_date);
     const benchSelected = swapSource?.week === selectedWeek && swapSource.teamId === entry.team_id;
-    const canSwap = isOwner && !!onSwapBench && !benchKickedOff && !isPastWeek;
+    const isPending = pendingKey === `${selectedWeek}:${entry.team_id}`;
+    const canSwap = isOwner && !!onSwapBench && !benchKickedOff && !isPastWeek && !isPending;
+    const openGameModal = () => setGameScoreModal({
+      game: game!, teamId: entry.team_id, teamName: entry.team_name, teamLogo: entry.team_logo,
+      week: selectedWeek, isCaptain,
+    });
 
     return (
       <div
         key={entry.team_id}
-        className={`card relative overflow-hidden p-4 transition-all ${isCaptain ? 'border-gold-500/50 bg-amber-950/20' : ''}`}
+        className={`card relative overflow-hidden p-4 transition-colors ${isCaptain ? 'border-gold-500/50 bg-amber-950/20' : ''}`}
       >
         {/* Oversized, faded team logo watermark */}
         {entry.team_logo && (
@@ -368,35 +385,38 @@ export function RosterView({
 
         <div className="relative z-10">
         {/* Clickable header — opens schedule modal */}
-        <div
-          className="flex items-start gap-3 cursor-pointer hover:opacity-90 transition-opacity"
+        <button
+          type="button"
           onClick={() => setModalTeam(entry)}
+          aria-label={`${entry.team_name} — view full schedule`}
+          className="w-full flex items-start gap-3 text-left rounded-lg hover:opacity-90 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-400"
         >
-          <TeamLogo src={entry.team_logo} alt={entry.team_name} fallbackName={entry.team_name} size={40} />
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
+          <TeamLogo src={entry.team_logo} alt="" fallbackName={entry.team_name} size={40} />
+          <span className="flex-1 min-w-0 block">
+            <span className="flex items-center gap-2">
               <span className="font-medium text-white truncate">{entry.team_name}</span>
               {isCaptain && (
                 <span className="badge-gold text-xs">
-                  <Star className="w-2.5 h-2.5 fill-current" /> Captain
+                  <Star className="w-2.5 h-2.5 fill-current" aria-hidden="true" /> Captain
                 </span>
               )}
-            </div>
-            <span className="text-xs text-turf-500">{entry.team_conference}</span>
-          </div>
+            </span>
+            <span className="text-xs text-turf-500 block">{entry.team_conference}</span>
+          </span>
           {weekBreak && weekBreak.points !== 0 && (
-            <div className={`font-mono font-bold text-sm flex-shrink-0 ${weekBreak.points > 0 ? 'text-field-400' : 'text-red-300'}`}>
+            <span className={`font-mono font-bold text-sm flex-shrink-0 ${weekBreak.points > 0 ? 'text-field-400' : 'text-red-300'}`}>
               {weekBreak.points > 0 ? '+' : ''}{weekBreak.points}
-            </div>
+            </span>
           )}
-        </div>
+        </button>
 
         {scoring.bench_enabled && (
           <button
             type="button"
             disabled={!canSwap}
+            aria-busy={isPending || undefined}
             onClick={() => handleSwapClick(selectedWeek, entry.team_id, benchedFlag)}
-            className={`mt-2 w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+            className={`mt-2 w-full flex items-center justify-center gap-1.5 py-1.5 min-h-[32px] rounded-lg text-xs font-medium border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-400 ${
               benchSelected
                 ? 'border-field-500 bg-field-900/30 text-field-300'
                 : benchedFlag
@@ -405,44 +425,38 @@ export function RosterView({
             } ${!canSwap ? 'opacity-50 cursor-not-allowed' : 'hover:border-field-600'}`}
           >
             {benchKickedOff || isPastWeek
-              ? <Lock className="w-3 h-3 flex-shrink-0" />
+              ? <Lock className="w-3 h-3 flex-shrink-0" aria-hidden="true" />
               : benchedFlag
-              ? <Armchair className="w-3 h-3 flex-shrink-0" />
-              : <UserCheck className="w-3 h-3 flex-shrink-0" />}
-            {benchKickedOff
+              ? <Armchair className="w-3 h-3 flex-shrink-0" aria-hidden="true" />
+              : <UserCheck className="w-3 h-3 flex-shrink-0" aria-hidden="true" />}
+            {isPending
+              ? 'Swapping…'
+              : benchKickedOff
               ? (benchedFlag ? 'Benched — locked' : 'Starting — locked')
               : isPastWeek
               ? (benchedFlag ? 'Benched — week advanced' : 'Starting — week advanced')
               : benchSelected
-              ? 'Tap the team to swap with'
-              : benchedFlag ? 'Benched — tap to swap in' : 'Starting — tap to bench'}
+              ? 'Select the team to swap with'
+              : benchedFlag ? 'Benched — select to swap in' : 'Starting — select to bench'}
           </button>
         )}
 
         {game ? (
-          <div
-            role="button"
-            tabIndex={0}
-            className="mt-3 w-full text-left group/game cursor-pointer"
-            onClick={() => setGameScoreModal({
-              game,
-              teamId: entry.team_id,
-              teamName: entry.team_name,
-              teamLogo: entry.team_logo,
-              week: selectedWeek,
-              isCaptain,
-            })}
-            onKeyDown={e => { if (e.key === 'Enter') setGameScoreModal({ game, teamId: entry.team_id, teamName: entry.team_name, teamLogo: entry.team_logo, week: selectedWeek, isCaptain }); }}
+          <button
+            type="button"
+            className="mt-3 w-full text-left group/game rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-400"
+            onClick={openGameModal}
+            aria-label={`${isHome ? 'vs' : 'at'} ${game.opponent} — view scoring details`}
           >
-            <div className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-turf-800/60 transition-colors">
-              <div className="flex items-center gap-2 min-w-0">
-                <TeamLogo src={oppLogo} alt={game.opponent} fallbackName={game.opponent} size={24} />
-                <div className="text-xs text-turf-400 truncate">
+            <span className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-turf-800/60 transition-colors">
+              <span className="flex items-center gap-2 min-w-0">
+                <TeamLogo src={oppLogo} alt="" fallbackName={game.opponent} size={24} />
+                <span className="text-xs text-turf-400 truncate block">
                   {game.result ? (
                     <span className="flex items-center gap-1">
                       {game.result === 'W'
-                        ? <TrendingUp className="w-3 h-3 text-field-400 flex-shrink-0" />
-                        : <TrendingDown className="w-3 h-3 text-red-300 flex-shrink-0" />
+                        ? <TrendingUp className="w-3 h-3 text-field-400 flex-shrink-0" aria-hidden="true" />
+                        : <TrendingDown className="w-3 h-3 text-red-300 flex-shrink-0" aria-hidden="true" />
                       }
                       <span className={game.result === 'W' ? 'text-field-300' : 'text-red-300'}>
                         {game.result} {isHome ? 'vs' : 'at'} {game.opponent}
@@ -451,23 +465,23 @@ export function RosterView({
                     </span>
                   ) : (
                     <span className="flex items-center gap-1 text-turf-500">
-                      <Minus className="w-3 h-3 flex-shrink-0" />
+                      <Minus className="w-3 h-3 flex-shrink-0" aria-hidden="true" />
                       {isHome ? 'vs' : 'at'} {game.opponent} — {gameDateInfo!.date}
                       {gameDateInfo!.time !== 'TBD' ? ` · ${gameDateInfo!.time}` : ''}
                     </span>
                   )}
-                </div>
-              </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
+                </span>
+              </span>
+              <span className="flex items-center gap-2 flex-shrink-0">
                 {game.home_score != null && game.away_score != null && (
                   <span className="font-mono text-xs text-turf-500">
                     {game.home_score}–{game.away_score}
                   </span>
                 )}
-                <span className="text-turf-700 group-hover/game:text-turf-500 transition-colors text-xs">↗</span>
-              </div>
-            </div>
-          </div>
+                <span aria-hidden="true" className="text-turf-700 group-hover/game:text-turf-500 transition-colors text-xs">↗</span>
+              </span>
+            </span>
+          </button>
         ) : (
           <p className="mt-2 text-xs text-turf-500">No game this week</p>
         )}
@@ -476,7 +490,7 @@ export function RosterView({
           <div className="mt-3 pt-3 border-t border-turf-800/60 flex items-center justify-between gap-2">
             <div className="min-w-0">
               <span className={`text-xs font-medium flex items-center gap-1 ${isCaptain ? 'text-gold-400' : 'text-turf-300'}`}>
-                <Star className="w-3 h-3 flex-shrink-0" /> {isCaptain ? 'Captain ×2' : 'Captain'}
+                <Star className="w-3 h-3 flex-shrink-0" aria-hidden="true" /> {isCaptain ? 'Captain ×2' : 'Captain'}
               </span>
               <p className="text-xs text-turf-500">
                 {captainKickedOff
@@ -492,15 +506,16 @@ export function RosterView({
             </div>
             <button
               type="button"
+              role="switch"
               onClick={() => onSetCaptain(selectedWeek, entry.team_id)}
               disabled={captainKickedOff || isPastWeek || (!canBeCaptain && !isCaptain)}
-              aria-label={isCaptain ? 'Remove captain' : 'Set captain'}
-              aria-pressed={isCaptain}
-              className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${
+              aria-label={`Captain: ${entry.team_name}`}
+              aria-checked={isCaptain}
+              className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 after:absolute after:-inset-2 after:content-[''] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-turf-900 focus-visible:ring-field-400 ${
                 isCaptain ? 'bg-gold-500' : canBeCaptain ? 'bg-turf-700' : 'bg-turf-800 opacity-50 cursor-not-allowed'
               }`}
             >
-              <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${isCaptain ? 'left-5' : 'left-0.5'}`} />
+              <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-[left] motion-reduce:transition-none ${isCaptain ? 'left-5' : 'left-0.5'}`} />
             </button>
           </div>
         )}
@@ -530,31 +545,37 @@ export function RosterView({
             ? null
             : (existingPick!.side === 'cover' ? spreadResult === 'covered' : spreadResult === 'missed');
 
-          const handleToggle = async () => {
+          const pendingKeyHere = `${selectedWeek}:${entry.team_id}`;
+
+          const handleToggle = () => {
             if (toggleDisabled) return;
-            if (isOn) {
-              if (onRemoveSpread) await onRemoveSpread(selectedWeek, entry.team_id);
-            } else if (onSetSpread && weekSpread !== null) {
-              const result = await onSetSpread(selectedWeek, entry.team_id, weekSpread);
-              if (result.error) setSpreadError(result.error);
-            }
+            runPending(pendingKeyHere, async () => {
+              if (isOn) {
+                if (onRemoveSpread) await onRemoveSpread(selectedWeek, entry.team_id);
+              } else if (onSetSpread && weekSpread !== null) {
+                const result = await onSetSpread(selectedWeek, entry.team_id, weekSpread);
+                if (result.error) setSpreadError(result.error);
+              }
+            });
           };
 
-          const handlePickSide = async (side: 'cover' | 'against') => {
-            if (existingPick) {
-              if (existingPick.side === side) {
-                if (!canRemove || !onRemoveSpread) return;
-                await onRemoveSpread(selectedWeek, entry.team_id);
+          const handlePickSide = (side: 'cover' | 'against') => {
+            runPending(pendingKeyHere, async () => {
+              if (existingPick) {
+                if (existingPick.side === side) {
+                  if (!canRemove || !onRemoveSpread) return;
+                  await onRemoveSpread(selectedWeek, entry.team_id);
+                } else {
+                  if (!canSwitchSide || !onSetSpread || weekSpread === null) return;
+                  const result = await onSetSpread(selectedWeek, entry.team_id, weekSpread, side);
+                  if (result.error) setSpreadError(result.error);
+                }
               } else {
-                if (!canSwitchSide || !onSetSpread || weekSpread === null) return;
+                if (!canPick || !onSetSpread || weekSpread === null) return;
                 const result = await onSetSpread(selectedWeek, entry.team_id, weekSpread, side);
                 if (result.error) setSpreadError(result.error);
               }
-            } else {
-              if (!canPick || !onSetSpread || weekSpread === null) return;
-              const result = await onSetSpread(selectedWeek, entry.team_id, weekSpread, side);
-              if (result.error) setSpreadError(result.error);
-            }
+            });
           };
 
           let subtext: string;
@@ -567,6 +588,8 @@ export function RosterView({
                 scoring.spread_allow_against_pick ? ` · ${existingPick.side === 'against' ? 'Against' : 'Cover'}` : ''
               } · ${teamSeasonUses}/${scoring.spread_max_per_team} season`;
             }
+          } else if (isPending) {
+            subtext = 'Saving…';
           } else if (spreadsLoading && !weekSpread) {
             subtext = 'Loading line…';
           } else if (weekSpread === null) {
@@ -600,15 +623,15 @@ export function RosterView({
             <div className="mt-2 pt-2 border-t border-turf-800/60 flex items-center justify-between gap-2">
               <div className="min-w-0">
                 <span className={`text-xs font-medium flex items-center gap-1 ${labelColor}`}>
-                  <Coins className="w-3 h-3 flex-shrink-0" /> Spread
+                  <Coins className="w-3 h-3 flex-shrink-0" aria-hidden="true" /> Spread
                 </span>
                 <p className="text-xs text-turf-500 truncate">{subtext}</p>
               </div>
               {scoring.spread_allow_against_pick ? (
-                <div className="flex items-center gap-1 flex-shrink-0">
+                <div className="flex items-center gap-1 flex-shrink-0" role="group" aria-label={`Spread pick: ${entry.team_name}`}>
                   {(['cover', 'against'] as const).map(side => {
                     const active = existingPick?.side === side;
-                    const disabled = active ? !canRemove : (existingPick ? !canSwitchSide : !canPick);
+                    const disabled = isPending || (active ? !canRemove : (existingPick ? !canSwitchSide : !canPick));
                     return (
                       <button
                         key={side}
@@ -616,7 +639,7 @@ export function RosterView({
                         onClick={() => handlePickSide(side)}
                         disabled={disabled}
                         aria-pressed={active}
-                        className={`px-2 py-1 rounded text-[10px] font-semibold uppercase tracking-wide transition-colors ${
+                        className={`px-2.5 py-1.5 min-h-[28px] rounded text-xs font-semibold uppercase tracking-wide transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-400 ${
                           active
                             ? side === 'cover' ? 'bg-field-600 text-white' : 'bg-blue-600 text-white'
                             : 'bg-turf-800 text-turf-400 hover:text-white'
@@ -630,13 +653,14 @@ export function RosterView({
               ) : (
                 <button
                   type="button"
+                  role="switch"
                   onClick={handleToggle}
-                  disabled={toggleDisabled}
-                  aria-label={isOn ? 'Remove spread pick' : 'Pick spread'}
-                  aria-pressed={isOn}
-                  className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${trackColor} ${toggleDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  disabled={toggleDisabled || isPending}
+                  aria-label={`Spread pick: ${entry.team_name}`}
+                  aria-checked={isOn}
+                  className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 after:absolute after:-inset-2 after:content-[''] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-turf-900 focus-visible:ring-field-400 ${trackColor} ${toggleDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
-                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${isOn ? 'left-5' : 'left-0.5'}`} />
+                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-[left] motion-reduce:transition-none ${isOn ? 'left-5' : 'left-0.5'}`} />
                 </button>
               )}
             </div>
@@ -681,42 +705,71 @@ export function RosterView({
 
         {/* Header */}
         <div className="card p-5 flex items-center justify-between">
-          <div className="relative" ref={managerMenuRef}>
-            <button
-              onClick={() => members.length > 1 && setShowManagerMenu(v => !v)}
-              className={`flex items-center gap-3 group rounded-lg -m-1 p-1 transition-colors ${
-                members.length > 1 ? 'hover:bg-turf-800' : 'cursor-default'
-              }`}
-            >
-              <Avatar
-                displayName={member.display_name}
-                avatarType={member.avatar_type}
-                avatarValue={member.avatar_value}
-                size={40}
-                bgClassName="bg-field-500"
-                textClassName="text-turf-950"
-              />
-              <div className="text-left">
-                <div className="flex items-center gap-2">
-                  <h2 className="font-display text-2xl tracking-wide text-white group-hover:text-field-400 transition-colors">
-                    {member.display_name}
-                  </h2>
-                  {member.role === 'commissioner' && <Shield className="w-4 h-4 text-field-400 flex-shrink-0" />}
-                  {members.length > 1 && (
-                    <ChevronDown className={`w-4 h-4 text-turf-500 transition-transform flex-shrink-0 ${showManagerMenu ? 'rotate-180' : ''}`} />
-                  )}
-                </div>
-                <p className="text-turf-500 text-sm">{roster.length} teams drafted</p>
-              </div>
-            </button>
+          <div className="relative" ref={managerMenu.rootRef}>
+            {(() => {
+              const identity = (
+                <>
+                  <Avatar
+                    displayName={member.display_name}
+                    avatarType={member.avatar_type}
+                    avatarValue={member.avatar_value}
+                    size={40}
+                    bgClassName="bg-field-500"
+                    textClassName="text-turf-950"
+                  />
+                  <span className="text-left block">
+                    <span className="flex items-center gap-2">
+                      <h2 className="font-display text-2xl tracking-wide text-white group-hover:text-field-400 transition-colors">
+                        {member.display_name}
+                      </h2>
+                      {member.role === 'commissioner' && (
+                        <>
+                          <Shield className="w-4 h-4 text-field-400 flex-shrink-0" aria-hidden="true" />
+                          <span className="sr-only">Commissioner</span>
+                        </>
+                      )}
+                      {members.length > 1 && (
+                        <ChevronDown aria-hidden="true" className={`w-4 h-4 text-turf-500 transition-transform motion-reduce:transition-none flex-shrink-0 ${managerMenu.open ? 'rotate-180' : ''}`} />
+                      )}
+                    </span>
+                    <span className="text-turf-500 text-sm block">{roster.length} teams drafted</span>
+                  </span>
+                </>
+              );
+              // With a single member there's nothing to switch to — render
+              // the identity as static content, not a button that does nothing.
+              return members.length > 1 ? (
+                <button
+                  type="button"
+                  aria-haspopup="menu"
+                  aria-expanded={managerMenu.open}
+                  aria-label={`Viewing ${member.display_name}'s roster — switch manager`}
+                  onClick={() => managerMenu.setOpen(v => !v)}
+                  className="flex items-center gap-3 group rounded-lg -m-1 p-1 transition-colors hover:bg-turf-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-400"
+                >
+                  {identity}
+                </button>
+              ) : (
+                <div className="flex items-center gap-3 -m-1 p-1">{identity}</div>
+              );
+            })()}
 
-            {showManagerMenu && (
-              <div className="absolute top-full left-0 mt-1 w-72 card shadow-xl shadow-black/40 overflow-hidden animate-slide-up z-50 p-1.5 max-h-80 overflow-y-auto">
+            {managerMenu.open && (
+              <div
+                ref={managerMenu.menuRef}
+                role="menu"
+                aria-label="Switch manager"
+                className="absolute top-full left-0 mt-1 w-72 card shadow-xl shadow-black/40 overflow-hidden animate-slide-up motion-reduce:animate-none z-50 p-1.5 max-h-80 overflow-y-auto"
+              >
                 {members.map(m => (
                   <button
                     key={m.user_id}
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={m.user_id === viewUserId}
+                    tabIndex={-1}
                     onClick={() => goToManager(m.user_id)}
-                    className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors ${
+                    className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors focus-visible:outline-none focus-visible:bg-turf-800 focus-visible:text-white ${
                       m.user_id === viewUserId
                         ? 'bg-field-900/60 text-field-300'
                         : 'text-turf-300 hover:bg-turf-800 hover:text-white'
@@ -750,54 +803,81 @@ export function RosterView({
             <div className="flex gap-1.5 flex-wrap">
               {weeklyScores.map(ws => {
                 if (!ws.points && ws.week > currentWeek) return null;
+                // Chips look tappable, so they are: selecting one browses
+                // that week. The portal-penalty detail lives in the
+                // accessible name (and title for mouse users), not title alone.
+                const detail = ws.fa_points !== 0
+                  ? `Week ${ws.week}: ${ws.points} pts (includes ${ws.fa_points} portal penalty)`
+                  : `Week ${ws.week}: ${ws.points} pts`;
                 return (
-                  <div
+                  <button
                     key={ws.week}
-                    className={`flex flex-col items-center justify-center w-10 h-10 rounded-lg text-xs font-mono ${
+                    type="button"
+                    onClick={() => { setSelectedWeek(ws.week); selectView('week'); }}
+                    aria-label={`${detail} — view week ${ws.week}`}
+                    aria-current={ws.week === selectedWeek ? 'true' : undefined}
+                    title={detail}
+                    className={`flex flex-col items-center justify-center w-11 h-11 rounded-lg text-xs font-mono transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-400 ${
                       ws.week === selectedWeek
                         ? 'bg-field-500/20 border border-field-600 text-field-300'
                         : ws.points > 0
-                        ? 'bg-turf-800 text-turf-300'
+                        ? 'bg-turf-800 text-turf-300 hover:bg-turf-700'
                         : ws.points < 0
-                        ? 'bg-red-900/30 text-red-300'
-                        : 'bg-turf-900 text-turf-500'
+                        ? 'bg-red-900/30 text-red-300 hover:bg-red-900/50'
+                        : 'bg-turf-900 text-turf-500 hover:bg-turf-800'
                     }`}
-                    title={
-                      ws.fa_points !== 0
-                        ? `Week ${ws.week}: ${ws.points} pts (includes ${ws.fa_points} portal penalty)`
-                        : `Week ${ws.week}: ${ws.points} pts`
-                    }
                   >
-                    <span className="text-turf-500" style={{ fontSize: 9 }}>W{ws.week}</span>
-                    <span className="font-bold">{ws.points}</span>
-                  </div>
+                    <span className="text-turf-500 text-xs leading-none">W{ws.week}</span>
+                    <span className="font-bold leading-tight">{ws.points}</span>
+                  </button>
                 );
               })}
             </div>
           </div>
         )}
 
-        {/* View toggle */}
+        {/* View toggle. The week side is a compact "Week N ▾" menu button
+            centered in its half — only the text/chevron opens the picker,
+            not the whole half-width area — and choosing it also activates
+            the week view. */}
         <div className="flex gap-1 bg-turf-900 p-1 rounded-xl border border-turf-800">
-          <div className="relative flex-1" ref={weekMenuRef}>
+          <div
+            className={`relative flex-1 flex items-center justify-center rounded-lg transition-colors ${
+              view === 'week' ? 'bg-field-500' : ''
+            }`}
+            ref={weekMenu.rootRef}
+          >
             <button
-              onClick={() => { setShowWeekMenu(v => !v); selectView('week'); }}
-              className={`w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium transition-all ${
-                view === 'week' ? 'bg-field-500 text-turf-950' : 'text-turf-400 hover:text-white'
+              type="button"
+              aria-haspopup="menu"
+              aria-expanded={weekMenu.open}
+              aria-controls="roster-panel-week"
+              onClick={() => { selectView('week'); weekMenu.setOpen(v => !v); }}
+              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-field-400 ${
+                view === 'week' ? 'text-turf-950 hover:bg-field-400' : 'text-turf-400 hover:text-white'
               }`}
             >
-              <List className="w-3.5 h-3.5 flex-shrink-0" />
+              <List className="w-3.5 h-3.5 flex-shrink-0" aria-hidden="true" />
               {selectedWeek === 0 ? 'Week 0' : `Week ${selectedWeek}`}
-              <ChevronDown className={`w-3 h-3 transition-transform ${showWeekMenu ? 'rotate-180' : ''}`} />
+              <ChevronDown aria-hidden="true" className={`w-3.5 h-3.5 transition-transform motion-reduce:transition-none ${weekMenu.open ? 'rotate-180' : ''}`} />
             </button>
 
-            {showWeekMenu && (
-              <div className="absolute top-full left-0 mt-1 w-40 card shadow-xl shadow-black/40 overflow-hidden animate-slide-up z-50 p-1.5 max-h-72 overflow-y-auto">
+            {weekMenu.open && (
+              <div
+                ref={weekMenu.menuRef}
+                role="menu"
+                aria-label="Week"
+                className="absolute top-full left-0 mt-1 w-40 card shadow-xl shadow-black/40 overflow-hidden animate-slide-up motion-reduce:animate-none z-50 p-1.5 max-h-72 overflow-y-auto"
+              >
                 {WEEKS.map(w => (
                   <button
                     key={w}
-                    onClick={() => { setSelectedWeek(w); selectView('week'); setShowWeekMenu(false); }}
-                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-sm transition-colors ${
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={w === selectedWeek}
+                    tabIndex={-1}
+                    onClick={() => { setSelectedWeek(w); selectView('week'); weekMenu.setOpen(false); }}
+                    className={`w-full flex items-center justify-between px-2.5 py-1.5 min-h-[32px] rounded-lg text-sm transition-colors focus-visible:outline-none focus-visible:bg-turf-800 focus-visible:text-white ${
                       w === selectedWeek
                         ? 'bg-field-900/60 text-field-400'
                         : 'text-turf-300 hover:bg-turf-800 hover:text-white'
@@ -811,17 +891,20 @@ export function RosterView({
             )}
           </div>
           <button
+            type="button"
+            aria-pressed={view === 'schedule'}
+            aria-controls="roster-panel-schedule"
             onClick={() => selectView('schedule')}
-            className={`flex items-center gap-1.5 flex-1 justify-center py-2 rounded-lg text-sm font-medium transition-all ${
+            className={`flex items-center gap-1.5 flex-1 justify-center py-2 rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-field-400 ${
               view === 'schedule' ? 'bg-field-500 text-turf-950' : 'text-turf-400 hover:text-white'
             }`}
           >
-            <Calendar className="w-3.5 h-3.5" /> Full Schedule
+            <Calendar className="w-3.5 h-3.5" aria-hidden="true" /> Full Schedule
           </button>
         </div>
 
         {/* ── THIS WEEK VIEW ── */}
-        <div className={viewPanelClass('week')}>
+        <div id="roster-panel-week" className={`${viewPanelClass('week')} motion-reduce:animate-none`}>
           {weekRoster.length === 0 ? (
             <div className="card p-12 text-center text-turf-500">
               <p>{roster.length === 0 ? 'No teams drafted yet' : 'No teams rostered that week'}</p>
@@ -850,48 +933,54 @@ export function RosterView({
         </div>
 
         {benchError && (
-          <div className="card p-3 border-red-800/50 bg-red-950/20 text-xs text-red-300 flex items-center justify-between">
+          <div role="alert" className="card p-3 border-red-800/50 bg-red-950/20 text-xs text-red-300 flex items-center justify-between">
             <span>{benchError}</span>
-            <button onClick={() => setBenchError(null)} className="text-red-500 hover:text-red-300 ml-2">✕</button>
+            <button type="button" onClick={() => setBenchError(null)} aria-label="Dismiss" className="text-red-500 hover:text-red-300 ml-2 p-1.5 -m-1.5 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400">
+              <X className="w-3.5 h-3.5" aria-hidden="true" />
+            </button>
           </div>
         )}
 
         {/* ── FULL SCHEDULE VIEW ── */}
         {scoring.spread_enabled && (
-          <div className={`px-1 ${viewPanelClass('schedule')}`}>
+          <div className={`px-1 ${viewPanelClass('schedule')} motion-reduce:animate-none`}>
             <p className="text-xs text-turf-500 flex items-center gap-1.5">
-              <Coins className="w-3.5 h-3.5 flex-shrink-0" />
-              Spread picks available — click opponent logo to view scoring, use team row to pick spreads
+              <Coins className="w-3.5 h-3.5 flex-shrink-0" aria-hidden="true" />
+              Spread picks available — select an opponent logo for scoring details, or a team's week cell to pick a spread
             </p>
           </div>
         )}
 
         {spreadError && (
-          <div className="card p-3 border-red-800/50 bg-red-950/20 text-xs text-red-300 flex items-center justify-between">
+          <div role="alert" className="card p-3 border-red-800/50 bg-red-950/20 text-xs text-red-300 flex items-center justify-between">
             <span>{spreadError}</span>
-            <button onClick={() => setSpreadError(null)} className="text-red-500 hover:text-red-300 ml-2">✕</button>
+            <button type="button" onClick={() => setSpreadError(null)} aria-label="Dismiss" className="text-red-500 hover:text-red-300 ml-2 p-1.5 -m-1.5 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400">
+              <X className="w-3.5 h-3.5" aria-hidden="true" />
+            </button>
           </div>
         )}
 
-        <div className={`card overflow-hidden ${viewPanelClass('schedule')}`}>
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
+        <div id="roster-panel-schedule" className={`card overflow-hidden ${viewPanelClass('schedule')} motion-reduce:animate-none`}>
+            {/* tabIndex so keyboard users can scroll the wide grid */}
+            <div className="overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-field-400" tabIndex={0} aria-label="Full season schedule, scrolls horizontally">
+              <table className="w-full text-xs" aria-label="Full season schedule by team and week">
                 <thead>
                   <tr className="border-b border-turf-800">
-                    <th className="px-4 py-3 text-left text-turf-400 font-medium sticky left-0 bg-turf-900 z-10 min-w-44">
+                    <th scope="col" className="px-4 py-3 text-left text-turf-400 font-medium sticky left-0 bg-turf-900 z-10 min-w-44">
                       Team
                     </th>
                     {WEEKS.map(w => (
                       <th
                         key={w}
+                        scope="col"
                         className={`px-2 py-3 text-center font-medium min-w-[4.5rem] ${
                           w === currentWeek ? 'text-field-400' : 'text-turf-500'
                         }`}
                       >
                         {w === currentWeek ? (
                           <span className="flex flex-col items-center gap-0.5">
-                            <span className="w-1.5 h-1.5 rounded-full bg-field-400 inline-block" />
-                            Wk {w}
+                            <span className="w-1.5 h-1.5 rounded-full bg-field-400 inline-block" aria-hidden="true" />
+                            Wk {w}<span className="sr-only"> (current week)</span>
                           </span>
                         ) : `Wk ${w}`}
                       </th>
@@ -904,13 +993,15 @@ export function RosterView({
                     return (
                       <tr key={entry.team_id} className="hover:bg-turf-800/20 transition-colors">
                         {/* Team name — sticky left, clickable */}
-                        <td className="px-4 py-2.5 sticky left-0 bg-turf-900 z-10 border-r border-turf-800">
-                          <Tooltip content="Click to view full schedule" position="right" width="w-44">
+                        <th scope="row" className="px-4 py-2.5 sticky left-0 bg-turf-900 z-10 border-r border-turf-800 font-normal text-left">
+                          <Tooltip content="View full schedule" position="right" width="w-44">
                           <button
-                            className="flex items-center gap-2 text-left w-full group"
+                            type="button"
+                            className="flex items-center gap-2 text-left w-full group rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-400"
                             onClick={() => setModalTeam(entry)}
+                            aria-label={`${entry.team_name} — view full schedule`}
                           >
-                            <TeamLogo src={entry.team_logo} alt={entry.team_name} fallbackName={entry.team_name} size={24} />
+                            <TeamLogo src={entry.team_logo} alt="" fallbackName={entry.team_name} size={24} />
                             <span className="font-medium text-white truncate max-w-28 group-hover:text-field-300 transition-colors">
                               {entry.team_name}
                             </span>
@@ -919,7 +1010,7 @@ export function RosterView({
                           <div className="text-turf-500 mt-0.5 pl-8">
                             {captainUses}/2 captain uses
                           </div>
-                        </td>
+                        </th>
 
                         {/* Week cells */}
                         {WEEKS.map(w => {
@@ -958,7 +1049,9 @@ export function RosterView({
                                     width="w-44"
                                   >
                                   <button
-                                    className="rounded hover:ring-1 hover:ring-field-500/50 transition-all"
+                                    type="button"
+                                    aria-label={`${isHome ? 'vs' : 'at'} ${game.opponent}${game.opponent_rank ? ` (#${game.opponent_rank})` : ''} — week ${w} scoring details`}
+                                    className="rounded hover:ring-1 hover:ring-field-500/50 transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-400"
                                     onClick={e => {
                                       e.stopPropagation();
                                       const isCaptainThisWeek = getCaptainForWeek(w) === entry.team_id;
@@ -972,7 +1065,7 @@ export function RosterView({
                                       });
                                     }}
                                   >
-                                    <TeamLogo src={oppLogo} alt={game.opponent} fallbackName={game.opponent} size={28} />
+                                    <TeamLogo src={oppLogo} alt="" fallbackName={game.opponent} size={28} />
                                   </button>
                                   </Tooltip>
 
@@ -998,20 +1091,26 @@ export function RosterView({
                                     const canRemove = isOwner && onSetCaptain && !kicked && !isPast;
                                     return canRemove ? (
                                       <button
+                                        type="button"
                                         onClick={e => { e.stopPropagation(); onSetCaptain!(w, entry.team_id); }}
-                                        className="text-amber-400 font-bold text-xs hover:text-red-300 transition-colors border border-amber-900/40 hover:border-red-800 rounded px-1"
+                                        className="text-amber-400 font-bold text-xs hover:text-red-300 transition-colors border border-amber-900/40 hover:border-red-800 rounded px-1.5 min-h-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-400"
                                         title="Remove captain"
+                                        aria-label={`Remove captain from ${entry.team_name}, week ${w}`}
                                       >
-                                        ★ ✕
+                                        <span aria-hidden="true">★ ✕</span>
                                       </button>
                                     ) : (
-                                      <div className="text-amber-400 font-bold text-xs">★</div>
+                                      <div className="text-amber-400 font-bold text-xs">
+                                        <span aria-hidden="true">★</span><span className="sr-only">Captain</span>
+                                      </div>
                                     );
                                   })()}
                                   {canSetCap && !isCap && (
                                     <button
+                                      type="button"
                                       onClick={e => { e.stopPropagation(); onSetCaptain!(w, entry.team_id); }}
-                                      className="text-turf-500 hover:text-gold-400 transition-colors text-xs border border-turf-700 hover:border-gold-600 rounded px-1 py-0.5 w-full"
+                                      aria-label={`Set ${entry.team_name} as captain, week ${w}`}
+                                      className="text-turf-500 hover:text-gold-400 transition-colors text-xs border border-turf-700 hover:border-gold-600 rounded px-1 py-0.5 min-h-6 w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-400"
                                     >
                                       + Cap
                                     </button>
@@ -1045,6 +1144,7 @@ export function RosterView({
                                     const pickWon = !sp?.result || sp.result === 'push'
                                       ? null
                                       : (sp!.side === 'cover' ? sp!.result === 'covered' : sp!.result === 'missed');
+                                    const cellPending = pendingKey === `${w}:${entry.team_id}`;
 
                                     if (sp) {
                                       const sidePrefix = scoring.spread_allow_against_pick
@@ -1057,27 +1157,39 @@ export function RosterView({
                                           pickWon === true ? 'text-field-400' :
                                           pickWon === false ? 'text-red-300' : 'text-blue-400'
                                         }`}>
-                                          {(scoring.spread_allow_against_pick ? canSwitchSpreadSide : canRemoveSpread) ? (
-                                            <button
-                                              onClick={e => {
-                                                e.stopPropagation();
-                                                const action = scoring.spread_allow_against_pick && sp.side === 'cover'
-                                                  ? onSetSpread!(w, entry.team_id, sp.locked_spread, 'against')
-                                                  : onRemoveSpread!(w, entry.team_id);
-                                                action.then(r => {
-                                                  if (r.error) setSpreadError(r.error);
-                                                });
-                                              }}
-                                              className="hover:text-red-300 transition-colors border border-current/20 hover:border-red-800 rounded px-0.5 flex items-center gap-0.5"
-                                              title={scoring.spread_allow_against_pick && sp.side === 'cover' ? 'Switch to against' : 'Remove spread pick'}
-                                            >
-                                              <Coins className="w-2.5 h-2.5" />{sidePrefix}{formatSpread(sp.locked_spread)}
-                                              {sp.result === null ? ' ✕' : resultGlyph}
-                                            </button>
-                                          ) : (
+                                          {(scoring.spread_allow_against_pick ? canSwitchSpreadSide : canRemoveSpread) ? (() => {
+                                            const switching = scoring.spread_allow_against_pick && sp.side === 'cover';
+                                            const actionLabel = switching ? 'Switch to against' : 'Remove spread pick';
+                                            return (
+                                              <button
+                                                type="button"
+                                                disabled={cellPending}
+                                                onClick={e => {
+                                                  e.stopPropagation();
+                                                  runPending(`${w}:${entry.team_id}`, () =>
+                                                    (switching
+                                                      ? onSetSpread!(w, entry.team_id, sp.locked_spread, 'against')
+                                                      : onRemoveSpread!(w, entry.team_id)
+                                                    ).then(r => { if (r.error) setSpreadError(r.error); })
+                                                  );
+                                                }}
+                                                className="hover:text-red-300 transition-colors border border-current/20 hover:border-red-800 rounded px-1 min-h-6 flex items-center gap-0.5 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-400"
+                                                title={actionLabel}
+                                                aria-label={`${actionLabel}: ${entry.team_name} ${sidePrefix.trim() ? (sp.side === 'against' ? 'against' : 'cover') : ''} ${formatSpread(sp.locked_spread)}, week ${w}`}
+                                              >
+                                                <Coins className="w-2.5 h-2.5" aria-hidden="true" />{sidePrefix}{formatSpread(sp.locked_spread)}
+                                                <span aria-hidden="true">{sp.result === null ? ' ✕' : resultGlyph}</span>
+                                              </button>
+                                            );
+                                          })() : (
                                             <span className="flex items-center gap-0.5">
-                                              <Coins className="w-2.5 h-2.5" />{sidePrefix}{formatSpread(sp.locked_spread)}
-                                              {resultGlyph}
+                                              <Coins className="w-2.5 h-2.5" aria-hidden="true" />{sidePrefix}{formatSpread(sp.locked_spread)}
+                                              <span aria-hidden="true">{resultGlyph}</span>
+                                              {sp.result && (
+                                                <span className="sr-only">
+                                                  {sp.result === 'push' ? 'push' : pickWon ? 'won' : 'lost'}
+                                                </span>
+                                              )}
                                             </span>
                                           )}
                                         </div>
@@ -1085,15 +1197,20 @@ export function RosterView({
                                     }
                                     if (canPickSpread) return (
                                       <button
+                                        type="button"
+                                        disabled={cellPending}
                                         onClick={e => {
                                           e.stopPropagation();
-                                          onSetSpread!(w, entry.team_id, weekSpread!).then(r => {
-                                            if (r.error) setSpreadError(r.error);
-                                          });
+                                          runPending(`${w}:${entry.team_id}`, () =>
+                                            onSetSpread!(w, entry.team_id, weekSpread!).then(r => {
+                                              if (r.error) setSpreadError(r.error);
+                                            })
+                                          );
                                         }}
-                                        className="text-blue-600 hover:text-blue-400 text-xs transition-colors mt-0.5 border border-blue-900/40 hover:border-blue-700 rounded px-1 flex items-center gap-0.5"
+                                        aria-label={`Pick spread ${formatSpread(weekSpread)} for ${entry.team_name}, week ${w}`}
+                                        className="text-blue-600 hover:text-blue-400 text-xs transition-colors mt-0.5 border border-blue-900/40 hover:border-blue-700 rounded px-1 min-h-6 flex items-center gap-0.5 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-400"
                                       >
-                                        <Coins className="w-2.5 h-2.5" />{formatSpread(weekSpread)}
+                                        <Coins className="w-2.5 h-2.5" aria-hidden="true" />{formatSpread(weekSpread)}
                                       </button>
                                     );
                                     return null;
@@ -1105,14 +1222,18 @@ export function RosterView({
                                     const benchedHere = isBenchedForWeek(entry.team_id, w);
                                     const kicked = isGameKickedOff((game as any)?.start_date);
                                     const selected = swapSource?.week === w && swapSource.teamId === entry.team_id;
-                                    const canInteract = isOwner && !!onSwapBench && !kicked && !isPast;
+                                    const swapPending = pendingKey === `${w}:${entry.team_id}`;
+                                    const canInteract = isOwner && !!onSwapBench && !kicked && !isPast && !swapPending;
+                                    const stateLabel = benchedHere ? 'Benched' : 'Starting';
                                     return (
                                       <button
                                         type="button"
                                         disabled={!canInteract}
+                                        aria-pressed={selected}
                                         onClick={e => { e.stopPropagation(); handleSwapClick(w, entry.team_id, benchedHere); }}
-                                        title={benchedHere ? 'Benched' : 'Starting'}
-                                        className={`mt-0.5 text-[10px] font-bold uppercase tracking-wide rounded px-1 border ${
+                                        title={stateLabel}
+                                        aria-label={`${entry.team_name}, week ${w}: ${stateLabel}${canInteract ? (selected ? ' — selected for swap' : ' — select to swap') : ''}`}
+                                        className={`mt-0.5 text-xs font-bold uppercase tracking-wide rounded px-1.5 min-h-6 border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-400 ${
                                           selected
                                             ? 'border-field-500 text-field-300 bg-field-900/40'
                                             : benchedHere
@@ -1142,15 +1263,15 @@ export function RosterView({
             <div className="border-t border-turf-800 px-4 py-3 flex items-center gap-4 text-xs text-turf-500 flex-wrap">
               <span className="flex items-center gap-1"><span className="text-field-400 font-bold">W</span> Win</span>
               <span className="flex items-center gap-1"><span className="text-red-300 font-bold">L</span> Loss</span>
-              <span className="flex items-center gap-1"><span className="text-amber-400">★</span> Captain</span>
+              <span className="flex items-center gap-1"><span className="text-amber-400" aria-hidden="true">★</span> Captain</span>
               {scoring.bench_enabled && (
-                <span className="flex items-center gap-1"><span className="text-field-400 font-bold">ST</span>/<span className="text-turf-500 font-bold">BN</span> Starter/Bench — tap to swap</span>
+                <span className="flex items-center gap-1"><span className="text-field-400 font-bold">ST</span>/<span className="text-turf-500 font-bold">BN</span> Starter/Bench — select to swap</span>
               )}
-              <span className="flex items-center gap-1"><span className="text-turf-400">—</span> Bye / no game</span>
+              <span className="flex items-center gap-1"><span className="text-turf-400" aria-hidden="true">—</span> Bye / no game</span>
               <span className="flex items-center gap-1 text-turf-500">
-                Click a team name for full schedule details
+                Select a team name for full schedule details
               </span>
-              <span className="text-turf-500 ml-auto">Scroll right →</span>
+              <span className="text-turf-500 ml-auto">Scroll right<span aria-hidden="true"> →</span></span>
             </div>
         </div>
       </FadeIn>

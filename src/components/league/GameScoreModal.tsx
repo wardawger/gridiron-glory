@@ -3,6 +3,7 @@ import type { GameResult, ScoringSettings, SpreadPick } from '../../types';
 import { scoreGame, getSpreadOutcome, scoreSpread } from '../../services/scoring';
 import { TeamLogo } from '../ui/TeamLogo';
 import { WeatherBadge } from '../ui/WeatherBadge';
+import { useDialog } from '../../hooks/useDialog';
 
 function formatGameDate(startDate: string | null | undefined, startTimeTbd: boolean): { date: string; time: string } {
   if (!startDate) return { date: 'TBD', time: 'TBD' };
@@ -84,6 +85,7 @@ export function GameScoreModal({ game, teamName, teamLogo, week, isCaptain, scor
   const basePoints    = scoreGame(game, scoring, false);
   const captainBonus  = scoreGame(game, scoring, isCaptain) - basePoints;
   const totalPoints   = scoreGame(game, scoring, isCaptain) + spreadPts;
+  const panelRef = useDialog(onClose);
 
   return (
     <div
@@ -92,15 +94,21 @@ export function GameScoreModal({ game, teamName, teamLogo, week, isCaptain, scor
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-sm rounded-2xl border border-turf-700 bg-turf-950 shadow-2xl"
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Week ${week}: ${teamName} ${isHome ? 'vs' : 'at'} ${game.opponent} scoring details`}
+        tabIndex={-1}
+        className="relative w-full max-w-sm rounded-2xl border border-turf-700 bg-turf-950 shadow-2xl focus:outline-none"
         onClick={e => e.stopPropagation()}
       >
         {/* Header — scoreboard: logo + score per side */}
         <div className="relative border-b border-turf-800 px-5 py-5">
           <button
+            type="button"
             onClick={onClose}
             aria-label="Close"
-            className="absolute top-3 right-3 rounded-lg border border-turf-700 p-1.5 text-turf-400 hover:border-turf-500 hover:text-white transition-colors"
+            className="absolute top-3 right-3 rounded-lg border border-turf-700 p-1.5 text-turf-400 hover:border-turf-500 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-400"
           >
             <X className="h-3.5 w-3.5" />
           </button>

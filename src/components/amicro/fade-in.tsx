@@ -1,5 +1,5 @@
 import React from 'react';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 
 interface FadeInProps {
   children: React.ReactNode;
@@ -14,13 +14,15 @@ export function FadeIn({
   delay = 0,
   className = '',
 }: FadeInProps) {
+  // Honor prefers-reduced-motion: render at full opacity immediately.
+  const reduceMotion = useReducedMotion();
   return (
     <motion.div
-      initial={{ opacity: 0 }}
+      initial={{ opacity: reduceMotion ? 1 : 0 }}
       animate={{ opacity: 1 }}
       transition={{
-        duration,
-        delay,
+        duration: reduceMotion ? 0 : duration,
+        delay: reduceMotion ? 0 : delay,
         ease: [0.215, 0.61, 0.355, 1], // easeOutCubic
       }}
       className={className}
