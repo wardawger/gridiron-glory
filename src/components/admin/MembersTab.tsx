@@ -365,7 +365,7 @@ export function MembersTab({
                   )}
                 </div>
                 {isLastCommissioner && (
-                  <p className="text-xs text-turf-600">A league needs at least one commissioner</p>
+                  <p className="text-xs text-turf-500">A league needs at least one commissioner</p>
                 )}
               </div>
             </div>

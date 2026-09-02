@@ -67,7 +67,7 @@ function TrophyCategoryCard({ category }: { category: TrophyCategory }) {
         <p className="text-xs text-turf-500 mt-0.5">{category.description}</p>
       </div>
       {category.winners.length === 0 ? (
-        <p className="text-xs text-turf-600 italic">Nobody yet</p>
+        <p className="text-xs text-turf-500 italic">Nobody yet</p>
       ) : (
         <div className="space-y-2.5">
           {category.winners.map(w => (

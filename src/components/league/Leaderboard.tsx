@@ -123,7 +123,7 @@ function MetricLabel({ label, tooltip, polarity }: MetricTooltipProps) {
         <span className="text-turf-300 text-xs font-medium">{label}</span>
         <InfoTooltip content={tooltip} position="bottom" width="w-56" />
       </span>
-      {polarity && <p className="text-xs text-turf-600 leading-tight">{polarity}</p>}
+      {polarity && <p className="text-xs text-turf-500 leading-tight">{polarity}</p>}
     </div>
   );
 }
@@ -625,7 +625,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                 <span className="flex items-center gap-1"><span className="text-field-400" aria-hidden="true">▲</span> Strong</span>
                 <span className="flex items-center gap-1"><span className="text-amber-400" aria-hidden="true">●</span> Average</span>
                 <span className="flex items-center gap-1"><span className="text-red-300" aria-hidden="true">▼</span> Weak</span>
-                <span className="text-turf-600">Each metric is judged on its own fixed scale, not ranked against the other managers.</span>
+                <span className="text-turf-500">Each metric is judged on its own fixed scale, not ranked against the other managers.</span>
               </div>
 
               {/* Undrafted top teams */}
