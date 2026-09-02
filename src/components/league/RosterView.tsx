@@ -869,7 +869,7 @@ export function RosterView({
                 ref={weekMenu.menuRef}
                 role="menu"
                 aria-label="Week"
-                className="absolute top-full left-0 mt-1 w-40 card shadow-xl shadow-black/40 overflow-hidden animate-slide-up motion-reduce:animate-none z-50 p-1.5 max-h-72 overflow-y-auto"
+                className="absolute top-full left-1/2 -translate-x-1/2 mt-1 w-40 card shadow-xl shadow-black/40 overflow-hidden animate-slide-up motion-reduce:animate-none z-50 p-1.5 max-h-72 overflow-y-auto"
               >
                 {WEEKS.map(w => (
                   <button
