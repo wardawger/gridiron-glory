@@ -11,6 +11,9 @@ import { computeAnalytics, heatColor } from '../../services/analytics';
 import { Avatar } from '../ui/Avatar';
 import { TeamLogo } from '../ui/TeamLogo';
 import { InfoTooltip } from '../ui/Tooltip';
+import {
+  PLAYER_COLORS, CHART_TOOLTIP_STYLE, CHART_TOOLTIP_LABEL, CHART_TOOLTIP_ITEM, legendFormatter,
+} from '../../lib/chartTheme';
 
 interface Props {
   entries: LeaderboardEntry[];
@@ -21,22 +24,6 @@ interface Props {
   rankings: APRanking[];
   teams: CfbTeam[];
 }
-
-const PLAYER_COLORS = ['#f59e0b', '#60a5fa', '#a78bfa', '#34d399', '#f87171', '#fb923c'];
-
-// Recharts' built-in tooltip only takes inline styles, so these mirror the
-// app's turf-900 / turf-700 tokens (see tailwind.config.js) rather than
-// introducing off-palette hex values.
-const CHART_TOOLTIP_STYLE = {
-  background: '#212529',
-  border: '1px solid #495057',
-  borderRadius: 8,
-  fontSize: 12,
-  boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
-};
-const CHART_TOOLTIP_LABEL = { color: '#fff', marginBottom: 4, fontWeight: 600 };
-const CHART_TOOLTIP_ITEM  = { color: '#adb5bd' };
-const legendFormatter = (value: string) => <span style={{ color: '#adb5bd' }}>{value}</span>;
 
 // Compact team label for the analytics cells. Plain last-word truncation
 // turned "Ohio State", "Florida State" and "Michigan State" into an

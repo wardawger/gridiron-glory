@@ -1,5 +1,5 @@
-import React, { useRef, useState } from 'react';
-import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion';
+import React, { useRef } from 'react';
+import { motion, useMotionValue, useSpring, useTransform, useReducedMotion } from 'framer-motion';
 
 interface TiltCardProps {
   children: React.ReactNode;
@@ -14,8 +14,10 @@ export function TiltCard({
   className = '',
   cardClassName = '',
 }: TiltCardProps) {
-  const cardRef = useRef<HTMLDivElement>(null);
-  const [isHovered, setIsHovered] = useState(false);
+  // Measured once per hover rather than on every mousemove — reading
+  // getBoundingClientRect in the move handler forces a layout on each event.
+  const rectRef = useRef<DOMRect | null>(null);
+  const reduceMotion = useReducedMotion();
 
   // Motion values for x/y mouse offset relative to card center (-0.5 to 0.5)
   const x = useMotionValue(0);
@@ -26,31 +28,39 @@ export function TiltCard({
   const rotateX = useSpring(useTransform(y, [-0.5, 0.5], [maxTilt, -maxTilt]), springConfig);
   const rotateY = useSpring(useTransform(x, [-0.5, 0.5], [-maxTilt, maxTilt]), springConfig);
 
-  const handleMouseMove = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (!cardRef.current) return;
-    const rect = cardRef.current.getBoundingClientRect();
-    
-    // Calculate normalized position relative to center (-0.5 to 0.5)
-    const relativeX = (event.clientX - rect.left) / rect.width - 0.5;
-    const relativeY = (event.clientY - rect.top) / rect.height - 0.5;
+  // Purely decorative on a non-interactive card, so under
+  // prefers-reduced-motion it's dropped rather than softened.
+  if (reduceMotion) {
+    return (
+      <div className={`relative ${className}`}>
+        <div className={`w-full h-full ${cardClassName}`}>{children}</div>
+      </div>
+    );
+  }
 
-    x.set(relativeX);
-    y.set(relativeY);
+  const handleMouseEnter = (event: React.MouseEvent<HTMLDivElement>) => {
+    rectRef.current = event.currentTarget.getBoundingClientRect();
+  };
+
+  const handleMouseMove = (event: React.MouseEvent<HTMLDivElement>) => {
+    const rect = rectRef.current;
+    if (!rect) return;
+    x.set((event.clientX - rect.left) / rect.width - 0.5);
+    y.set((event.clientY - rect.top) / rect.height - 0.5);
   };
 
   const handleMouseLeave = () => {
-    setIsHovered(false);
+    rectRef.current = null;
     x.set(0);
     y.set(0);
   };
 
   return (
     <div
-      ref={cardRef}
+      onMouseEnter={handleMouseEnter}
       onMouseMove={handleMouseMove}
-      onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={handleMouseLeave}
-      className={`relative cursor-pointer ${className}`}
+      className={`relative ${className}`}
       style={{ perspective: '800px' }}
     >
       <motion.div
@@ -59,7 +69,7 @@ export function TiltCard({
           rotateY,
           transformStyle: 'preserve-3d',
         }}
-        className={`w-full h-full select-none ${cardClassName}`}
+        className={`w-full h-full ${cardClassName}`}
       >
         <div style={{ transform: 'translateZ(24px)', transformStyle: 'preserve-3d' }} className="w-full h-full">
           {children}

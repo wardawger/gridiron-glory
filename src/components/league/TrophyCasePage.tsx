@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useId } from 'react';
 import { Archive, Crown, Medal, TrendingUp, Target, Rocket, Trophy, ChevronDown } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import type {
@@ -9,6 +9,10 @@ import { Avatar } from '../ui/Avatar';
 import { TeamLogo } from '../ui/TeamLogo';
 import { computeTrophies } from '../../services/trophies';
 import { TiltCard } from '../amicro/tilt-card';
+import {
+  PLAYER_COLORS, CHART_TOOLTIP_STYLE, CHART_TOOLTIP_LABEL, CHART_TOOLTIP_ITEM,
+  CHART_AXIS_TICK, legendFormatter,
+} from '../../lib/chartTheme';
 
 interface Props {
   league: League;
@@ -29,16 +33,15 @@ const PODIUM_STYLES = [
   { icon: Medal, iconClass: 'text-amber-700',  ring: 'ring-amber-700/30',  bg: 'bg-amber-700/10',  label: '3rd Place' },
 ];
 
-// Matches Leaderboard.tsx's PLAYER_COLORS palette (not exported from there,
-// so duplicated here — this app doesn't share chart color constants across files).
-const PLAYER_COLORS = ['#f59e0b', '#60a5fa', '#a78bfa', '#34d399', '#f87171', '#fb923c'];
+const dateFmt = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' });
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 function PodiumCard({ entry, place }: { entry: SeasonHistoryEntry; place: 0 | 1 | 2 }) {
   const style = PODIUM_STYLES[place];
   const Icon = style.icon;
   return (
-    <TiltCard maxTilt={10} cardClassName={`card-inner p-4 text-center ring-1 ${style.ring} ${style.bg}`}>
-      <Icon className={`w-6 h-6 mx-auto mb-2 ${style.iconClass}`} />
+    <TiltCard maxTilt={10} cardClassName={`card-inner p-3 sm:p-4 text-center ring-1 ${style.ring} ${style.bg}`}>
+      <Icon className={`w-6 h-6 mx-auto mb-2 ${style.iconClass}`} aria-hidden="true" />
       <Avatar
         displayName={entry.display_name}
         avatarType={entry.avatar_type}
@@ -48,19 +51,19 @@ function PodiumCard({ entry, place }: { entry: SeasonHistoryEntry; place: 0 | 1 
       />
       <p className="font-medium text-white mt-2 truncate">{entry.display_name}</p>
       <p className="text-xs text-turf-500">{style.label}</p>
-      <p className="font-mono font-bold text-lg text-white mt-1">{entry.total_points} pts</p>
+      <p className="font-mono font-bold text-lg text-white mt-1 tabular-nums">{entry.total_points} pts</p>
     </TiltCard>
   );
 }
 
 // One achievement category: name, description, and the qualifying
 // manager(s) — with their team(s) where applicable. Shared by the live
-// current-season grid and each past season's "Trophy highlights" toggle.
+// current-season grid and each past season's "Trophy Highlights" toggle.
 function TrophyCategoryCard({ category }: { category: TrophyCategory }) {
   return (
     <div className="card-inner p-4 space-y-3">
       <div>
-        <p className="font-medium text-white text-sm">{category.label}</p>
+        <h3 className="font-medium text-white text-sm">{category.label}</h3>
         <p className="text-xs text-turf-500 mt-0.5">{category.description}</p>
       </div>
       {category.winners.length === 0 ? (
@@ -76,20 +79,20 @@ function TrophyCategoryCard({ category }: { category: TrophyCategory }) {
                   <div className="flex items-center gap-1.5 flex-wrap mt-1">
                     {w.teams.map(t => (
                       <span key={t.team_id} className="inline-flex items-center gap-1 text-xs text-turf-400">
-                        <TeamLogo src={t.team_logo} alt={t.team_name} fallbackName={t.team_name} size={16} />
+                        <TeamLogo src={t.team_logo} alt="" fallbackName={t.team_name} size={16} />
                         {t.team_name}
                       </span>
                     ))}
-                    {w.detail && <span className="text-xs text-turf-500 font-mono">{w.detail}</span>}
+                    {w.detail && <span className="text-xs text-turf-500 font-mono tabular-nums">{w.detail}</span>}
                   </div>
                 )}
               </div>
               {w.tier != null && (
                 <span
-                  className="w-6 h-6 rounded-full bg-gold-500/15 text-gold-400 text-xs font-mono font-bold flex items-center justify-center flex-shrink-0"
+                  className="w-6 h-6 rounded-full bg-gold-500/15 text-gold-400 text-xs font-mono font-bold flex items-center justify-center flex-shrink-0 tabular-nums"
                   title={`Tier ${w.tier}`}
                 >
-                  {w.tier}
+                  <span className="sr-only">Tier </span>{w.tier}
                 </span>
               )}
             </div>
@@ -112,6 +115,7 @@ function SeasonCard({ season }: { season: SeasonHistory }) {
   const [first, second, third] = season.standings;
   const rest = season.standings.slice(3);
   const [showTrophies, setShowTrophies] = useState(false);
+  const panelId = useId();
   const trophyCategories = (season.trophies?.categories ?? []).filter(c => c.winners.length > 0);
 
   return (
@@ -119,11 +123,11 @@ function SeasonCard({ season }: { season: SeasonHistory }) {
       <div className="px-5 py-4 border-b border-turf-800">
         <h2 className="font-display text-xl tracking-wide text-white">{season.season_label} Season</h2>
         <p className="text-xs text-turf-500">
-          Archived {new Date(season.archived_at).toLocaleDateString()} · {season.standings.length} players
+          Archived {dateFmt.format(new Date(season.archived_at))} · {plural(season.standings.length, 'player')}
         </p>
       </div>
 
-      <div className="p-5 grid grid-cols-3 gap-3">
+      <div className="p-5 grid grid-cols-3 gap-2 sm:gap-3">
         {first  && <PodiumCard entry={first}  place={0} />}
         {second && <PodiumCard entry={second} place={1} />}
         {third  && <PodiumCard entry={third}  place={2} />}
@@ -133,10 +137,10 @@ function SeasonCard({ season }: { season: SeasonHistory }) {
         <div className="border-t border-turf-800 divide-y divide-turf-800/60">
           {rest.map(e => (
             <div key={e.user_id} className="flex items-center gap-3 px-5 py-2.5">
-              <span className="font-mono text-sm text-turf-500 w-6 text-center flex-shrink-0">{e.rank}</span>
+              <span className="font-mono text-sm text-turf-500 w-6 text-center flex-shrink-0 tabular-nums">{e.rank}</span>
               <Avatar displayName={e.display_name} avatarType={e.avatar_type} avatarValue={e.avatar_value} size={28} />
               <span className="flex-1 text-sm text-turf-300 truncate">{e.display_name}</span>
-              <span className="font-mono text-sm text-white">{e.total_points} pts</span>
+              <span className="font-mono text-sm text-white tabular-nums">{e.total_points} pts</span>
             </div>
           ))}
         </div>
@@ -145,16 +149,22 @@ function SeasonCard({ season }: { season: SeasonHistory }) {
       {trophyCategories.length > 0 && (
         <div className="border-t border-turf-800">
           <button
+            type="button"
             onClick={() => setShowTrophies(v => !v)}
-            className="w-full flex items-center justify-between px-5 py-3 text-sm text-turf-300 hover:text-white transition-colors"
+            aria-expanded={showTrophies}
+            aria-controls={panelId}
+            className="w-full flex items-center justify-between px-5 py-3 text-sm text-turf-300 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-field-400"
           >
             <span className="flex items-center gap-2">
-              <Trophy className="w-3.5 h-3.5 text-gold-400" /> Trophy highlights
+              <Trophy className="w-3.5 h-3.5 text-gold-400" aria-hidden="true" /> Trophy Highlights
             </span>
-            <ChevronDown className={`w-4 h-4 transition-transform ${showTrophies ? 'rotate-180' : ''}`} />
+            <ChevronDown
+              className={`w-4 h-4 transition-transform motion-reduce:transition-none ${showTrophies ? 'rotate-180' : ''}`}
+              aria-hidden="true"
+            />
           </button>
           {showTrophies && (
-            <div className="px-5 pb-5">
+            <div id={panelId} className="px-5 pb-5">
               <TrophyGrid categories={trophyCategories} />
             </div>
           )}
@@ -204,7 +214,7 @@ function useSeasonTrends(seasonHistory: SeasonHistory[]) {
       mostChampionships = {
         label: 'Most Championships',
         name: latestNameByUser.get(userId) ?? 'Unknown',
-        detail: `${count} title${count === 1 ? '' : 's'}`,
+        detail: plural(count, 'title'),
       };
     }
 
@@ -230,7 +240,7 @@ function useSeasonTrends(seasonHistory: SeasonHistory[]) {
       ? {
           label: 'Most Consistent',
           name: latestNameByUser.get(consistencyCandidates[0].userId) ?? 'Unknown',
-          detail: `avg. rank ${consistencyCandidates[0].mean.toFixed(1)} across ${consistencyCandidates[0].seasons} seasons`,
+          detail: `avg. rank ${consistencyCandidates[0].mean.toFixed(1)} across ${plural(consistencyCandidates[0].seasons, 'season')}`,
         }
       : null;
 
@@ -280,7 +290,7 @@ function TrendsSection({ seasonHistory }: { seasonHistory: SeasonHistory[] }) {
   return (
     <div className="card p-5 space-y-5">
       <div className="flex items-center gap-2">
-        <TrendingUp className="w-4 h-4 text-field-400" />
+        <TrendingUp className="w-4 h-4 text-field-400" aria-hidden="true" />
         <h2 className="font-display text-xl tracking-wide text-white">Trends</h2>
       </div>
 
@@ -288,10 +298,10 @@ function TrendsSection({ seasonHistory }: { seasonHistory: SeasonHistory[] }) {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {callouts.map(c => (
             <div key={c.label} className="card-inner p-3 text-center">
-              <c.icon className="w-4 h-4 mx-auto mb-1.5 text-gold-400" />
+              <c.icon className="w-4 h-4 mx-auto mb-1.5 text-gold-400" aria-hidden="true" />
               <p className="text-xs text-turf-500">{c.label}</p>
               <p className="font-medium text-white mt-0.5 truncate">{c.name}</p>
-              <p className="text-xs text-turf-400 font-mono mt-0.5">{c.detail}</p>
+              <p className="text-xs text-turf-400 font-mono mt-0.5 tabular-nums">{c.detail}</p>
             </div>
           ))}
         </div>
@@ -299,26 +309,23 @@ function TrendsSection({ seasonHistory }: { seasonHistory: SeasonHistory[] }) {
 
       <div>
         <p className="text-xs text-turf-500 mb-3">Total points by season</p>
-        <div className="h-72">
+        <div
+          className="h-72"
+          role="img"
+          aria-label={`Line chart of total points by season for ${plural(userIds.length, 'manager')} across ${plural(chartData.length, 'season')}`}
+        >
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
-              <XAxis dataKey="season_label" tick={{ fill: '#6c757d', fontSize: 11 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: '#6c757d', fontSize: 11 }} axisLine={false} tickLine={false} />
+              <XAxis dataKey="season_label" tick={CHART_AXIS_TICK} axisLine={false} tickLine={false} />
+              <YAxis tick={CHART_AXIS_TICK} axisLine={false} tickLine={false} />
               <Tooltip
-                contentStyle={{
-                  background: '#21262d',
-                  border: '1px solid #30363d',
-                  borderRadius: 8,
-                  fontSize: 12,
-                  boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
-                }}
-                labelStyle={{ color: '#fff', marginBottom: 4, fontWeight: 600 }}
-                itemStyle={{ color: '#adb5bd' }}
+                contentStyle={CHART_TOOLTIP_STYLE}
+                labelStyle={CHART_TOOLTIP_LABEL}
+                itemStyle={CHART_TOOLTIP_ITEM}
               />
-              <Legend
-                wrapperStyle={{ fontSize: 12, paddingTop: 12 }}
-                formatter={(value) => <span style={{ color: '#adb5bd' }}>{value}</span>}
-              />
+              <Legend wrapperStyle={{ fontSize: 12, paddingTop: 12 }} formatter={legendFormatter} />
+              {/* No connectNulls: a manager who sat a season out should show a
+                  gap rather than a line implying they played through it. */}
               {userIds.map((userId, i) => (
                 <Line
                   key={userId}
@@ -329,7 +336,6 @@ function TrendsSection({ seasonHistory }: { seasonHistory: SeasonHistory[] }) {
                   strokeWidth={2}
                   dot={{ r: 2 }}
                   activeDot={{ r: 4 }}
-                  connectNulls
                 />
               ))}
             </LineChart>
@@ -350,14 +356,14 @@ export function TrophyCasePage({
   );
 
   return (
-    <div className="space-y-5 animate-fade-in max-w-3xl mx-auto">
+    <div className="space-y-5 animate-fade-in motion-reduce:animate-none max-w-3xl mx-auto">
       <div className="card p-5">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gold-500 flex items-center justify-center flex-shrink-0">
-            <Archive className="w-5 h-5 text-turf-950" />
+            <Archive className="w-5 h-5 text-turf-950" aria-hidden="true" />
           </div>
           <div>
-            <h1 className="font-display text-2xl tracking-wide text-white">Trophy Case</h1>
+            <h1 className="font-display text-2xl tracking-wide text-white text-balance">Trophy Case</h1>
             <p className="text-turf-500 text-sm">Achievements, champions, and past seasons in {league.name}</p>
           </div>
         </div>
@@ -366,8 +372,8 @@ export function TrophyCasePage({
       {draftPicks.length > 0 && (
         <div className="card p-5 space-y-4">
           <div className="flex items-center gap-2">
-            <Trophy className="w-4 h-4 text-gold-400" />
-            <h2 className="font-display text-xl tracking-wide text-white">This Season's Trophies</h2>
+            <Trophy className="w-4 h-4 text-gold-400" aria-hidden="true" />
+            <h2 className="font-display text-xl tracking-wide text-white">This Season’s Trophies</h2>
           </div>
           <TrophyGrid categories={currentTrophies.categories} />
         </div>
@@ -375,10 +381,10 @@ export function TrophyCasePage({
 
       {seasonHistory.length === 0 ? (
         <div className="card p-12 text-center">
-          <Archive className="w-10 h-10 mx-auto mb-3 text-turf-700" />
+          <Archive className="w-10 h-10 mx-auto mb-3 text-turf-700" aria-hidden="true" />
           <p className="text-turf-400 font-medium">No past seasons yet</p>
           <p className="text-turf-500 text-sm mt-1">
-            Once your commissioner ends a season (after the national championship game), it'll show up here.
+            Once your commissioner ends a season (after the national championship game), it’ll show up here.
           </p>
         </div>
       ) : (
