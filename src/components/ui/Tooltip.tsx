@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect, useId } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
@@ -42,16 +42,20 @@ export function Tooltip({ content, children, position = 'bottom', width = 'w-56'
   const ref = useRef<HTMLDivElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const [coords, setCoords] = useState<Coords | null>(null);
+  const contentId = useId();
 
-  // Hide on scroll or click outside
+  // Hide on scroll, click outside, or Escape
   useEffect(() => {
     if (!show) return;
     const hide = () => setShow(false);
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShow(false); };
     window.addEventListener('scroll', hide, { passive: true });
     window.addEventListener('click', hide);
+    window.addEventListener('keydown', onKey);
     return () => {
       window.removeEventListener('scroll', hide);
       window.removeEventListener('click', hide);
+      window.removeEventListener('keydown', onKey);
     };
   }, [show]);
 
@@ -126,6 +130,11 @@ export function Tooltip({ content, children, position = 'bottom', width = 'w-56'
       className={`relative ${fullWidth ? 'flex w-full' : 'inline-flex'}`}
       onMouseEnter={() => setShow(true)}
       onMouseLeave={() => setShow(false)}
+      // Keyboard users reach the trigger via Tab, never hover — open on
+      // focus, close when focus leaves the trigger subtree.
+      onFocus={() => setShow(true)}
+      onBlur={e => { if (!ref.current?.contains(e.relatedTarget as Node | null)) setShow(false); }}
+      aria-describedby={show ? contentId : undefined}
       // Touch devices fire a click but no hover events at all — without this,
       // tapping the trigger on mobile would never open the tooltip in the
       // first place. stopPropagation keeps this same tap from immediately
@@ -157,7 +166,7 @@ export function Tooltip({ content, children, position = 'bottom', width = 'w-56'
             />
           )}
           {/* Card */}
-          <div ref={cardRef} className="relative bg-turf-800 border border-turf-600 rounded-lg px-3 py-2.5 shadow-xl shadow-black/50">
+          <div ref={cardRef} role="tooltip" id={contentId} className="relative bg-turf-800 border border-turf-600 rounded-lg px-3 py-2.5 shadow-xl shadow-black/50">
             {/* Close button — mobile only, since touch has no hover-to-dismiss */}
             <button
               onClick={e => { e.stopPropagation(); setShow(false); }}
@@ -186,12 +195,16 @@ export function InfoTooltip({ content, position = 'bottom', width = 'w-56' }: {
 }) {
   return (
     <Tooltip content={content} position={position} width={width} clickToOpen>
+      {/* 24px hit target (negative margin keeps the visual 14px dot from
+          shifting the surrounding layout) around the small ⓘ glyph. */}
       <button
         type="button"
         aria-label="More info"
-        className="w-3.5 h-3.5 rounded-full bg-turf-700 text-turf-400 text-xs flex items-center justify-center flex-shrink-0 hover:bg-turf-600 hover:text-white transition-colors select-none"
+        className="group w-6 h-6 -m-[5px] rounded-full flex items-center justify-center flex-shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-400"
       >
-        i
+        <span aria-hidden="true" className="w-3.5 h-3.5 rounded-full bg-turf-700 text-turf-400 text-xs flex items-center justify-center group-hover:bg-turf-600 group-hover:text-white transition-colors select-none">
+          i
+        </span>
       </button>
     </Tooltip>
   );

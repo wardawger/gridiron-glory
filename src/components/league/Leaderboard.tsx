@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   Cell, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Legend,
@@ -23,6 +23,31 @@ interface Props {
 }
 
 const PLAYER_COLORS = ['#f59e0b', '#60a5fa', '#a78bfa', '#34d399', '#f87171', '#fb923c'];
+
+// Recharts' built-in tooltip only takes inline styles, so these mirror the
+// app's turf-900 / turf-700 tokens (see tailwind.config.js) rather than
+// introducing off-palette hex values.
+const CHART_TOOLTIP_STYLE = {
+  background: '#212529',
+  border: '1px solid #495057',
+  borderRadius: 8,
+  fontSize: 12,
+  boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+};
+const CHART_TOOLTIP_LABEL = { color: '#fff', marginBottom: 4, fontWeight: 600 };
+const CHART_TOOLTIP_ITEM  = { color: '#adb5bd' };
+const legendFormatter = (value: string) => <span style={{ color: '#adb5bd' }}>{value}</span>;
+
+// Compact team label for the analytics cells. Plain last-word truncation
+// turned "Ohio State", "Florida State" and "Michigan State" into an
+// identical "State" — keep the qualifier when the last word is generic.
+const GENERIC_SUFFIXES = new Set(['State', 'Tech', 'A&M', 'College', 'University']);
+function shortTeamName(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length <= 1) return name;
+  const last = parts[parts.length - 1];
+  return GENERIC_SUFFIXES.has(last) ? parts.slice(-2).join(' ') : last;
+}
 
 // Short display label for charts — first name plus a last-initial, so two
 // managers who share a first word (e.g. "Mr. Wilson" / "Mr. Anderson") still
@@ -103,7 +128,7 @@ interface MetricTooltipProps {
 
 function MetricLabel({ label, tooltip }: MetricTooltipProps) {
   return (
-    <div className="inline-flex items-center gap-1.5 select-none">
+    <div className="inline-flex items-center gap-1.5">
       <span className="text-turf-300 text-xs font-medium">{label}</span>
       <InfoTooltip content={tooltip} position="bottom" width="w-56" />
     </div>
@@ -116,22 +141,25 @@ interface AnalyticsRowProps {
   label: string;
   tooltip: string;
   values: { display: string; color: string; textColor: string; logo?: string; teamName?: string }[];
+  // First row of a metric group — draws the group gap as a border instead
+  // of an empty spacer <tr>, which screen readers would announce as a row.
+  groupStart?: boolean;
 }
 
-function AnalyticsRow({ label, tooltip, values }: AnalyticsRowProps) {
+function AnalyticsRow({ label, tooltip, values, groupStart = false }: AnalyticsRowProps) {
   return (
-    <tr className="hover:bg-turf-800/20 transition-colors">
+    <tr className={`hover:bg-turf-800/20 transition-colors ${groupStart ? 'border-t-[6px] border-t-turf-800/30' : ''}`}>
       <td className="px-4 py-2.5">
         <MetricLabel label={label} tooltip={tooltip} />
       </td>
       {values.map((v, i) => (
         <td
           key={i}
-          className="px-3 py-2.5 text-center font-mono text-xs font-medium select-none"
+          className="px-3 py-2.5 text-center font-mono text-xs font-medium text-white"
           style={{ background: v.color }}
         >
           <span
-            className="inline-flex items-center justify-center gap-1.5 cursor-default"
+            className="inline-flex items-center justify-center gap-1.5"
             style={{ color: v.display === '—' ? '#adb5bd' : undefined }}
           >
             {v.logo && v.teamName && (
@@ -148,10 +176,20 @@ function AnalyticsRow({ label, tooltip, values }: AnalyticsRowProps) {
 // ── Main component ────────────────────────────────────────────────────────
 
 type AnalyticsTab = 'table' | 'graphs' | 'weekly';
+const ANALYTICS_TABS: AnalyticsTab[] = ['table', 'weekly', 'graphs'];
 
 export function Leaderboard({ entries, currentWeek, userId, confChampComplete, draftPicks, rankings, teams }: Props) {
-  const navigate = useNavigate();
   const [analyticsTab, setAnalyticsTab] = useState<AnalyticsTab>('table');
+
+  // Roving arrow-key focus for the analytics tablist (WAI-ARIA tabs pattern).
+  const onTabKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>, idx: number) => {
+    const delta = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+    if (!delta) return;
+    e.preventDefault();
+    const next = ANALYTICS_TABS[(idx + delta + ANALYTICS_TABS.length) % ANALYTICS_TABS.length];
+    setAnalyticsTab(next);
+    (e.currentTarget.parentElement?.querySelector(`#analytics-tab-${next}`) as HTMLElement | null)?.focus();
+  };
   const teamsById = useMemo(() => new Map(teams.map(t => [t.id, t])), [teams]);
 
   const { analytics, undrafted, scatterPoints } = useMemo(
@@ -248,7 +286,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
   const captainEffValues = analytics.map(a => a.captain_efficiency ?? 0);
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in motion-reduce:animate-none">
 
       {/* ── Total Points Bar Chart ─────────────────────── */}
       <div className="card p-5">
@@ -282,6 +320,9 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
 
       {/* ── Standings List ────────────────────────────── */}
       <div className="card divide-y divide-turf-800">
+        {entries.length === 0 && (
+          <p className="text-turf-500 text-sm text-center py-10">No managers yet — standings appear once the league has members.</p>
+        )}
         {entries.map((entry, idx) => {
           const isMe      = entry.user_id === userId;
           const weekScore = entry.weekly_scores.find(w => w.week === currentWeek);
@@ -289,14 +330,14 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
           const statPts   = (entry as any).stat_points ?? 0;
 
           return (
-            <button
+            <Link
               key={entry.user_id}
-              onClick={() => navigate(`/roster/${entry.user_id}`)}
-              className={`w-full flex items-center gap-4 px-5 py-4 hover:bg-turf-800/50 transition-colors text-left group ${isMe ? 'bg-field-950/30' : ''}`}
+              to={`/roster/${entry.user_id}`}
+              className={`w-full flex items-center gap-4 px-5 py-4 hover:bg-turf-800/50 transition-colors text-left group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-field-400 ${isMe ? 'bg-field-950/30' : ''}`}
             >
               <div className="w-8 flex-shrink-0 text-center">
                 {idx === 0
-                  ? <Crown className="w-5 h-5 text-gold-400 mx-auto" />
+                  ? <><Crown className="w-5 h-5 text-gold-400 mx-auto" aria-hidden="true" /><span className="sr-only">1st place</span></>
                   : <span className={`font-mono font-bold text-lg ${idx === 1 ? 'text-slate-400' : idx === 2 ? 'text-amber-700' : 'text-turf-600'}`}>{idx + 1}</span>
                 }
               </div>
@@ -312,7 +353,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                 <div className="flex items-center gap-2">
                   <span className={`font-medium truncate ${isMe ? 'text-field-300' : 'text-white'}`}>{entry.display_name}</span>
                   {isMe && <span className="badge-green text-xs">You</span>}
-                  {idx === 0 && <Star className="w-3 h-3 text-gold-400 fill-gold-400" />}
+                  {idx === 0 && <Star className="w-3 h-3 text-gold-400 fill-gold-400" aria-hidden="true" />}
                 </div>
                 <div className="text-xs text-turf-500 flex items-center gap-2 mt-0.5 flex-wrap">
                   {entry.roster.length > 0 ? (
@@ -328,7 +369,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                         />
                       ))}
                       {entry.roster.length > 6 && (
-                        <span className="pl-2 text-[10px] text-turf-500">+{entry.roster.length - 6} more</span>
+                        <span className="pl-2 text-xs text-turf-500">+{entry.roster.length - 6} more</span>
                       )}
                     </div>
                   ) : (
@@ -341,12 +382,17 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                   )}
                   {statPts !== 0 && (
                     <span className={statPts > 0 ? 'text-blue-400' : 'text-red-300'}>
-                      {statPts > 0 ? '+' : ''}{statPts} stats{!confChampComplete ? ' ◎' : ''}
+                      {statPts > 0 ? '+' : ''}{statPts} stats
+                      {!confChampComplete && (
+                        <span title="Provisional — final once conference championships are complete">
+                          {' ◎'}<span className="sr-only"> (provisional)</span>
+                        </span>
+                      )}
                     </span>
                   )}
                   {lastWeek && lastWeek.points !== 0 && (
                     <span className="flex items-center gap-0.5">
-                      {lastWeek.points > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                      {lastWeek.points > 0 ? <TrendingUp className="w-3 h-3" aria-hidden="true" /> : <TrendingDown className="w-3 h-3" aria-hidden="true" />}
                       {lastWeek.points > 0 ? '+' : ''}{lastWeek.points} last wk
                     </span>
                   )}
@@ -356,7 +402,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                 <div className="font-mono font-bold text-xl text-white group-hover:text-field-400 transition-colors">{entry.total_points}</div>
                 <div className="text-xs text-turf-500">{weekScore ? `${weekScore.points > 0 ? '+' : ''}${weekScore.points} wk` : '—'}</div>
               </div>
-            </button>
+            </Link>
           );
         })}
       </div>
@@ -366,12 +412,19 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
         <div className="card overflow-hidden">
           <div className="flex items-center justify-between px-5 py-4 border-b border-turf-800">
             <h2 className="section-title text-xl">Roster Analytics</h2>
-            <div className="flex gap-1 bg-turf-800 p-1 rounded-lg">
-              {(['table', 'weekly', 'graphs'] as const).map(id => (
+            <div role="tablist" aria-label="Roster analytics view" className="flex gap-1 bg-turf-800 p-1 rounded-lg">
+              {ANALYTICS_TABS.map((id, idx) => (
                 <button
                   key={id}
+                  type="button"
+                  role="tab"
+                  id={`analytics-tab-${id}`}
+                  aria-selected={analyticsTab === id}
+                  aria-controls={`analytics-panel-${id}`}
+                  tabIndex={analyticsTab === id ? 0 : -1}
                   onClick={() => setAnalyticsTab(id)}
-                  className={`px-3 py-1 rounded-md text-xs font-medium transition-all capitalize ${
+                  onKeyDown={e => onTabKeyDown(e, idx)}
+                  className={`px-3 py-1.5 min-h-[32px] rounded-md text-xs font-medium transition-colors capitalize focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-400 ${
                     analyticsTab === id ? 'bg-field-500 text-turf-950' : 'text-turf-400 hover:text-white'
                   }`}
                 >
@@ -383,17 +436,18 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
 
           {/* ── TABLE VIEW ── */}
           {analyticsTab === 'table' && (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+            <div role="tabpanel" id="analytics-panel-table" aria-labelledby="analytics-tab-table" className="overflow-x-auto">
+              <table className="w-full text-sm" aria-label="Roster analytics by manager">
                 <thead>
                   <tr className="border-b border-turf-800">
-                    <th className="px-4 py-3 text-left text-xs text-turf-500 uppercase tracking-wide font-medium w-44 select-none">
+                    <th scope="col" className="px-4 py-3 text-left text-xs text-turf-500 uppercase tracking-wide font-medium w-44">
                       Metric
                     </th>
                     {analytics.map((a, i) => (
                       <th
                         key={a.user_id}
-                        className="px-3 py-3 text-center select-none"
+                        scope="col"
+                        className="px-3 py-3 text-center"
                       >
                         <span className="inline-flex items-center gap-1.5 max-w-[9rem]">
                           <span
@@ -440,9 +494,8 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                     }))}
                   />
 
-                  <tr><td colSpan={analytics.length + 1} className="py-1 bg-turf-800/30" /></tr>
-
                   <AnalyticsRow
+                    groupStart
                     label="Win/Loss Record"
                     tooltip="Combined win-loss record across every completed game your rostered teams have played this season."
                     values={analytics.map((a, i) => ({
@@ -462,14 +515,13 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                     }))}
                   />
 
-                  <tr><td colSpan={analytics.length + 1} className="py-1 bg-turf-800/30" /></tr>
-
                   <AnalyticsRow
+                    groupStart
                     label="Best Pick"
                     tooltip="Your team that has earned the most fantasy points so far this season."
                     values={analytics.map((a, i) => ({
                       display: a.best_pick
-                        ? `${a.best_pick.team_name.split(' ').slice(-1)[0]} (${a.best_pick.points > 0 ? '+' : ''}${a.best_pick.points})`
+                        ? `${shortTeamName(a.best_pick.team_name)} (${a.best_pick.points > 0 ? '+' : ''}${a.best_pick.points})`
                         : '—',
                       color: heatColor(a.best_pick?.points ?? 0, bestPickValues, true),
                       textColor: PLAYER_COLORS[i],
@@ -483,7 +535,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                     tooltip="Your team that has earned the fewest fantasy points so far this season."
                     values={analytics.map((a, i) => ({
                       display: a.worst_pick
-                        ? `${a.worst_pick.team_name.split(' ').slice(-1)[0]} (${a.worst_pick.points > 0 ? '+' : ''}${a.worst_pick.points})`
+                        ? `${shortTeamName(a.worst_pick.team_name)} (${a.worst_pick.points > 0 ? '+' : ''}${a.worst_pick.points})`
                         : '—',
                       color: heatColor(a.worst_pick?.points ?? 0, worstPickValues, true),
                       textColor: PLAYER_COLORS[i],
@@ -497,7 +549,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                     tooltip="Your highest AP-ranked team this week."
                     values={analytics.map((a, i) => ({
                       display: a.best_team
-                        ? `${a.best_team.team_name.split(' ').slice(-1)[0]} (#${a.best_team.rank})`
+                        ? `${shortTeamName(a.best_team.team_name)} (#${a.best_team.rank})`
                         : '—',
                       color: 'transparent',
                       textColor: PLAYER_COLORS[i],
@@ -511,7 +563,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                     tooltip="Your lowest AP-ranked team. Unranked teams are excluded."
                     values={analytics.map((a, i) => ({
                       display: a.worst_team
-                        ? `${a.worst_team.team_name.split(' ').slice(-1)[0]} (#${a.worst_team.rank})`
+                        ? `${shortTeamName(a.worst_team.team_name)} (#${a.worst_team.rank})`
                         : '—',
                       color: 'transparent',
                       textColor: PLAYER_COLORS[i],
@@ -520,9 +572,8 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                     }))}
                   />
 
-                  <tr><td colSpan={analytics.length + 1} className="py-1 bg-turf-800/30" /></tr>
-
                   <AnalyticsRow
+                    groupStart
                     label="Over/Under Draft Pts"
                     tooltip="Sum of (pick number − AP rank) for all your ranked teams. Negative means you drafted better than expected — you got high-ranked teams late."
                     values={analytics.map((a, i) => ({
@@ -553,7 +604,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {undrafted.map(t => (
-                      <span key={t.team_id} className="badge-gray text-xs cursor-default select-none inline-flex items-center gap-1.5">
+                      <span key={t.team_id} className="badge-gray text-xs inline-flex items-center gap-1.5">
                         <TeamLogo
                           src={teamsById.get(t.team_id)?.logo}
                           alt={t.team_name}
@@ -571,32 +622,23 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
 
           {/* ── WEEKLY VIEW ── */}
           {analyticsTab === 'weekly' && (
-            <div className="p-5">
+            <div role="tabpanel" id="analytics-panel-weekly" aria-labelledby="analytics-tab-weekly" className="p-5">
               <p className="text-xs text-turf-500 mb-4">Points scored per week by each player</p>
               {weeklyData.length === 0 ? (
                 <p className="text-turf-500 text-sm text-center py-8">No weekly data yet — check back once games are played</p>
               ) : (
-                <div className="h-72">
+                <div className="h-72" role="img" aria-label={`Bar chart of points scored per week by each manager, weeks 0 through ${currentWeek}`}>
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={weeklyData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
                       <XAxis dataKey="week" tick={{ fill: '#6c757d', fontSize: 11 }} axisLine={false} tickLine={false} />
                       <YAxis tick={{ fill: '#6c757d', fontSize: 11 }} axisLine={false} tickLine={false} />
                       <Tooltip
-                        contentStyle={{
-                          background: '#21262d',
-                          border: '1px solid #30363d',
-                          borderRadius: 8,
-                          fontSize: 12,
-                          boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
-                        }}
-                        labelStyle={{ color: '#fff', marginBottom: 4, fontWeight: 600 }}
-                        itemStyle={{ color: '#adb5bd' }}
+                        contentStyle={CHART_TOOLTIP_STYLE}
+                        labelStyle={CHART_TOOLTIP_LABEL}
+                        itemStyle={CHART_TOOLTIP_ITEM}
                         cursor={{ fill: 'rgba(255,255,255,0.03)' }}
                       />
-                      <Legend
-                        wrapperStyle={{ fontSize: 12, paddingTop: 12 }}
-                        formatter={(value) => <span style={{ color: '#adb5bd' }}>{value}</span>}
-                      />
+                      <Legend wrapperStyle={{ fontSize: 12, paddingTop: 12 }} formatter={legendFormatter} />
                       {entries.map((e, i) => (
                         <Bar
                           key={e.user_id}
@@ -617,7 +659,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
 
           {/* ── GRAPHS VIEW ── */}
           {analyticsTab === 'graphs' && (
-            <div className="p-5 space-y-4">
+            <div role="tabpanel" id="analytics-panel-graphs" aria-labelledby="analytics-tab-graphs" className="p-5 space-y-4">
               {/* Radar */}
               <div className="card-inner p-4">
                 <h3 className="font-display text-lg tracking-wide text-white">Roster profile</h3>
@@ -625,28 +667,24 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                 {radarData.length === 0 ? (
                   <p className="text-turf-500 text-sm text-center py-8">No ranking data yet</p>
                 ) : (
-                  <div className="h-72 animate-radar-in" style={{ transformOrigin: 'center' }}>
+                  <div
+                    className="h-72 animate-radar-in motion-reduce:animate-none"
+                    style={{ transformOrigin: 'center' }}
+                    role="img"
+                    aria-label="Radar chart comparing each manager's roster on average rank, top-25 rank, best pick, worst pick, and draft value"
+                  >
                     <ResponsiveContainer width="100%" height="100%">
                       <RadarChart data={radarData} margin={{ top: 8, right: 24, left: 24, bottom: 8 }}>
                         <PolarGrid stroke="#495057" />
                         <PolarAngleAxis dataKey="metric" tick={{ fill: '#6c757d', fontSize: 11 }} />
                         <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
                         <Tooltip
-                          contentStyle={{
-                            background: '#21262d',
-                            border: '1px solid #30363d',
-                            borderRadius: 8,
-                            fontSize: 12,
-                            boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
-                          }}
-                          labelStyle={{ color: '#fff', fontWeight: 600 }}
-                          itemStyle={{ color: '#adb5bd' }}
+                          contentStyle={CHART_TOOLTIP_STYLE}
+                          labelStyle={CHART_TOOLTIP_LABEL}
+                          itemStyle={CHART_TOOLTIP_ITEM}
                           formatter={(value: number) => value.toFixed(1)}
                         />
-                        <Legend
-                          wrapperStyle={{ fontSize: 12, paddingTop: 8 }}
-                          formatter={(value) => <span style={{ color: '#adb5bd' }}>{value}</span>}
-                        />
+                        <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} formatter={legendFormatter} />
                         {entries.map((e, i) => (
                           <Radar
                             key={e.user_id}
@@ -672,26 +710,17 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                 {trendData.length === 0 ? (
                   <p className="text-turf-500 text-sm text-center py-8">No weekly data yet — check back once games are played</p>
                 ) : (
-                  <div className="h-72">
+                  <div className="h-72" role="img" aria-label="Line chart of each manager's cumulative points across the season">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={trendData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
                         <XAxis dataKey="week" tick={{ fill: '#6c757d', fontSize: 11 }} axisLine={false} tickLine={false} />
                         <YAxis tick={{ fill: '#6c757d', fontSize: 11 }} axisLine={false} tickLine={false} />
                         <Tooltip
-                          contentStyle={{
-                            background: '#21262d',
-                            border: '1px solid #30363d',
-                            borderRadius: 8,
-                            fontSize: 12,
-                            boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
-                          }}
-                          labelStyle={{ color: '#fff', marginBottom: 4, fontWeight: 600 }}
-                          itemStyle={{ color: '#adb5bd' }}
+                          contentStyle={CHART_TOOLTIP_STYLE}
+                          labelStyle={CHART_TOOLTIP_LABEL}
+                          itemStyle={CHART_TOOLTIP_ITEM}
                         />
-                        <Legend
-                          wrapperStyle={{ fontSize: 12, paddingTop: 12 }}
-                          formatter={(value) => <span style={{ color: '#adb5bd' }}>{value}</span>}
-                        />
+                        <Legend wrapperStyle={{ fontSize: 12, paddingTop: 12 }} formatter={legendFormatter} />
                         {entries.map((e, i) => (
                           <Line
                             key={e.user_id}
@@ -717,7 +746,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                 {scatterByManager.length === 0 ? (
                   <p className="text-turf-500 text-sm text-center py-8">No ranking data yet</p>
                 ) : (
-                  <div className="h-72">
+                  <div className="h-72" role="img" aria-label="Scatter plot of each drafted team's pick number against its AP rank, colored by manager">
                     <ResponsiveContainer width="100%" height="100%">
                       <ScatterChart margin={{ top: 16, right: 24, left: 8, bottom: 8 }}>
                         <XAxis
@@ -731,10 +760,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                           label={{ value: 'AP rank', angle: -90, position: 'insideLeft', fill: '#6c757d', fontSize: 11 }}
                         />
                         <Tooltip cursor={{ strokeDasharray: '3 3', stroke: '#495057' }} content={<ScatterTooltip />} />
-                        <Legend
-                          wrapperStyle={{ fontSize: 12, paddingTop: 8 }}
-                          formatter={(value) => <span style={{ color: '#adb5bd' }}>{value}</span>}
-                        />
+                        <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} formatter={legendFormatter} />
                         {scatterByManager.map(m => (
                           <Scatter key={m.name} name={m.name} data={m.data} fill={m.color} shape={TeamLogoDot} />
                         ))}
