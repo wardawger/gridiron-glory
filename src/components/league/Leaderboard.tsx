@@ -58,6 +58,31 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   );
 };
 
+// Weekly chart tooltip. Paired with shared={false} on the Tooltip, so it
+// receives only the bar actually under the cursor. The default shared
+// behaviour stacked all six managers into one panel tall enough to cover the
+// chart behind it.
+const WeeklyTooltip = ({ active, payload, label }: any) => {
+  if (!active || !payload?.length) return null;
+  const p = payload[0];
+  const pts = Number(p.value);
+  return (
+    <div className="bg-turf-900 border border-turf-700 rounded-lg px-3 py-2 shadow-xl shadow-black/40">
+      <p className="flex items-center gap-1.5 text-sm font-medium text-white">
+        <span
+          className="w-2 h-2 rounded-full flex-shrink-0"
+          style={{ backgroundColor: p.color ?? p.fill }}
+        />
+        {p.name}
+      </p>
+      <p className="text-xs text-turf-500">{label ?? p.payload?.week}</p>
+      <p className={`font-mono text-sm tabular-nums ${pts < 0 ? 'text-red-300' : 'text-field-400'}`}>
+        {pts > 0 ? '+' : ''}{pts} pts
+      </p>
+    </div>
+  );
+};
+
 // Custom scatter point — a team logo in a colored ring (ring color still
 // carries which manager's series it belongs to, matching the legend)
 // instead of a plain dot. Recharts renders scatter shapes as raw SVG, so
@@ -695,12 +720,10 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                     <BarChart data={weeklyData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
                       <XAxis dataKey="week" tick={CHART_AXIS_TICK} axisLine={false} tickLine={false} />
                       <YAxis tick={CHART_AXIS_TICK} axisLine={false} tickLine={false} />
-                      <Tooltip
-                        contentStyle={CHART_TOOLTIP_STYLE}
-                        labelStyle={CHART_TOOLTIP_LABEL}
-                        itemStyle={CHART_TOOLTIP_ITEM}
-                        cursor={{ fill: 'rgba(255,255,255,0.03)' }}
-                      />
+                      {/* shared={false} => only the hovered bar. cursor={false}
+                          because the default band highlight spans all six
+                          managers, which contradicts reading one of them. */}
+                      <Tooltip shared={false} cursor={false} content={<WeeklyTooltip />} />
                       <Legend wrapperStyle={{ fontSize: 12, paddingTop: 12 }} formatter={legendFormatter} />
                       {entries.map((e, i) => (
                         <Bar
@@ -709,6 +732,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                           dataKey={e.user_id}
                           fill={seriesColor(i)}
                           fillOpacity={0.85}
+                          activeBar={{ fillOpacity: 1 }}
                           radius={[3, 3, 0, 0]}
                           maxBarSize={24}
                         />
