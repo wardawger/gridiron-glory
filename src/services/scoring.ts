@@ -90,6 +90,20 @@ export function scoreSpread(
   if (outcome === null) return 0; // game not complete yet
   if (outcome === 'push') return 0; // push: no points awarded or taken, either side
 
+  return spreadPointsForOutcome(settings, side, outcome, baseGamePoints);
+}
+
+// Points a pick earns for a known (decided or pushed) outcome. Split out of
+// scoreSpread so a commissioner override — which forces the outcome rather
+// than deriving it from the score — awards exactly what auto-scoring would
+// have for that same outcome, in every point mode.
+export function spreadPointsForOutcome(
+  settings: ScoringSettings,
+  side: 'cover' | 'against',
+  outcome: 'covered' | 'missed' | 'push',
+  baseGamePoints: number,
+): number {
+  if (outcome === 'push') return 0;
   const won = didWinSpreadPick(side, outcome);
 
   // Commissioner-overridden flat penalty on a loss, independent of flat vs

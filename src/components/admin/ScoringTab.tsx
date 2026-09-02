@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
-import { TrendingUp, TrendingDown } from 'lucide-react';
+import { useState, useRef, useEffect, useMemo, useId } from 'react';
+import { TrendingUp, TrendingDown, Loader2 } from 'lucide-react';
 import type { League, ScoringSettings, StatBonusCategorySettings, CfbTeam } from '../../types';
 import { normalizeScoring, STAT_BONUS_CATEGORIES, STAT_BONUS_LABELS, BONUS_GROUPS, BONUS_LABELS } from '../../types';
 import { useCrossfadeVisibility } from '../../hooks/useCrossfade';
@@ -10,7 +10,7 @@ import { ScoreField } from './ScoreField';
 interface Props {
   league: League;
   teams: CfbTeam[];
-  onUpdateScoring: (s: ScoringSettings) => void;
+  onUpdateScoring: (s: ScoringSettings) => Promise<{ error?: string } | void>;
 }
 
 const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -21,11 +21,73 @@ const TOAST_DURATION_MS = 3000;
 // isn't shown two different places to set the same point values.
 const postseasonGroups = BONUS_GROUPS.filter(g => !g.label.startsWith('Statistical Rankings'));
 
+// A labelled on/off row: text on the left, Toggle on the right. Wrapping a
+// <button> in a <label> is invalid HTML and doesn't associate anything, so
+// this pairs the visible state text with the switch via aria-describedby
+// and gives the switch a real accessible name.
+function SwitchRow({ id, name, checked, onChange, onText = 'Enabled', offText = 'Disabled' }: {
+  id: string; name: string; checked: boolean; onChange: () => void; onText?: string; offText?: string;
+}) {
+  return (
+    <div className="flex items-center gap-2 flex-shrink-0">
+      <span id={`${id}-state`} className="text-xs text-turf-400">{checked ? onText : offText}</span>
+      <Toggle id={id} checked={checked} onChange={onChange} label={name} />
+    </div>
+  );
+}
+
+// Two-option segmented control (radio semantics).
+function Segmented<T extends string>({ labelledBy, value, options, onChange }: {
+  labelledBy: string; value: T; options: { value: T; label: string }[]; onChange: (v: T) => void;
+}) {
+  return (
+    <div role="radiogroup" aria-labelledby={labelledBy} className="flex gap-2">
+      {options.map(o => (
+        <button
+          key={o.value}
+          type="button"
+          role="radio"
+          aria-checked={value === o.value}
+          onClick={() => onChange(o.value)}
+          className={`flex-1 py-2 rounded-lg text-sm border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-400 ${
+            value === o.value ? 'bg-field-500 text-turf-950 border-field-500' : 'border-turf-700 text-turf-400 hover:text-white hover:border-turf-600'
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function ScoringTab({ league, teams, onUpdateScoring }: Props) {
-  const [scoring, setScoring] = useState<ScoringSettings>(normalizeScoring(league.scoring));
+  const uid = useId();
+  const [scoring, _setScoring] = useState<ScoringSettings>(normalizeScoring(league.scoring));
   const [showSavedToast, setShowSavedToast] = useState(false);
   const [saveError, setSaveError] = useState('');
+  const [saving, setSaving] = useState(false);
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const errorRef = useRef<HTMLDivElement>(null);
+
+  // Local edits vs. the league's saved settings. `dirty` gates two things:
+  // (1) an incoming league.scoring change (another commissioner saved, or
+  // realtime caught up) resyncs the form only while it has no local edits,
+  // so a concurrent save is never silently overwritten by stale local
+  // state; (2) a beforeunload warning while edits are unsaved.
+  const [dirty, setDirty] = useState(false);
+  const setScoring = (fn: (prev: ScoringSettings) => ScoringSettings) => {
+    setDirty(true);
+    _setScoring(fn);
+  };
+  useEffect(() => {
+    if (!dirty) _setScoring(normalizeScoring(league.scoring));
+  }, [league.scoring]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [dirty]);
 
   // Live conference list, not hardcoded — avoids the exact kind of drift the
   // P4 conference list itself once had before it was consolidated.
@@ -53,49 +115,42 @@ export function ScoringTab({ league, teams, onUpdateScoring }: Props) {
     if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
   }, []);
 
-  const handleSaveScoring = () => {
+  const handleSaveScoring = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (saving) return;
     if (scoring.bench_enabled && scoring.starters_count + scoring.bench_count !== league.max_teams_per_user) {
-      setSaveError(`Starters + Bench must total ${league.max_teams_per_user} (this league's teams per player)`);
+      setSaveError(`Starters + Bench must total ${league.max_teams_per_user} (this league’s teams per player). Adjust the Bench section and save again.`);
+      requestAnimationFrame(() => errorRef.current?.focus());
       return;
     }
     setSaveError('');
-    onUpdateScoring(scoring);
+    setSaving(true);
+    const result = await onUpdateScoring(scoring);
+    setSaving(false);
+    if (result && 'error' in result && result.error) {
+      setSaveError(`Couldn’t save: ${result.error}. Try again.`);
+      requestAnimationFrame(() => errorRef.current?.focus());
+      return;
+    }
+    setDirty(false);
     setShowSavedToast(true);
     if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
     toastTimeoutRef.current = setTimeout(() => setShowSavedToast(false), TOAST_DURATION_MS);
   };
 
+  const selectCls = 'input [&>option]:bg-turf-800 [&>option]:text-white';
+
   return (
-    <div className="space-y-4">
+    <form onSubmit={handleSaveScoring} className="space-y-4" noValidate>
       {/* Roster conference limits */}
       <div className="card p-5 space-y-4">
         <h3 className="font-medium text-white text-sm">Roster Conference Limits</h3>
         <p className="text-xs text-turf-400">Applies during the draft and to portal/waiver moves.</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 sm:gap-4">
-          <ScoreField
-            label="P4 Min (per conference)"
-            min={0}
-            value={scoring.p4_conf_min}
-            onChange={v => setScoring(prev => ({ ...prev, p4_conf_min: v }))}
-          />
-          <ScoreField
-            label="P4 Max (per conference)"
-            min={1}
-            value={scoring.p4_conf_max}
-            onChange={v => setScoring(prev => ({ ...prev, p4_conf_max: v }))}
-          />
-          <ScoreField
-            label="G5 Min (combined)"
-            min={0}
-            value={scoring.g5_conf_min}
-            onChange={v => setScoring(prev => ({ ...prev, g5_conf_min: v }))}
-          />
-          <ScoreField
-            label="G5 Max (combined)"
-            min={1}
-            value={scoring.g5_conf_max}
-            onChange={v => setScoring(prev => ({ ...prev, g5_conf_max: v }))}
-          />
+          <ScoreField label="P4 Min (per conference)" min={0} value={scoring.p4_conf_min} onChange={v => setScoring(prev => ({ ...prev, p4_conf_min: v }))} />
+          <ScoreField label="P4 Max (per conference)" min={1} value={scoring.p4_conf_max} onChange={v => setScoring(prev => ({ ...prev, p4_conf_max: v }))} />
+          <ScoreField label="G5 Min (combined)" min={0} value={scoring.g5_conf_min} onChange={v => setScoring(prev => ({ ...prev, g5_conf_min: v }))} />
+          <ScoreField label="G5 Max (combined)" min={1} value={scoring.g5_conf_max} onChange={v => setScoring(prev => ({ ...prev, g5_conf_max: v }))} />
         </div>
         <p className="text-xs text-turf-500">
           P4 = SEC, Big Ten, Big 12, ACC — each conference is capped separately. G5/non-P4 teams share one combined limit.
@@ -104,11 +159,11 @@ export function ScoringTab({ league, teams, onUpdateScoring }: Props) {
 
       {/* Excluded conferences */}
       <div className="card p-5 space-y-3">
-        <h3 className="font-medium text-white text-sm">Excluded Conferences</h3>
+        <h3 className="font-medium text-white text-sm" id={`${uid}-excl`}>Excluded Conferences</h3>
         <p className="text-xs text-turf-400">
-          Teams from checked conferences can't be drafted or picked up via the portal/waivers.
+          Teams from checked conferences can’t be drafted or picked up via the portal/waivers.
         </p>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2" role="group" aria-labelledby={`${uid}-excl`}>
           {allConferences.map(conference => {
             const excluded = scoring.excluded_conferences.includes(conference);
             return (
@@ -117,14 +172,14 @@ export function ScoringTab({ league, teams, onUpdateScoring }: Props) {
                 type="button"
                 onClick={() => toggleExcludedConference(conference)}
                 aria-pressed={excluded}
-                className={`flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm border transition-colors text-left ${
+                className={`flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm border transition-colors text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-400 ${
                   excluded
                     ? 'border-red-800 bg-red-950/30 text-red-300'
                     : 'border-turf-700 text-turf-300 hover:border-turf-600 hover:bg-turf-800/40'
                 }`}
               >
                 <span className="truncate">{conference}</span>
-                {excluded && <span className="text-[10px] uppercase tracking-wide flex-shrink-0">Excluded</span>}
+                {excluded && <span className="text-xs uppercase tracking-wide flex-shrink-0">Excluded</span>}
               </button>
             );
           })}
@@ -186,7 +241,7 @@ export function ScoringTab({ league, teams, onUpdateScoring }: Props) {
 
       {/* Statistical ranking bonus settings */}
       <div className="card p-5 space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-4">
           <div>
             <h3 className="font-medium text-white text-sm">Statistical Ranking Bonuses</h3>
             <p className="text-xs text-turf-400 mt-0.5">
@@ -195,15 +250,11 @@ export function ScoringTab({ league, teams, onUpdateScoring }: Props) {
               week, then locks in.
             </p>
           </div>
-          <Toggle
-            checked={scoring.stat_bonus_enabled}
-            onChange={() => setScoring(prev => ({ ...prev, stat_bonus_enabled: !prev.stat_bonus_enabled }))}
-            label={`${scoring.stat_bonus_enabled ? 'Disable' : 'Enable'} statistical ranking bonuses`}
-          />
+          <SwitchRow id={`${uid}-stat`} name="Statistical ranking bonuses enabled" checked={scoring.stat_bonus_enabled} onChange={() => setScoring(prev => ({ ...prev, stat_bonus_enabled: !prev.stat_bonus_enabled }))} />
         </div>
 
         {statBonusPanel.shown && (
-          <div className={`space-y-3 pt-2 border-t border-turf-800 ${statBonusPanel.className}`}>
+          <div className={`space-y-3 pt-2 border-t border-turf-800 ${statBonusPanel.className} motion-reduce:animate-none`}>
             {STAT_BONUS_CATEGORIES.map(cat => {
               const c = scoring.stat_bonus_categories[cat];
               const updateCat = (patch: Partial<StatBonusCategorySettings>) =>
@@ -223,30 +274,18 @@ export function ScoringTab({ league, teams, onUpdateScoring }: Props) {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-turf-400 flex items-center gap-1">
-                          <TrendingUp className="w-3 h-3 text-field-400" /> Top Bonus
+                          <TrendingUp className="w-3 h-3 text-field-400" aria-hidden="true" /> Top Bonus
                         </span>
                         <Toggle
                           checked={c.top_enabled}
                           onChange={() => updateCat({ top_enabled: !c.top_enabled })}
-                          label={`${c.top_enabled ? 'Disable' : 'Enable'} ${STAT_BONUS_LABELS[cat]} top bonus`}
+                          label={`${STAT_BONUS_LABELS[cat]} top bonus enabled`}
                         />
                       </div>
                       {c.top_enabled && (
                         <div className="grid grid-cols-1 sm:grid-cols-2 sm:gap-2">
-                          <ScoreField
-                            label="# of Teams"
-                            variant="compact"
-                            min={1}
-                            value={c.top_count}
-                            onChange={v => updateCat({ top_count: v })}
-                          />
-                          <ScoreField
-                            label="Points Each"
-                            variant="compact"
-                            step={0.5}
-                            value={c.top_points}
-                            onChange={v => updateCat({ top_points: v })}
-                          />
+                          <ScoreField label="# of Teams" variant="compact" min={1} value={c.top_count} onChange={v => updateCat({ top_count: v })} />
+                          <ScoreField label="Points Each" variant="compact" step={0.5} value={c.top_points} onChange={v => updateCat({ top_points: v })} />
                         </div>
                       )}
                     </div>
@@ -255,31 +294,18 @@ export function ScoringTab({ league, teams, onUpdateScoring }: Props) {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-turf-400 flex items-center gap-1">
-                          <TrendingDown className="w-3 h-3 text-red-300" /> Bottom Bonus
+                          <TrendingDown className="w-3 h-3 text-red-300" aria-hidden="true" /> Bottom Bonus
                         </span>
                         <Toggle
                           checked={c.bottom_enabled}
                           onChange={() => updateCat({ bottom_enabled: !c.bottom_enabled })}
-                          label={`${c.bottom_enabled ? 'Disable' : 'Enable'} ${STAT_BONUS_LABELS[cat]} bottom bonus`}
+                          label={`${STAT_BONUS_LABELS[cat]} bottom bonus enabled`}
                         />
                       </div>
                       {c.bottom_enabled && (
                         <div className="grid grid-cols-1 sm:grid-cols-2 sm:gap-2">
-                          <ScoreField
-                            label="# of Teams"
-                            variant="compact"
-                            min={1}
-                            value={c.bottom_count}
-                            onChange={v => updateCat({ bottom_count: v })}
-                          />
-                          <ScoreField
-                            label="Points Each"
-                            variant="compact"
-                            step={0.5}
-                            description="Negative values subtract points"
-                            value={c.bottom_points}
-                            onChange={v => updateCat({ bottom_points: v })}
-                          />
+                          <ScoreField label="# of Teams" variant="compact" min={1} value={c.bottom_count} onChange={v => updateCat({ bottom_count: v })} />
+                          <ScoreField label="Points Each" variant="compact" step={0.5} description="Negative values subtract points" value={c.bottom_points} onChange={v => updateCat({ bottom_points: v })} />
                         </div>
                       )}
                     </div>
@@ -293,41 +319,25 @@ export function ScoringTab({ league, teams, onUpdateScoring }: Props) {
 
       {/* Spread betting settings */}
       <div className="card p-5 space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-4">
           <div>
             <h3 className="font-medium text-white text-sm">Spread Betting</h3>
             <p className="text-xs text-turf-400 mt-0.5">Users pick which teams will cover or beat the spread each week</p>
           </div>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <span className="text-xs text-turf-400">{scoring.spread_enabled ? 'Enabled' : 'Disabled'}</span>
-            <button
-              onClick={() => setScoring(prev => ({ ...prev, spread_enabled: !prev.spread_enabled }))}
-              className={`relative w-10 h-5 rounded-full transition-colors ${scoring.spread_enabled ? 'bg-field-500' : 'bg-turf-700'}`}
-            >
-              <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${scoring.spread_enabled ? 'left-5' : 'left-0.5'}`} />
-            </button>
-          </label>
+          <SwitchRow id={`${uid}-spread`} name="Spread betting enabled" checked={scoring.spread_enabled} onChange={() => setScoring(prev => ({ ...prev, spread_enabled: !prev.spread_enabled }))} />
         </div>
 
         {spreadPanel.shown && (
-          <div className={`space-y-4 pt-2 border-t border-turf-800 ${spreadPanel.className}`}>
+          <div className={`space-y-4 pt-2 border-t border-turf-800 ${spreadPanel.className} motion-reduce:animate-none`}>
             {/* Points mode toggle */}
             <div>
-              <label className="label">Point Mode</label>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setScoring(prev => ({ ...prev, spread_is_multiplier: false }))}
-                  className={`flex-1 py-2 rounded-lg text-sm border transition-all ${!scoring.spread_is_multiplier ? 'bg-field-500 text-turf-950 border-field-500' : 'border-turf-700 text-turf-400 hover:text-white'}`}
-                >
-                  Flat Points
-                </button>
-                <button
-                  onClick={() => setScoring(prev => ({ ...prev, spread_is_multiplier: true }))}
-                  className={`flex-1 py-2 rounded-lg text-sm border transition-all ${scoring.spread_is_multiplier ? 'bg-field-500 text-turf-950 border-field-500' : 'border-turf-700 text-turf-400 hover:text-white'}`}
-                >
-                  Multiplier
-                </button>
-              </div>
+              <p className="label" id={`${uid}-mode`}>Point Mode</p>
+              <Segmented
+                labelledBy={`${uid}-mode`}
+                value={scoring.spread_is_multiplier ? 'multiplier' : 'flat'}
+                options={[{ value: 'flat', label: 'Flat Points' }, { value: 'multiplier', label: 'Multiplier' }]}
+                onChange={v => setScoring(prev => ({ ...prev, spread_is_multiplier: v === 'multiplier' }))}
+              />
               <p className="text-xs text-turf-500 mt-1">
                 {scoring.spread_is_multiplier
                   ? 'Multiplier: earn a multiple of the base game points for covering'
@@ -344,74 +354,42 @@ export function ScoringTab({ league, teams, onUpdateScoring }: Props) {
                 onChange={v => setScoring(prev => ({ ...prev, spread_points: v }))}
                 description={
                   <>Penalty for missing: {scoring.spread_miss_penalty_enabled
-                    ? `-${scoring.spread_miss_penalty_points} pts (custom)`
-                    : scoring.spread_is_multiplier ? `×${scoring.spread_points}` : `-${scoring.spread_points} pts`}</>
+                    ? `−${scoring.spread_miss_penalty_points} pts (custom)`
+                    : scoring.spread_is_multiplier ? `×${scoring.spread_points}` : `−${scoring.spread_points} pts`}</>
                 }
               />
-
-              <ScoreField
-                label="Max Picks / Week"
-                min={1}
-                max={10}
-                value={scoring.spread_max_per_week}
-                onChange={v => setScoring(prev => ({ ...prev, spread_max_per_week: v }))}
-              />
-
-              <ScoreField
-                label="Max Picks / Team / Season"
-                min={1}
-                max={20}
-                value={scoring.spread_max_per_team}
-                onChange={v => setScoring(prev => ({ ...prev, spread_max_per_team: v }))}
-              />
+              <ScoreField label="Max Picks / Week" min={1} max={10} value={scoring.spread_max_per_week} onChange={v => setScoring(prev => ({ ...prev, spread_max_per_week: v }))} />
+              <ScoreField label="Max Picks / Team / Season" min={1} max={20} value={scoring.spread_max_per_team} onChange={v => setScoring(prev => ({ ...prev, spread_max_per_team: v }))} />
 
               <div className="flex flex-col justify-end">
-                <label className="label">Captain Stacking</label>
-                <label className="flex items-center gap-2 cursor-pointer mt-1">
-                  <button
-                    onClick={() => setScoring(prev => ({ ...prev, spread_allow_captain_stack: !prev.spread_allow_captain_stack }))}
-                    className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${scoring.spread_allow_captain_stack ? 'bg-field-500' : 'bg-turf-700'}`}
-                  >
-                    <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${scoring.spread_allow_captain_stack ? 'left-5' : 'left-0.5'}`} />
-                  </button>
-                  <span className="text-xs text-turf-400">
-                    {scoring.spread_allow_captain_stack ? 'Allowed' : 'Not allowed'}
-                  </span>
-                </label>
-                <p className="text-xs text-turf-500 mt-0.5">Pick spread on captain's team</p>
+                <p className="label">Captain Stacking</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <Toggle
+                    id={`${uid}-stack`}
+                    checked={scoring.spread_allow_captain_stack}
+                    onChange={() => setScoring(prev => ({ ...prev, spread_allow_captain_stack: !prev.spread_allow_captain_stack }))}
+                    label="Allow spread pick on the captain’s team"
+                  />
+                  <span className="text-xs text-turf-400">{scoring.spread_allow_captain_stack ? 'Allowed' : 'Not allowed'}</span>
+                </div>
+                <p className="text-xs text-turf-500 mt-0.5">Pick spread on captain’s team</p>
               </div>
             </div>
 
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="text-sm text-white">Against-the-Spread Picks</p>
                 <p className="text-xs text-turf-500 mt-0.5">Let users pick a team to NOT cover the spread, not just to cover it. A push (exact tie against the line) always awards zero points either way.</p>
               </div>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <span className="text-xs text-turf-400">{scoring.spread_allow_against_pick ? 'Allowed' : 'Cover only'}</span>
-                <button
-                  onClick={() => setScoring(prev => ({ ...prev, spread_allow_against_pick: !prev.spread_allow_against_pick }))}
-                  className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${scoring.spread_allow_against_pick ? 'bg-field-500' : 'bg-turf-700'}`}
-                >
-                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${scoring.spread_allow_against_pick ? 'left-5' : 'left-0.5'}`} />
-                </button>
-              </label>
+              <SwitchRow id={`${uid}-against`} name="Against-the-spread picks allowed" onText="Allowed" offText="Cover only" checked={scoring.spread_allow_against_pick} onChange={() => setScoring(prev => ({ ...prev, spread_allow_against_pick: !prev.spread_allow_against_pick }))} />
             </div>
 
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="text-sm text-white">Miss Penalty</p>
                 <p className="text-xs text-turf-500 mt-0.5">Override the points lost when a spread pick misses (defaults to the same amount as covering)</p>
               </div>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <span className="text-xs text-turf-400">{scoring.spread_miss_penalty_enabled ? 'Enabled' : 'Disabled'}</span>
-                <button
-                  onClick={() => setScoring(prev => ({ ...prev, spread_miss_penalty_enabled: !prev.spread_miss_penalty_enabled }))}
-                  className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${scoring.spread_miss_penalty_enabled ? 'bg-field-500' : 'bg-turf-700'}`}
-                >
-                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${scoring.spread_miss_penalty_enabled ? 'left-5' : 'left-0.5'}`} />
-                </button>
-              </label>
+              <SwitchRow id={`${uid}-miss`} name="Custom miss penalty enabled" checked={scoring.spread_miss_penalty_enabled} onChange={() => setScoring(prev => ({ ...prev, spread_miss_penalty_enabled: !prev.spread_miss_penalty_enabled }))} />
             </div>
 
             {scoring.spread_miss_penalty_enabled && (
@@ -430,53 +408,27 @@ export function ScoringTab({ league, teams, onUpdateScoring }: Props) {
 
       {/* Free agency settings */}
       <div className="card p-5 space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-4">
           <div>
             <h3 className="font-medium text-white text-sm">Portal</h3>
             <p className="text-xs text-turf-400 mt-0.5">Let managers drop a rostered team and add an available one</p>
           </div>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <span className="text-xs text-turf-400">{scoring.free_agency_enabled ? 'Enabled' : 'Disabled'}</span>
-            <button
-              onClick={() => setScoring(prev => ({ ...prev, free_agency_enabled: !prev.free_agency_enabled }))}
-              className={`relative w-10 h-5 rounded-full transition-colors ${scoring.free_agency_enabled ? 'bg-field-500' : 'bg-turf-700'}`}
-            >
-              <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${scoring.free_agency_enabled ? 'left-5' : 'left-0.5'}`} />
-            </button>
-          </label>
+          <SwitchRow id={`${uid}-fa`} name="Portal enabled" checked={scoring.free_agency_enabled} onChange={() => setScoring(prev => ({ ...prev, free_agency_enabled: !prev.free_agency_enabled }))} />
         </div>
 
         {freeAgencyPanel.shown && (
-          <div className={`space-y-4 pt-2 border-t border-turf-800 ${freeAgencyPanel.className}`}>
+          <div className={`space-y-4 pt-2 border-t border-turf-800 ${freeAgencyPanel.className} motion-reduce:animate-none`}>
             <div className="grid grid-cols-1 sm:grid-cols-2 sm:gap-4">
-              <ScoreField
-                label="Max Adds/Drops / Season"
-                min={0}
-                value={scoring.fa_max_moves_per_season}
-                onChange={v => setScoring(prev => ({ ...prev, fa_max_moves_per_season: v }))}
-              />
-              <ScoreField
-                label="Max Adds/Drops / Week"
-                min={0}
-                value={scoring.fa_max_moves_per_week}
-                onChange={v => setScoring(prev => ({ ...prev, fa_max_moves_per_week: v }))}
-              />
+              <ScoreField label="Max Adds/Drops / Season" min={0} value={scoring.fa_max_moves_per_season} onChange={v => setScoring(prev => ({ ...prev, fa_max_moves_per_season: v }))} />
+              <ScoreField label="Max Adds/Drops / Week" min={0} value={scoring.fa_max_moves_per_week} onChange={v => setScoring(prev => ({ ...prev, fa_max_moves_per_week: v }))} />
             </div>
 
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="text-sm text-white">Point Penalty</p>
                 <p className="text-xs text-turf-500 mt-0.5">Subtract points the week a swap is made</p>
               </div>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <span className="text-xs text-turf-400">{scoring.fa_penalty_enabled ? 'Enabled' : 'Disabled'}</span>
-                <button
-                  onClick={() => setScoring(prev => ({ ...prev, fa_penalty_enabled: !prev.fa_penalty_enabled }))}
-                  className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${scoring.fa_penalty_enabled ? 'bg-field-500' : 'bg-turf-700'}`}
-                >
-                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${scoring.fa_penalty_enabled ? 'left-5' : 'left-0.5'}`} />
-                </button>
-              </label>
+              <SwitchRow id={`${uid}-fa-pen`} name="Portal point penalty enabled" checked={scoring.fa_penalty_enabled} onChange={() => setScoring(prev => ({ ...prev, fa_penalty_enabled: !prev.fa_penalty_enabled }))} />
             </div>
 
             {scoring.fa_penalty_enabled && (
@@ -496,44 +448,34 @@ export function ScoringTab({ league, teams, onUpdateScoring }: Props) {
       {/* Waiver wire settings */}
       {scoring.free_agency_enabled && (
         <div className="card p-5 space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-4">
             <div>
               <h3 className="font-medium text-white text-sm">Waiver Wire</h3>
               <p className="text-xs text-turf-400 mt-0.5">Queue adds/drops as claims resolved on a set day, with priority for contested teams</p>
             </div>
-            <Toggle
-              checked={scoring.waiver_enabled}
-              onChange={() => setScoring(prev => ({ ...prev, waiver_enabled: !prev.waiver_enabled }))}
-              label="Waiver Wire Enabled"
-            />
+            <SwitchRow id={`${uid}-waiver`} name="Waiver wire enabled" checked={scoring.waiver_enabled} onChange={() => setScoring(prev => ({ ...prev, waiver_enabled: !prev.waiver_enabled }))} />
           </div>
 
           {waiverPanel.shown && (
-            <div className={`space-y-4 pt-2 border-t border-turf-800 ${waiverPanel.className}`}>
+            <div className={`space-y-4 pt-2 border-t border-turf-800 ${waiverPanel.className} motion-reduce:animate-none`}>
               <div>
-                <label className="label">Priority Metric</label>
+                <p className="label" id={`${uid}-prio`}>Priority Metric</p>
                 <p className="text-xs text-turf-500 mb-2">Who wins when two managers claim the same team</p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setScoring(prev => ({ ...prev, waiver_priority_metric: 'worst_record' }))}
-                    className={`flex-1 py-2 rounded-lg text-sm border transition-all ${scoring.waiver_priority_metric === 'worst_record' ? 'bg-field-500 text-turf-950 border-field-500' : 'border-turf-700 text-turf-400 hover:text-white'}`}
-                  >
-                    Worst Record
-                  </button>
-                  <button
-                    onClick={() => setScoring(prev => ({ ...prev, waiver_priority_metric: 'fewest_points' }))}
-                    className={`flex-1 py-2 rounded-lg text-sm border transition-all ${scoring.waiver_priority_metric === 'fewest_points' ? 'bg-field-500 text-turf-950 border-field-500' : 'border-turf-700 text-turf-400 hover:text-white'}`}
-                  >
-                    Fewest Points
-                  </button>
-                </div>
+                <Segmented
+                  labelledBy={`${uid}-prio`}
+                  value={scoring.waiver_priority_metric}
+                  options={[{ value: 'worst_record', label: 'Worst Record' }, { value: 'fewest_points', label: 'Fewest Points' }]}
+                  onChange={v => setScoring(prev => ({ ...prev, waiver_priority_metric: v }))}
+                />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="label">Processing Day</label>
+                  <label htmlFor={`${uid}-day`} className="label">Processing Day</label>
                   <select
-                    className="input"
+                    id={`${uid}-day`}
+                    name="waiver_process_day"
+                    className={selectCls}
                     value={scoring.waiver_process_day}
                     onChange={e => setScoring(prev => ({ ...prev, waiver_process_day: parseInt(e.target.value) }))}
                   >
@@ -543,9 +485,11 @@ export function ScoringTab({ league, teams, onUpdateScoring }: Props) {
                   </select>
                 </div>
                 <div>
-                  <label className="label">League Timezone</label>
+                  <label htmlFor={`${uid}-tz`} className="label">League Timezone</label>
                   <select
-                    className="input"
+                    id={`${uid}-tz`}
+                    name="waiver_timezone"
+                    className={selectCls}
                     value={scoring.waiver_timezone}
                     onChange={e => setScoring(prev => ({ ...prev, waiver_timezone: e.target.value }))}
                   >
@@ -567,55 +511,42 @@ export function ScoringTab({ league, teams, onUpdateScoring }: Props) {
 
       {/* Starters / Bench settings */}
       <div className="card p-5 space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-4">
           <div>
             <h3 className="font-medium text-white text-sm">Bench</h3>
-            <p className="text-xs text-turf-400 mt-0.5">Split each roster into starters (score that week) and bench (don't). Locks per-team once its game kicks off.</p>
+            <p className="text-xs text-turf-400 mt-0.5">Split each roster into starters (score that week) and bench (don’t). Locks per-team once its game kicks off.</p>
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <span className="text-xs text-turf-400">{scoring.bench_enabled ? 'Enabled' : 'Disabled'}</span>
-            <Toggle
-              checked={scoring.bench_enabled}
-              onChange={() => setScoring(prev => ({ ...prev, bench_enabled: !prev.bench_enabled }))}
-              label="Bench Enabled"
-            />
-          </div>
+          <SwitchRow id={`${uid}-bench`} name="Bench enabled" checked={scoring.bench_enabled} onChange={() => setScoring(prev => ({ ...prev, bench_enabled: !prev.bench_enabled }))} />
         </div>
 
         {benchPanel.shown && (
-          <div className={`space-y-4 pt-2 border-t border-turf-800 ${benchPanel.className}`}>
+          <div className={`space-y-4 pt-2 border-t border-turf-800 ${benchPanel.className} motion-reduce:animate-none`}>
             <div className="grid grid-cols-1 sm:grid-cols-2 sm:gap-4">
-              <ScoreField
-                label="Starters"
-                min={1}
-                value={scoring.starters_count}
-                onChange={v => setScoring(prev => ({ ...prev, starters_count: v }))}
-              />
-              <ScoreField
-                label="Bench"
-                min={0}
-                value={scoring.bench_count}
-                onChange={v => setScoring(prev => ({ ...prev, bench_count: v }))}
-              />
+              <ScoreField label="Starters" min={1} value={scoring.starters_count} onChange={v => setScoring(prev => ({ ...prev, starters_count: v }))} />
+              <ScoreField label="Bench" min={0} value={scoring.bench_count} onChange={v => setScoring(prev => ({ ...prev, bench_count: v }))} />
             </div>
-            <p className="text-xs text-turf-500">
-              Must total {league.max_teams_per_user} — this league's teams per player. Currently {scoring.starters_count + scoring.bench_count}.
+            <p className="text-xs text-turf-500" aria-live="polite">
+              Must total {league.max_teams_per_user} — this league’s teams per player. Currently {scoring.starters_count + scoring.bench_count}.
             </p>
           </div>
         )}
       </div>
 
       {saveError && (
-        <div className="text-sm bg-red-900/40 text-red-300 border border-red-800 rounded-lg px-3 py-2">
+        <div ref={errorRef} tabIndex={-1} role="alert" className="text-sm bg-red-900/40 text-red-300 border border-red-800 rounded-lg px-3 py-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400">
           {saveError}
         </div>
       )}
 
-      <button onClick={handleSaveScoring} className="btn-primary">
-        Save Scoring Settings
-      </button>
+      <div className="flex items-center gap-3 flex-wrap">
+        <button type="submit" disabled={saving} className="btn-primary">
+          {saving && <Loader2 className="w-4 h-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />}
+          {saving ? 'Saving…' : 'Save Scoring Settings'}
+        </button>
+        <span className="text-xs text-turf-500" aria-live="polite">{dirty && !saving ? 'Unsaved changes' : ''}</span>
+      </div>
 
       <Toast message="Scoring settings saved" show={showSavedToast} />
-    </div>
+    </form>
   );
 }

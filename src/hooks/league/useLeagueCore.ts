@@ -591,10 +591,12 @@ export function useLeagueCore(user: User | null) {
     return {};
   };
 
-  const updateScoring = async (scoring: League['scoring']) => {
-    if (!league) return;
+  const updateScoring = async (scoring: League['scoring']): Promise<{ error?: string }> => {
+    if (!league) return { error: 'No league' };
     const { error } = await supabase.from('leagues').update({ scoring }).eq('id', league.id);
-    if (!error) posthog.capture('scoring_settings_saved');
+    if (error) return { error: error.message };
+    posthog.capture('scoring_settings_saved');
+    return {};
   };
 
   const removeFromRoster = async (userId: string, teamId: string) => {

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, useId, useState, type ReactNode } from 'react';
 import { Minus, Plus } from 'lucide-react';
 
 interface ScoreFieldProps {
@@ -37,39 +37,42 @@ function roundToStep(v: number, step: number): number {
 export function ScoreField({
   label, description, value, onChange, step = 1, min, max, variant = 'default',
 }: ScoreFieldProps) {
+  const id = useId();
   const nudge = (delta: number) => onChange(clamp(roundToStep(value + delta, step), min, max));
   const atMin = min !== undefined && value <= min;
   const atMax = max !== undefined && value >= max;
+
+  // The desktop input keeps its own text so a cleared field or a lone "-"
+  // (typing a negative) isn't coerced to 0 mid-keystroke. It commits to the
+  // parent only when the text parses, and snaps back to the real value on
+  // blur if it doesn't.
+  const [text, setText] = useState(String(value));
+  useEffect(() => { setText(String(value)); }, [value]);
+  const commit = (raw: string) => {
+    setText(raw);
+    const n = parseFloat(raw);
+    if (!Number.isNaN(n)) onChange(clamp(n, min, max));
+  };
+
+  const stepBtn = 'w-8 h-8 rounded-full flex items-center justify-center text-turf-300 hover:bg-turf-700 hover:text-white transition-colors disabled:opacity-30 disabled:hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-400';
 
   return (
     <div className="w-full">
       {/* Mobile row */}
       <div className="sm:hidden flex items-center justify-between gap-3 py-3 border-b border-turf-800 last:border-b-0">
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-white">{label}</p>
+          <p className="text-sm font-medium text-white" id={`${id}-m`}>{label}</p>
           {description && <p className="text-xs text-turf-500 mt-0.5">{description}</p>}
         </div>
-        <div className="flex items-center gap-0.5 bg-turf-800 border border-turf-600 rounded-full p-1 flex-shrink-0">
-          <button
-            type="button"
-            onClick={() => nudge(-step)}
-            disabled={atMin}
-            aria-label={`Decrease ${label}`}
-            className="w-7 h-7 rounded-full flex items-center justify-center text-turf-300 hover:bg-turf-700 hover:text-white transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
-          >
-            <Minus className="w-3.5 h-3.5" />
+        <div className="flex items-center gap-0.5 bg-turf-800 border border-turf-600 rounded-full p-0.5 flex-shrink-0" role="group" aria-labelledby={`${id}-m`}>
+          <button type="button" onClick={() => nudge(-step)} disabled={atMin} aria-label={`Decrease ${label}`} className={stepBtn}>
+            <Minus className="w-3.5 h-3.5" aria-hidden="true" />
           </button>
-          <span className="w-10 text-center font-mono font-semibold text-white text-sm tabular-nums">
+          <span className="w-10 text-center font-mono font-semibold text-white text-sm tabular-nums" aria-live="polite">
             {value}
           </span>
-          <button
-            type="button"
-            onClick={() => nudge(step)}
-            disabled={atMax}
-            aria-label={`Increase ${label}`}
-            className="w-7 h-7 rounded-full flex items-center justify-center text-turf-300 hover:bg-turf-700 hover:text-white transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
-          >
-            <Plus className="w-3.5 h-3.5" />
+          <button type="button" onClick={() => nudge(step)} disabled={atMax} aria-label={`Increase ${label}`} className={stepBtn}>
+            <Plus className="w-3.5 h-3.5" aria-hidden="true" />
           </button>
         </div>
       </div>
@@ -77,18 +80,23 @@ export function ScoreField({
       {/* Desktop — unchanged existing look */}
       <div className="hidden sm:block">
         {variant === 'compact' ? (
-          <label className="text-[10px] text-turf-500 uppercase tracking-wide block mb-1">{label}</label>
+          <label htmlFor={id} className="text-xs text-turf-500 uppercase tracking-wide block mb-1">{label}</label>
         ) : (
-          <label className="label">{label}</label>
+          <label htmlFor={id} className="label">{label}</label>
         )}
         <input
-          className={`input font-mono ${variant === 'compact' ? 'text-center' : ''}`}
+          id={id}
+          name={id}
+          className={`input font-mono tabular-nums ${variant === 'compact' ? 'text-center' : ''}`}
           type="number"
+          inputMode="decimal"
+          autoComplete="off"
           step={step}
           min={min}
           max={max}
-          value={value}
-          onChange={e => onChange(parseFloat(e.target.value) || 0)}
+          value={text}
+          onChange={e => commit(e.target.value)}
+          onBlur={() => setText(String(value))}
         />
         {description && <p className="text-xs text-turf-500 mt-0.5">{description}</p>}
       </div>
