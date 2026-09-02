@@ -584,7 +584,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                           <th
                             key={a.user_id}
                             scope="col"
-                            className={`px-3 py-3 text-center ${isMe ? 'bg-field-900/30' : ''}`}
+                            className={`px-3 py-3 text-center border-r border-turf-800 last:border-r-0 ${isMe ? 'bg-field-900/30' : ''}`}
                           >
                             <Link
                               to={`/roster/${a.user_id}`}
@@ -621,7 +621,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                           return (
                             <td
                               key={a.user_id}
-                              className={`px-3 py-2.5 text-center font-mono text-xs font-medium ${isMe ? 'bg-field-900/20' : ''}`}
+                              className={`px-3 py-2.5 text-center font-mono text-xs font-medium border-r border-turf-800/50 last:border-r-0 ${isMe ? 'bg-field-900/20' : ''}`}
                             >
                               <MetricValue metric={m} a={a} tier={tier} position={position} />
                             </td>
