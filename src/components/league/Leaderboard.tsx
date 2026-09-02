@@ -7,7 +7,7 @@ import {
 } from 'recharts';
 import { Crown, TrendingUp, TrendingDown, Star } from 'lucide-react';
 import type { LeaderboardEntry, DraftPick, APRanking, CfbTeam } from '../../types';
-import { computeAnalytics, tierFor } from '../../services/analytics';
+import { computeAnalytics, scalePosition, tierFor } from '../../services/analytics';
 import type { RosterAnalytics, MetricTier } from '../../services/analytics';
 import { Avatar } from '../ui/Avatar';
 import { TeamLogo } from '../ui/TeamLogo';
@@ -271,35 +271,45 @@ const METRICS: MetricDef[] = [
   },
 ];
 
-// Tier is carried by a glyph as well as a color, so the ranking survives
-// colorblindness and screen readers. Colour alone used to be the only signal,
-// and at the old alphas the green and red washes differed by 1.05:1.
-const TIER_GLYPH: Record<MetricTier, string> = { good: '▲', mid: '●', poor: '▼', none: '' };
+// Tier reaches the reader three ways: bar length (positional, so it survives
+// colorblindness), bar color (fast to scan), and sr-only text. That is why
+// there is no cell wash — colour alone used to be the only signal, and at the
+// old alphas the green and red washes differed by just 1.05:1.
 const TIER_LABEL: Record<MetricTier, string> = { good: 'strong', mid: 'average', poor: 'weak', none: '' };
-const TIER_TEXT: Record<MetricTier, string> = {
-  good: 'text-field-400', mid: 'text-amber-400', poor: 'text-red-300', none: '',
-};
-const TIER_CELL: Record<MetricTier, string> = {
-  good: 'bg-field-900/20', mid: 'bg-amber-900/15', poor: 'bg-red-950/25', none: '',
+const TIER_BAR: Record<MetricTier, string> = {
+  good: 'bg-field-400', mid: 'bg-amber-400', poor: 'bg-red-400', none: '',
 };
 
-// One metric's value as rendered in a cell: optional team logo, the value,
-// and its tier glyph.
-function MetricValue({ metric, a, tier }: { metric: MetricDef; a: RosterAnalytics; tier: MetricTier }) {
+// One metric's value in a cell: optional team logo, the value, and a bar
+// showing where that value falls on the metric's own fixed scale. Length is
+// the primary encoding; color repeats it so the grid stays scannable.
+function MetricValue({ metric, a, tier, position }: {
+  metric: MetricDef;
+  a: RosterAnalytics;
+  tier: MetricTier;
+  position: number | null;
+}) {
   const text = metric.display(a);
   const logo = metric.logo?.(a);
   const team = metric.team?.(a);
   return (
-    <span className={`inline-flex items-center gap-1.5 ${text === '—' ? 'text-turf-500' : 'text-white'}`}>
-      {logo && team && <TeamLogo src={logo} alt="" fallbackName={team} size={16} />}
-      <span className="tabular-nums">{text}</span>
-      {tier !== 'none' && (
-        <>
-          <span aria-hidden="true" className={TIER_TEXT[tier]}>{TIER_GLYPH[tier]}</span>
-          <span className="sr-only">, {TIER_LABEL[tier]}</span>
-        </>
+    <>
+      <span className={`inline-flex items-center gap-1.5 ${text === '—' ? 'text-turf-500' : 'text-white'}`}>
+        {logo && team && <TeamLogo src={logo} alt="" fallbackName={team} size={16} />}
+        <span className="tabular-nums">{text}</span>
+        {tier !== 'none' && <span className="sr-only">, {TIER_LABEL[tier]}</span>}
+      </span>
+      {position !== null && (
+        <span className="relative mx-auto mt-1.5 block h-[3px] w-12 rounded-full bg-turf-800" aria-hidden="true">
+          {/* 4% floor so the weakest value still reads as a mark rather than
+              as missing data */}
+          <span
+            className={`absolute inset-y-0 left-0 rounded-full ${TIER_BAR[tier]}`}
+            style={{ width: `${Math.max(4, position * 100)}%` }}
+          />
+        </span>
       )}
-    </span>
+    </>
   );
 }
 
@@ -574,7 +584,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                           <th
                             key={a.user_id}
                             scope="col"
-                            className={`px-3 py-3 text-center ${isMe ? 'bg-field-950/30' : ''}`}
+                            className={`px-3 py-3 text-center ${isMe ? 'bg-field-900/30' : ''}`}
                           >
                             <Link
                               to={`/roster/${a.user_id}`}
@@ -604,14 +614,16 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                           <MetricLabel label={m.label} tooltip={m.tooltip} polarity={m.polarity} />
                         </th>
                         {analytics.map(a => {
-                          const tier = m.domain ? tierFor(m.value(a), m.domain) : 'none';
+                          const value = m.value(a);
+                          const tier = m.domain ? tierFor(value, m.domain) : 'none';
+                          const position = m.domain ? scalePosition(value, m.domain) : null;
                           const isMe = a.user_id === userId;
                           return (
                             <td
                               key={a.user_id}
-                              className={`px-3 py-2.5 text-center font-mono text-xs font-medium ${TIER_CELL[tier]} ${isMe ? 'ring-1 ring-inset ring-field-800/40' : ''}`}
+                              className={`px-3 py-2.5 text-center font-mono text-xs font-medium ${isMe ? 'bg-field-900/20' : ''}`}
                             >
-                              <MetricValue metric={m} a={a} tier={tier} />
+                              <MetricValue metric={m} a={a} tier={tier} position={position} />
                             </td>
                           );
                         })}
@@ -622,10 +634,10 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
               </div>
 
               <div className="border-t border-turf-800 px-4 py-3 flex items-center gap-x-4 gap-y-1 text-xs text-turf-500 flex-wrap">
-                <span className="flex items-center gap-1"><span className="text-field-400" aria-hidden="true">▲</span> Strong</span>
-                <span className="flex items-center gap-1"><span className="text-amber-400" aria-hidden="true">●</span> Average</span>
-                <span className="flex items-center gap-1"><span className="text-red-300" aria-hidden="true">▼</span> Weak</span>
-                <span className="text-turf-500">Each metric is judged on its own fixed scale, not ranked against the other managers.</span>
+                <span className="flex items-center gap-1.5"><span className="h-[3px] w-8 rounded-full bg-field-400" aria-hidden="true" /> Strong</span>
+                <span className="flex items-center gap-1.5"><span className="h-[3px] w-8 rounded-full bg-amber-400" aria-hidden="true" /> Average</span>
+                <span className="flex items-center gap-1.5"><span className="h-[3px] w-8 rounded-full bg-red-400" aria-hidden="true" /> Weak</span>
+                <span className="text-turf-500">Bar length is the value on that metric's own fixed scale, not a ranking against the other managers.</span>
               </div>
 
               {/* Undrafted top teams */}
