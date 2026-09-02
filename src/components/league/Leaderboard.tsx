@@ -7,7 +7,7 @@ import {
 } from 'recharts';
 import { Crown, TrendingUp, TrendingDown, Star } from 'lucide-react';
 import type { LeaderboardEntry, DraftPick, APRanking, CfbTeam } from '../../types';
-import { computeAnalytics, scalePosition, tierFor } from '../../services/analytics';
+import { computeAnalytics, tierFor } from '../../services/analytics';
 import type { RosterAnalytics, MetricTier } from '../../services/analytics';
 import { Avatar } from '../ui/Avatar';
 import { TeamLogo } from '../ui/TeamLogo';
@@ -149,7 +149,6 @@ interface MetricDef {
   domain: [number, number] | null;
   value: (a: RosterAnalytics) => number | null;
   display: (a: RosterAnalytics) => string;
-  fmtValue: (n: number) => string;
   logo?: (a: RosterAnalytics) => string | undefined;
   team?: (a: RosterAnalytics) => string | undefined;
 }
@@ -165,7 +164,6 @@ const METRICS: MetricDef[] = [
     domain: [25, 1],
     value: a => (a.avg_rank > 0 ? a.avg_rank : null),
     display: a => (a.avg_rank > 0 ? a.avg_rank.toFixed(1) : '—'),
-    fmtValue: n => n.toFixed(1),
   },
   {
     id: 'top25',
@@ -175,7 +173,6 @@ const METRICS: MetricDef[] = [
     domain: [25, 1],
     value: a => (a.top25_avg > 0 ? a.top25_avg : null),
     display: a => (a.top25_avg > 0 ? a.top25_avg.toFixed(1) : '—'),
-    fmtValue: n => n.toFixed(1),
   },
   {
     id: 'bot25',
@@ -185,7 +182,6 @@ const METRICS: MetricDef[] = [
     domain: [25, 1],
     value: a => (a.bot25_avg > 0 ? a.bot25_avg : null),
     display: a => (a.bot25_avg > 0 ? a.bot25_avg.toFixed(1) : '—'),
-    fmtValue: n => n.toFixed(1),
   },
   {
     id: 'record',
@@ -196,7 +192,6 @@ const METRICS: MetricDef[] = [
     domain: [-6, 6],
     value: a => (a.wins > 0 || a.losses > 0 ? a.wins - a.losses : null),
     display: a => (a.wins > 0 || a.losses > 0 ? `${a.wins}-${a.losses}` : '—'),
-    fmtValue: n => `${signed(Number(n.toFixed(1)))} diff`,
   },
   {
     id: 'captain',
@@ -206,7 +201,6 @@ const METRICS: MetricDef[] = [
     domain: [0, 100],
     value: a => a.captain_efficiency,
     display: a => (a.captain_efficiency !== null ? `${a.captain_efficiency}%` : '—'),
-    fmtValue: n => `${Math.round(n)}%`,
   },
   {
     id: 'best_pick',
@@ -217,7 +211,6 @@ const METRICS: MetricDef[] = [
     domain: [-20, 35],
     value: a => a.best_pick?.points ?? null,
     display: a => (a.best_pick ? `${shortTeamName(a.best_pick.team_name)} (${signed(a.best_pick.points)})` : '—'),
-    fmtValue: n => `${signed(Number(n.toFixed(1)))} pts`,
     logo: a => a.best_pick?.team_logo,
     team: a => a.best_pick?.team_name,
   },
@@ -232,7 +225,6 @@ const METRICS: MetricDef[] = [
     domain: null,
     value: a => a.worst_pick?.points ?? null,
     display: a => (a.worst_pick ? `${shortTeamName(a.worst_pick.team_name)} (${signed(a.worst_pick.points)})` : '—'),
-    fmtValue: n => `${signed(Number(n.toFixed(1)))} pts`,
     logo: a => a.worst_pick?.team_logo,
     team: a => a.worst_pick?.team_name,
   },
@@ -244,7 +236,6 @@ const METRICS: MetricDef[] = [
     domain: null,
     value: a => a.best_team?.rank ?? null,
     display: a => (a.best_team ? `${shortTeamName(a.best_team.team_name)} (#${a.best_team.rank})` : '—'),
-    fmtValue: n => `#${Math.round(n)}`,
     logo: a => a.best_team?.team_logo,
     team: a => a.best_team?.team_name,
   },
@@ -256,7 +247,6 @@ const METRICS: MetricDef[] = [
     domain: null,
     value: a => a.worst_team?.rank ?? null,
     display: a => (a.worst_team ? `${shortTeamName(a.worst_team.team_name)} (#${a.worst_team.rank})` : '—'),
-    fmtValue: n => `#${Math.round(n)}`,
     logo: a => a.worst_team?.team_logo,
     team: a => a.worst_team?.team_name,
   },
@@ -269,7 +259,6 @@ const METRICS: MetricDef[] = [
     domain: [30, -30],
     value: a => a.over_under_pts,
     display: a => signed(a.over_under_pts),
-    fmtValue: n => signed(Number(n.toFixed(1))),
   },
   {
     id: 'ou_avg',
@@ -279,7 +268,6 @@ const METRICS: MetricDef[] = [
     domain: [15, -15],
     value: a => a.over_under_avg,
     display: a => signed(a.over_under_avg),
-    fmtValue: n => signed(Number(n.toFixed(1))),
   },
 ];
 
@@ -294,30 +282,6 @@ const TIER_TEXT: Record<MetricTier, string> = {
 const TIER_CELL: Record<MetricTier, string> = {
   good: 'bg-field-900/20', mid: 'bg-amber-900/15', poor: 'bg-red-950/25', none: '',
 };
-
-// Position of one manager on a metric's fixed scale, with faint ticks for
-// everyone else. Position is a positional encoding rather than a hue, so it
-// reads the same for a colorblind user and shows the real spread: ticks
-// bunched together mean the metric barely separates anyone, which the old
-// three-bucket wash actively concealed.
-function ScaleTrack({ position, others }: { position: number | null; others: number[] }) {
-  if (position === null) return <div className="h-1.5 mt-2" aria-hidden="true" />;
-  return (
-    <div className="relative h-1.5 mt-2 rounded-full bg-turf-800" aria-hidden="true">
-      {others.map((p, i) => (
-        <span
-          key={i}
-          className="absolute top-1/2 -translate-y-1/2 w-px h-2 bg-turf-600"
-          style={{ left: `${p * 100}%` }}
-        />
-      ))}
-      <span
-        className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-white ring-2 ring-turf-900"
-        style={{ left: `${position * 100}%` }}
-      />
-    </div>
-  );
-}
 
 // One metric's value as rendered in a cell: optional team logo, the value,
 // and its tier glyph.
@@ -346,7 +310,6 @@ const ANALYTICS_TABS: AnalyticsTab[] = ['table', 'weekly', 'graphs'];
 
 export function Leaderboard({ entries, currentWeek, userId, confChampComplete, draftPicks, rankings, teams }: Props) {
   const [analyticsTab, setAnalyticsTab] = useState<AnalyticsTab>('table');
-  const [tableScope, setTableScope] = useState<'you' | 'everyone'>('you');
 
   // Roving arrow-key focus for the analytics tablist (WAI-ARIA tabs pattern).
   const onTabKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>, idx: number) => {
@@ -440,14 +403,6 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
       data: scatterPoints.filter(p => p.user_id === e.user_id),
     })).filter(m => m.data.length > 0);
   }, [entries, scatterPoints]);
-
-  // The current user's own analytics row, when they're a member of this
-  // league. Drives the default "You" view; absent for a commissioner who
-  // isn't playing, who falls back to the full matrix.
-  const me = useMemo(
-    () => analytics.find(a => a.user_id === userId) ?? null,
-    [analytics, userId]
-  );
 
   return (
     <div className="space-y-6 animate-fade-in motion-reduce:animate-none">
@@ -601,141 +556,70 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
           {/* ── TABLE VIEW ── */}
           {analyticsTab === 'table' && (
             <div role="tabpanel" id="analytics-panel-table" aria-labelledby="analytics-tab-table">
-              <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-turf-800 flex-wrap">
-                <p className="text-xs text-turf-500">
-                  {tableScope === 'you' && me
-                    ? 'Where your roster lands on each measure, against the rest of the league.'
-                    : 'Every manager, side by side.'}
-                </p>
-                <div role="radiogroup" aria-label="Comparison scope" className="flex gap-1 bg-turf-800 p-1 rounded-lg flex-shrink-0">
-                  {([['you', 'You'], ['everyone', 'Everyone']] as const).map(([id, label]) => (
-                    <button
-                      key={id}
-                      type="button"
-                      role="radio"
-                      aria-checked={tableScope === id}
-                      disabled={id === 'you' && !me}
-                      onClick={() => setTableScope(id)}
-                      className={`px-3 py-1.5 min-h-[32px] rounded-md text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-400 disabled:opacity-40 disabled:cursor-not-allowed ${
-                        tableScope === id ? 'bg-field-500 text-turf-950' : 'text-turf-400 hover:text-white'
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {tableScope === 'you' && me ? (
-                <table className="w-full text-sm" aria-label="Your roster analytics against the league">
-                  <caption className="sr-only">
-                    Each metric with your value, where it sits on that metric's fixed scale, and the league average.
-                  </caption>
+              <div
+                className="overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-field-400"
+                tabIndex={0}
+                aria-label="Roster analytics by manager, scrolls horizontally"
+              >
+                <table className="w-full text-sm" aria-label="Roster analytics by manager">
+                  <caption className="sr-only">Metrics down the side, managers across the top.</caption>
                   <thead>
                     <tr className="border-b border-turf-800">
-                      <th scope="col" className="px-4 py-3 text-left text-xs text-turf-500 uppercase tracking-wide font-medium">Metric</th>
-                      <th scope="col" className="px-3 py-3 text-left text-xs text-field-400 uppercase tracking-wide font-medium w-[45%]">You</th>
-                      <th scope="col" className="px-4 py-3 text-right text-xs text-turf-500 uppercase tracking-wide font-medium">League avg</th>
+                      <th scope="col" className="px-4 py-3 text-left text-xs text-turf-500 uppercase tracking-wide font-medium w-44 sticky left-0 bg-turf-900 z-10 border-r border-turf-800">
+                        Metric
+                      </th>
+                      {analytics.map((a, i) => {
+                        const isMe = a.user_id === userId;
+                        return (
+                          <th
+                            key={a.user_id}
+                            scope="col"
+                            className={`px-3 py-3 text-center ${isMe ? 'bg-field-950/30' : ''}`}
+                          >
+                            <Link
+                              to={`/roster/${a.user_id}`}
+                              className="inline-flex items-center gap-1.5 max-w-[9rem] rounded hover:text-field-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-400"
+                            >
+                              <span
+                                className="w-2 h-2 rounded-full flex-shrink-0"
+                                style={{ backgroundColor: seriesColor(i) }}
+                              />
+                              <span className="font-sans font-bold text-sm text-white truncate">
+                                {chartLabel(a.display_name)}
+                              </span>
+                            </Link>
+                            {isMe && <span className="badge-green text-xs mt-1 mx-auto block w-fit">You</span>}
+                          </th>
+                        );
+                      })}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-turf-800/50">
-                    {METRICS.map(m => {
-                      const mine = m.value(me);
-                      const pos = m.domain ? scalePosition(mine, m.domain) : null;
-                      const tier = m.domain ? tierFor(mine, m.domain) : 'none';
-                      const others = m.domain
-                        ? analytics
-                            .filter(a => a.user_id !== me.user_id)
-                            .map(a => scalePosition(m.value(a), m.domain!))
-                            .filter((v): v is number => v !== null)
-                        : [];
-                      const all = analytics
-                        .map(a => m.value(a))
-                        .filter((v): v is number => v !== null);
-                      const avg = all.length ? all.reduce((sum, v) => sum + v, 0) / all.length : null;
-                      return (
-                        <tr key={m.id} className={`hover:bg-turf-800/20 transition-colors ${m.groupStart ? 'border-t-[6px] border-t-turf-800/30' : ''}`}>
-                          <th scope="row" className="px-4 py-3 text-left font-normal align-top">
-                            <MetricLabel label={m.label} tooltip={m.tooltip} polarity={m.polarity} />
-                          </th>
-                          <td className="px-3 py-3 align-top font-mono text-xs font-medium">
-                            <MetricValue metric={m} a={me} tier={tier} />
-                            <ScaleTrack position={pos} others={others} />
-                          </td>
-                          <td className="px-4 py-3 text-right align-top font-mono text-xs text-turf-400 tabular-nums">
-                            {avg !== null ? m.fmtValue(avg) : '—'}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              ) : (
-                <div
-                  className="overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-field-400"
-                  tabIndex={0}
-                  aria-label="Roster analytics by manager, scrolls horizontally"
-                >
-                  <table className="w-full text-sm" aria-label="Roster analytics by manager">
-                    <caption className="sr-only">Metrics down the side, managers across the top.</caption>
-                    <thead>
-                      <tr className="border-b border-turf-800">
-                        <th scope="col" className="px-4 py-3 text-left text-xs text-turf-500 uppercase tracking-wide font-medium w-44 sticky left-0 bg-turf-900 z-10 border-r border-turf-800">
-                          Metric
+                    {METRICS.map(m => (
+                      <tr key={m.id} className={`group hover:bg-turf-800/20 transition-colors ${m.groupStart ? 'border-t-[6px] border-t-turf-800/30' : ''}`}>
+                        <th
+                          scope="row"
+                          className="px-4 py-2.5 text-left font-normal sticky left-0 bg-turf-900 group-hover:bg-turf-800 transition-colors z-10 border-r border-turf-800"
+                        >
+                          <MetricLabel label={m.label} tooltip={m.tooltip} polarity={m.polarity} />
                         </th>
-                        {analytics.map((a, i) => {
+                        {analytics.map(a => {
+                          const tier = m.domain ? tierFor(m.value(a), m.domain) : 'none';
                           const isMe = a.user_id === userId;
                           return (
-                            <th
+                            <td
                               key={a.user_id}
-                              scope="col"
-                              className={`px-3 py-3 text-center ${isMe ? 'bg-field-950/30' : ''}`}
+                              className={`px-3 py-2.5 text-center font-mono text-xs font-medium ${TIER_CELL[tier]} ${isMe ? 'ring-1 ring-inset ring-field-800/40' : ''}`}
                             >
-                              <Link
-                                to={`/roster/${a.user_id}`}
-                                className="inline-flex items-center gap-1.5 max-w-[9rem] rounded hover:text-field-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-400"
-                              >
-                                <span
-                                  className="w-2 h-2 rounded-full flex-shrink-0"
-                                  style={{ backgroundColor: seriesColor(i) }}
-                                />
-                                <span className="font-sans font-bold text-sm text-white truncate">
-                                  {chartLabel(a.display_name)}
-                                </span>
-                              </Link>
-                              {isMe && <span className="badge-green text-xs mt-1 mx-auto block w-fit">You</span>}
-                            </th>
+                              <MetricValue metric={m} a={a} tier={tier} />
+                            </td>
                           );
                         })}
                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-turf-800/50">
-                      {METRICS.map(m => (
-                        <tr key={m.id} className={`group hover:bg-turf-800/20 transition-colors ${m.groupStart ? 'border-t-[6px] border-t-turf-800/30' : ''}`}>
-                          <th
-                            scope="row"
-                            className="px-4 py-2.5 text-left font-normal sticky left-0 bg-turf-900 group-hover:bg-turf-800 transition-colors z-10 border-r border-turf-800"
-                          >
-                            <MetricLabel label={m.label} tooltip={m.tooltip} polarity={m.polarity} />
-                          </th>
-                          {analytics.map(a => {
-                            const tier = m.domain ? tierFor(m.value(a), m.domain) : 'none';
-                            const isMe = a.user_id === userId;
-                            return (
-                              <td
-                                key={a.user_id}
-                                className={`px-3 py-2.5 text-center font-mono text-xs font-medium ${TIER_CELL[tier]} ${isMe ? 'ring-1 ring-inset ring-field-800/40' : ''}`}
-                              >
-                                <MetricValue metric={m} a={a} tier={tier} />
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+                    ))}
+                  </tbody>
+                </table>
+              </div>
 
               <div className="border-t border-turf-800 px-4 py-3 flex items-center gap-x-4 gap-y-1 text-xs text-turf-500 flex-wrap">
                 <span className="flex items-center gap-1"><span className="text-field-400" aria-hidden="true">▲</span> Strong</span>
