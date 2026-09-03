@@ -387,18 +387,6 @@ export function DraftRoom({
     window.scrollTo({ top: 0, left: 0 });
   }, []);
 
-  // Auto-scroll the picks list to the latest pick, but only for picks made
-  // *after* the page has already loaded — draftPicks.length has no "previous"
-  // value to compare against on first mount, so without this guard the
-  // effect fires on every page load too, not just on a new pick coming in.
-  const isFirstPicksRender = useRef(true);
-  useEffect(() => {
-    if (isFirstPicksRender.current) {
-      isFirstPicksRender.current = false;
-      return;
-    }
-    picksRef.current?.lastElementChild?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }, [draftPicks.length]);
 
   const handlePick = async (team: CfbTeam) => {
     if (!isMyTurn || picking) return;
