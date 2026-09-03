@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { RosterView } from '../components/league/RosterView';
-import type { League, LeagueMember, DraftPick, CaptainPick, GameData, SpreadPick, SpreadData, FreeAgencyMove, ScoreCorrection, BenchPick } from '../types';
+import type { League, LeagueMember, DraftPick, CaptainPick, GameData, SpreadPick, SpreadData, FreeAgencyMove, ScoreCorrection, BenchPick, APRanking } from '../types';
 import { calcWeeklyScore } from '../services/scoring';
 import { rosterAtWeek } from '../services/roster';
 
@@ -11,6 +11,7 @@ interface Props {
   draftPicks: DraftPick[];
   captainPicks: CaptainPick[];
   gameData: GameData;
+  rankings: APRanking[];
   spreadData: Record<number, SpreadData>;
   spreadPicks: SpreadPick[];
   freeAgencyMoves: FreeAgencyMove[];
@@ -26,7 +27,7 @@ interface Props {
 }
 
 export function RosterPage({
-  league, members, draftPicks, captainPicks, gameData,
+  league, members, draftPicks, captainPicks, gameData, rankings,
   spreadData, spreadPicks, freeAgencyMoves, scoreCorrections, benchPicks,
   userId, onSetCaptain, onSetSpread, onRemoveSpread, onRefreshSpreads,
   onSwapBench, onEnsureBenchSeeded,
@@ -79,6 +80,7 @@ export function RosterPage({
       draftPicks={draftPicks}
       captainPicks={captainPicks}
       gameData={gameData}
+      rankings={rankings}
       scoring={league.scoring}
       currentWeek={league.current_week}
       weeklyScores={weeklyScores}

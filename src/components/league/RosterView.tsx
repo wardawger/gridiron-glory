@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Shield, TrendingUp, TrendingDown, Minus, Star, Calendar, List, X, MapPin, Tv, Clock, Coins, ChevronDown, UserCheck, Armchair, Lock } from 'lucide-react';
-import type { RosterEntry, CaptainPick, GameData, ScoringSettings, LeagueMember, WeeklyScore, GameResult, SpreadPick, SpreadData, FreeAgencyMove, DraftPick, ScoreCorrection, BenchPick } from '../../types';
+import type { RosterEntry, CaptainPick, GameData, ScoringSettings, LeagueMember, WeeklyScore, GameResult, SpreadPick, SpreadData, FreeAgencyMove, DraftPick, ScoreCorrection, BenchPick, APRanking } from '../../types';
 import { calcWeeklyScore } from '../../services/scoring';
 import { rosterAtWeek, isGameKickedOff } from '../../services/roster';
 import { useTabCrossfade } from '../../hooks/useCrossfade';
@@ -21,6 +21,7 @@ interface Props {
   draftPicks: DraftPick[];
   captainPicks: CaptainPick[];
   gameData: GameData;
+  rankings: APRanking[];
   scoring: ScoringSettings;
   currentWeek: number;
   weeklyScores: WeeklyScore[];
@@ -236,13 +237,22 @@ function ScheduleModal({ team, gameData, captainPicks, userId, currentWeek, onCl
 // ── Main RosterView ───────────────────────────────────────────────────────────
 
 export function RosterView({
-  member, roster, draftPicks, captainPicks, gameData, scoring,
+  member, roster, draftPicks, captainPicks, gameData, rankings, scoring,
   currentWeek, weeklyScores, isOwner, onSetCaptain, captainUsage,
   spreadData, spreadPicks, spreadUsage, onSetSpread, onRemoveSpread, onRefreshSpreads,
   freeAgencyMoves, scoreCorrections, viewUserId, members, currentUserId,
   benchPicks, onSwapBench, onEnsureBenchSeeded,
 }: Props) {
   const navigate = useNavigate();
+  // Current AP poll, keyed by team id. A rostered team's own rank is not
+  // stored per week in gameData the way its opponent's is, so this is the
+  // latest published poll — the same source the Scoreboard uses. For the
+  // current week the two agree; browsing back to an earlier week shows the
+  // opponent's rank as of that week and the team's rank as of today.
+  const rankByTeamId = useMemo(
+    () => new Map(rankings.filter(r => r.team_id).map(r => [r.team_id!, r.rank])),
+    [rankings]
+  );
   const { active: view, select: selectView, panelClass: viewPanelClass } = useTabCrossfade<'week' | 'schedule'>('week');
   // Which week the roster page is browsing — defaults to the league's actual
   // current week each time this page is opened, but can be changed freely
@@ -355,6 +365,7 @@ export function RosterView({
     // or not-yet-set start_date shouldn't stay editable forever just
     // because CFBD hasn't populated it, once the league has moved on.
     const isPastWeek = selectedWeek < currentWeek;
+    const teamRank = rankByTeamId.get(entry.team_id) ?? null;
     const canBeCaptain = (captainUses < 2 || isCaptain) && !captainKickedOff && !isPastWeek;
     const oppLogo = (game as any)?.opponent_logo ?? null;
     const isHome  = (game as any)?.is_home  ?? true;
@@ -394,7 +405,9 @@ export function RosterView({
           <TeamLogo src={entry.team_logo} alt="" fallbackName={entry.team_name} size={40} />
           <span className="flex-1 min-w-0 block">
             <span className="flex items-center gap-2">
-              <span className="font-medium text-white truncate">{entry.team_name}</span>
+              <span className="font-medium text-white truncate">
+                {teamRank ? <span className="text-turf-400">#{teamRank} </span> : ''}{entry.team_name}
+              </span>
               {isCaptain && (
                 <span className="badge-gold text-xs">
                   <Star className="w-2.5 h-2.5 fill-current" aria-hidden="true" /> Captain
@@ -466,7 +479,8 @@ export function RosterView({
                   ) : (
                     <span className="flex items-center gap-1 text-turf-500">
                       <Minus className="w-3 h-3 flex-shrink-0" aria-hidden="true" />
-                      {isHome ? 'vs' : 'at'} {game.opponent} — {gameDateInfo!.date}
+                      {isHome ? 'vs' : 'at'} {game.opponent}
+                      {game.opponent_rank ? ` (#${game.opponent_rank})` : ''} — {gameDateInfo!.date}
                       {gameDateInfo!.time !== 'TBD' ? ` · ${gameDateInfo!.time}` : ''}
                     </span>
                   )}
