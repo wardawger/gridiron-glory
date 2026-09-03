@@ -190,6 +190,7 @@ export interface StatBoardEntry {
   team_id: string;
   team_name: string;
   team_logo: string;
+  user_id: string;
   owner_name: string;
   rank: number;
   value: number;
@@ -227,6 +228,7 @@ export function buildStatBonusBoard(
         team_id:    b.team_id,
         team_name:  b.team_name,
         team_logo:  team?.team_logo ?? '',
+        user_id:    userId,
         owner_name: memberName(userId),
         rank:       b.rank,
         value:      b.value,

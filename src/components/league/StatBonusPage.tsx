@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { Award, TrendingUp, TrendingDown } from 'lucide-react';
+import { useMemo, useId, useState } from 'react';
+import { Award, TrendingUp, TrendingDown, ChevronDown, Users } from 'lucide-react';
 import type { League, LeagueMember, RosterEntry, TeamSeasonStats } from '../../types';
 import { normalizeScoring } from '../../types';
 import { calcStatRankingBonuses } from '../../services/scoring';
@@ -59,16 +59,31 @@ function BonusRow({ rank, teamLogo, teamName, ownerName, value, points, statLabe
 }
 
 export function StatBonusPage({ league, members, rosters, seasonStats }: Props) {
+  const uid = useId();
   const confChampComplete = league.current_week >= 15;
   const scoring = useMemo(() => normalizeScoring(league.scoring), [league.scoring]);
 
-  const board = useMemo(() => {
+  const fullBoard = useMemo(() => {
     const byUser = calcStatRankingBonuses(rosters, seasonStats, !confChampComplete, scoring);
     return buildStatBonusBoard(byUser, rosters, members);
   }, [rosters, seasonStats, confChampComplete, scoring, members]);
 
+  // Defaults to every manager. Filtering narrows each category's top/bottom
+  // lists down to one manager's rows rather than hiding whole categories,
+  // since a filtered manager may only appear in one of the two.
+  const [managerFilter, setManagerFilter] = useState<string>('all');
+  const board = useMemo(() => {
+    if (managerFilter === 'all') return fullBoard;
+    return fullBoard.map(cat => ({
+      ...cat,
+      top: cat.top.filter(e => e.user_id === managerFilter),
+      bottom: cat.bottom.filter(e => e.user_id === managerFilter),
+    }));
+  }, [fullBoard, managerFilter]);
+
   const featureOn = scoring.stat_bonus_enabled;
-  const hasAnyData = board.some(b => b.top.length > 0 || b.bottom.length > 0);
+  const hasAnyData = fullBoard.some(b => b.top.length > 0 || b.bottom.length > 0);
+  const hasFilteredData = board.some(b => b.top.length > 0 || b.bottom.length > 0);
 
   return (
     <div className="space-y-5 animate-fade-in motion-reduce:animate-none">
@@ -104,6 +119,30 @@ export function StatBonusPage({ league, members, rosters, seasonStats }: Props) 
         )}
       </div>
 
+      {featureOn && hasAnyData && (
+        <div className="card p-3 flex items-center gap-2.5">
+          <Users className="w-4 h-4 text-turf-500 flex-shrink-0" aria-hidden="true" />
+          <label htmlFor={`${uid}-mgr-filter`} className="text-xs text-turf-400 flex-shrink-0">
+            Manager
+          </label>
+          <div className="relative flex-1 max-w-56">
+            <select
+              id={`${uid}-mgr-filter`}
+              name="manager_filter"
+              className="input appearance-none pr-9 text-sm [&>option]:bg-turf-800 [&>option]:text-white"
+              value={managerFilter}
+              onChange={e => setManagerFilter(e.target.value)}
+            >
+              <option value="all">All managers</option>
+              {members.map(m => (
+                <option key={m.user_id} value={m.user_id}>{m.display_name}</option>
+              ))}
+            </select>
+            <ChevronDown className="w-4 h-4 text-turf-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true" />
+          </div>
+        </div>
+      )}
+
       {!featureOn ? (
         <div className="card p-12 text-center text-turf-500">
           <Award className="w-8 h-8 mx-auto mb-3 text-turf-700" aria-hidden="true" />
@@ -115,6 +154,18 @@ export function StatBonusPage({ league, members, rosters, seasonStats }: Props) 
           <Award className="w-8 h-8 mx-auto mb-3 text-turf-700" aria-hidden="true" />
           <p>No season stats available yet.</p>
           <p className="text-xs text-turf-500 mt-1">Check back once the season is underway.</p>
+        </div>
+      ) : !hasFilteredData ? (
+        <div className="card p-12 text-center text-turf-500">
+          <Award className="w-8 h-8 mx-auto mb-3 text-turf-700" aria-hidden="true" />
+          <p>{members.find(m => m.user_id === managerFilter)?.display_name ?? 'This manager'} has no statistical bonuses yet.</p>
+          <button
+            type="button"
+            onClick={() => setManagerFilter('all')}
+            className="text-xs text-field-400 hover:text-field-300 transition-colors mt-1"
+          >
+            Show all managers
+          </button>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

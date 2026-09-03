@@ -12,6 +12,7 @@ import type { RosterAnalytics, MetricTier } from '../../services/analytics';
 import { Avatar } from '../ui/Avatar';
 import { TeamLogo } from '../ui/TeamLogo';
 import { InfoTooltip } from '../ui/Tooltip';
+import { Toggle } from '../ui/Toggle';
 import {
   seriesColor, CHART_TOOLTIP_STYLE, CHART_TOOLTIP_LABEL, CHART_TOOLTIP_ITEM, legendFormatter,
   CHART_AXIS_TICK, CHART_GRID, CHART_MUTED, CHART_SURFACE,
@@ -364,9 +365,22 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
     [entries, draftPicks, rankings]
   );
 
-  const chartData = entries.map(e => ({
+  // Off by default: the bar graph and standings list read as pure game
+  // performance (wins/losses/spread/captain) unless a manager opts into
+  // seeing the statistical-ranking bonuses layered on top. Re-sorts by
+  // whichever total is on screen, so rank always matches what's displayed.
+  const [includeStatBonuses, setIncludeStatBonuses] = useState(false);
+  const displayTotal = (e: LeaderboardEntry) =>
+    includeStatBonuses ? e.total_points : e.total_points - ((e as any).stat_points ?? 0);
+
+  const rankedEntries = useMemo(
+    () => [...entries].sort((a, b) => displayTotal(b) - displayTotal(a)),
+    [entries, includeStatBonuses]
+  );
+
+  const chartData = rankedEntries.map(e => ({
     name: chartLabel(e.display_name),
-    points: e.total_points,
+    points: displayTotal(e),
   }));
   const chartDomain: [number, number] = [
     Math.min(0, ...chartData.map(d => d.points)),
@@ -462,7 +476,18 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
       <div className="card p-5">
         <div className="flex items-center justify-between mb-4">
           <h2 className="section-title text-xl">Season Standings</h2>
-          <span className="badge-gray text-xs">Week {currentWeek}</span>
+          <div className="flex items-center gap-3">
+            <label htmlFor="include-stat-bonuses" className="flex items-center gap-2 text-xs text-turf-400 cursor-pointer">
+              Stat Bonuses
+              <Toggle
+                id="include-stat-bonuses"
+                checked={includeStatBonuses}
+                onChange={() => setIncludeStatBonuses(v => !v)}
+                label="Include statistical ranking bonuses in the totals below"
+              />
+            </label>
+            <span className="badge-gray text-xs">Week {currentWeek}</span>
+          </div>
         </div>
         <div className="h-48">
           <ResponsiveContainer width="100%" height="100%">
@@ -490,10 +515,10 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
 
       {/* ── Standings List ────────────────────────────── */}
       <div className="card divide-y divide-turf-800">
-        {entries.length === 0 && (
+        {rankedEntries.length === 0 && (
           <p className="text-turf-500 text-sm text-center py-10">No managers yet — standings appear once the league has members.</p>
         )}
-        {entries.map((entry, idx) => {
+        {rankedEntries.map((entry, idx) => {
           const isMe      = entry.user_id === userId;
           const weekScore = entry.weekly_scores.find(w => w.week === currentWeek);
           const lastWeek  = entry.weekly_scores.find(w => w.week === currentWeek - 1);
@@ -551,8 +576,9 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                     </span>
                   )}
                   {statPts !== 0 && (
-                    <span className={statPts > 0 ? 'text-blue-400' : 'text-red-300'}>
+                    <span className={(statPts > 0 ? 'text-blue-400' : 'text-red-300') + (!includeStatBonuses ? ' opacity-50' : '')}>
                       {statPts > 0 ? '+' : ''}{statPts} stats
+                      {!includeStatBonuses && ' (hidden below)'}
                       {!confChampComplete && (
                         <span title="Provisional — final once conference championships are complete">
                           {' ◎'}<span className="sr-only"> (provisional)</span>
@@ -569,7 +595,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                 </div>
               </div>
               <div className="text-right flex-shrink-0">
-                <div className="font-mono font-bold text-xl text-white group-hover:text-field-400 transition-colors">{entry.total_points}</div>
+                <div className="font-mono font-bold text-xl text-white group-hover:text-field-400 transition-colors tabular-nums">{displayTotal(entry)}</div>
                 <div className="text-xs text-turf-500">{weekScore ? `${weekScore.points > 0 ? '+' : ''}${weekScore.points} wk` : '—'}</div>
               </div>
             </Link>
