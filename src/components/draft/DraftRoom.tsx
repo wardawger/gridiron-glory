@@ -1038,10 +1038,10 @@ export function DraftRoom({
               <>
                 <div role="tablist" aria-label="Draft Room right panel" className="flex gap-1 bg-turf-900 p-1 rounded-xl border border-turf-800">
                   {([
-                    { id: 'board',   label: 'Board',   count: 0 },
-                    { id: 'queue',   label: 'Queue',   count: queuedTeamIds.length },
-                    { id: 'rosters', label: 'Rosters', count: 0 },
-                  ] as const).map(({ id, label, count }, idx) => (
+                    { id: 'board',   label: 'Board',   icon: LayoutGrid, count: 0 },
+                    { id: 'queue',   label: 'Queue',   icon: Star,       count: queuedTeamIds.length },
+                    { id: 'rosters', label: 'Rosters', icon: Users,      count: 0 },
+                  ] as const).map(({ id, label, icon: Icon, count }, idx) => (
                     <button
                       key={id}
                       type="button"
@@ -1056,6 +1056,7 @@ export function DraftRoom({
                         panel === id ? 'bg-field-500 text-turf-950' : 'text-turf-400 hover:text-white'
                       }`}
                     >
+                      <Icon className="w-3.5 h-3.5" aria-hidden="true" />
                       {label}
                       {!!count && (
                         <span className={`text-xs font-mono rounded-full px-1 ${panel === id ? 'bg-turf-950/20' : 'bg-turf-800'}`}>
