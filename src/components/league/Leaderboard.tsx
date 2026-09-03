@@ -578,7 +578,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                   {statPts !== 0 && (
                     <span className={(statPts > 0 ? 'text-blue-400' : 'text-red-300') + (!includeStatBonuses ? ' opacity-50' : '')}>
                       {statPts > 0 ? '+' : ''}{statPts} stats
-                      {!includeStatBonuses && ' (hidden below)'}
+                      {!includeStatBonuses && <span className="sr-only"> (excluded from total below)</span>}
                       {!confChampComplete && (
                         <span title="Provisional — final once conference championships are complete">
                           {' ◎'}<span className="sr-only"> (provisional)</span>
