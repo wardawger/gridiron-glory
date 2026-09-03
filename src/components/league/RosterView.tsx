@@ -84,10 +84,13 @@ interface ModalProps {
   captainPicks: CaptainPick[];
   userId: string;
   currentWeek: number;
+  // Latest published AP poll. The opponents listed below carry their rank
+  // as of the week they are played, which is stored per game.
+  teamRank: number | null;
   onClose: () => void;
 }
 
-function ScheduleModal({ team, gameData, captainPicks, userId, currentWeek, onClose }: ModalProps) {
+function ScheduleModal({ team, gameData, captainPicks, userId, currentWeek, teamRank, onClose }: ModalProps) {
   const teamGames = gameData[team.team_id] ?? {};
   const panelRef = useDialog(onClose);
 
@@ -120,7 +123,9 @@ function ScheduleModal({ team, gameData, captainPicks, userId, currentWeek, onCl
         <div className="sticky top-0 z-10 flex items-center gap-4 border-b border-turf-800 bg-turf-950 px-6 py-4">
           <TeamLogo src={team.team_logo} alt={team.team_name} fallbackName={team.team_name} size={48} />
           <div className="flex-1 min-w-0">
-            <h2 id="schedule-modal-title" className="font-display text-xl font-bold text-white tracking-wide">{team.team_name}</h2>
+            <h2 id="schedule-modal-title" className="font-display text-xl font-bold text-white tracking-wide">
+              {teamRank ? <span className="text-turf-400">#{teamRank} </span> : ''}{team.team_name}
+            </h2>
             <p className="text-sm text-turf-400">{team.team_conference} · {seasonYear} Schedule</p>
           </div>
           <button
@@ -496,15 +501,15 @@ export function RosterView({
                         : <TrendingDown className="w-3 h-3 text-red-300 flex-shrink-0" aria-hidden="true" />
                       }
                       <span className={game.result === 'W' ? 'text-field-300' : 'text-red-300'}>
-                        {game.result} {isHome ? 'vs' : 'at'} {game.opponent}
-                        {game.opponent_rank && <span className="text-turf-500"> (#{game.opponent_rank})</span>}
+                        {game.result} {isHome ? 'vs' : 'at'}{' '}
+                        {game.opponent_rank ? <span className="text-turf-500">#{game.opponent_rank} </span> : ''}{game.opponent}
                       </span>
                     </span>
                   ) : (
                     <span className="flex items-center gap-1 text-turf-500">
                       <Minus className="w-3 h-3 flex-shrink-0" aria-hidden="true" />
-                      {isHome ? 'vs' : 'at'} {game.opponent}
-                      {game.opponent_rank ? ` (#${game.opponent_rank})` : ''} — {gameDateInfo!.date}
+                      {isHome ? 'vs' : 'at'}{' '}
+                      {game.opponent_rank ? `#${game.opponent_rank} ` : ''}{game.opponent} — {gameDateInfo!.date}
                       {gameDateInfo!.time !== 'TBD' ? ` · ${gameDateInfo!.time}` : ''}
                     </span>
                   )}
@@ -738,6 +743,7 @@ export function RosterView({
           captainPicks={captainPicks}
           userId={member.user_id}
           currentWeek={currentWeek}
+          teamRank={rankByTeamId.get(modalTeam.team_id) ?? null}
           onClose={() => setModalTeam(null)}
         />
       )}
