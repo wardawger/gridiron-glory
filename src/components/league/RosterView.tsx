@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, TrendingUp, TrendingDown, Minus, Star, Calendar, List, X, MapPin, Tv, Clock, Coins, ChevronDown, UserCheck, Armchair, Lock } from 'lucide-react';
+import { Shield, TrendingUp, TrendingDown, Minus, Star, Calendar, List, X, MapPin, Tv, Clock, Coins, ChevronDown, UserCheck, Armchair, Lock, Eye } from 'lucide-react';
 import type { RosterEntry, CaptainPick, GameData, ScoringSettings, LeagueMember, WeeklyScore, GameResult, SpreadPick, SpreadData, FreeAgencyMove, DraftPick, ScoreCorrection, BenchPick, APRanking } from '../../types';
 import { calcWeeklyScore } from '../../services/scoring';
 import { rosterAtWeek, isGameKickedOff } from '../../services/roster';
@@ -521,8 +521,11 @@ export function RosterView({
                     {game.home_score}–{game.away_score}
                   </span>
                 )}
-                <span className="text-xs text-turf-600 group-hover/game:text-field-400 transition-colors whitespace-nowrap">
-                  View matchup<span aria-hidden="true"> ↗</span>
+                {/* "matchup" is dropped below sm so the row keeps room for the
+                    score and the opponent text on a phone. */}
+                <span className="inline-flex items-center gap-1 text-xs text-turf-600 group-hover/game:text-field-400 transition-colors whitespace-nowrap">
+                  <Eye className="w-3.5 h-3.5 flex-shrink-0" aria-hidden="true" />
+                  View<span className="hidden sm:inline">{' matchup'}</span>
                 </span>
               </span>
             </span>
