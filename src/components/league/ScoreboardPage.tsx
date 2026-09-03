@@ -479,6 +479,7 @@ export function ScoreboardPage({
           game={modalRow.breakdown.game!}
           teamName={modalRow.breakdown.team_name}
           teamLogo={teamsById.get(modalRow.breakdown.team_id)?.logo ?? ''}
+          teamRank={rankByTeamId.get(modalRow.breakdown.team_id) ?? null}
           week={week}
           isCaptain={modalRow.breakdown.is_captain}
           scoring={scoring}

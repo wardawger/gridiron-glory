@@ -25,6 +25,9 @@ interface GameScoreModalProps {
   game: GameResult;
   teamName: string;
   teamLogo: string;
+  // Current AP rank of the rostered team, or null when unranked. The
+  // opponent's comes off the game row itself (ranked as of that week).
+  teamRank?: number | null;
   week: number;
   isCaptain: boolean;
   scoring: ScoringSettings;
@@ -35,7 +38,7 @@ interface GameScoreModalProps {
 // Shared by RosterView (clicking a rostered team) and ScoreboardPage
 // (clicking a team's detail icon) — one modal, so both surfaces can never
 // disagree about what a team's week actually scored.
-export function GameScoreModal({ game, teamName, teamLogo, week, isCaptain, scoring, spreadPick, onClose }: GameScoreModalProps) {
+export function GameScoreModal({ game, teamName, teamLogo, teamRank = null, week, isCaptain, scoring, spreadPick, onClose }: GameScoreModalProps) {
   const isWin      = game.result === 'W';
   const isLoss     = game.result === 'L';
   const isComplete = game.completed;
@@ -121,7 +124,9 @@ export function GameScoreModal({ game, teamName, teamLogo, week, isCaptain, scor
               }`}>
                 {myScore ?? '–'}
               </span>
-              <span className="text-xs text-turf-400 text-center leading-tight max-w-24 truncate">{teamName}</span>
+              <span className="text-xs text-turf-400 text-center leading-tight max-w-24 truncate">
+                {teamRank ? `#${teamRank} ` : ''}{teamName}
+              </span>
             </div>
 
             <div className="flex flex-shrink-0 flex-col items-center gap-1 px-1">

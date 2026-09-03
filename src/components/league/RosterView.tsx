@@ -693,6 +693,7 @@ export function RosterView({
           game={gameScoreModal.game}
           teamName={gameScoreModal.teamName}
           teamLogo={gameScoreModal.teamLogo}
+          teamRank={rankByTeamId.get(gameScoreModal.teamId) ?? null}
           week={gameScoreModal.week}
           isCaptain={gameScoreModal.isCaptain}
           scoring={scoring}
@@ -1006,6 +1007,7 @@ export function RosterView({
                 <tbody className="divide-y divide-turf-800/50">
                   {roster.map(entry => {
                     const captainUses = captainUsage.get(entry.team_id) ?? 0;
+                    const rowRank = rankByTeamId.get(entry.team_id) ?? null;
                     return (
                       <tr key={entry.team_id} className="hover:bg-turf-800/20 transition-colors">
                         {/* Team name — sticky left, clickable */}
@@ -1019,7 +1021,7 @@ export function RosterView({
                           >
                             <TeamLogo src={entry.team_logo} alt="" fallbackName={entry.team_name} size={24} />
                             <span className="font-medium text-white truncate max-w-28 group-hover:text-field-300 transition-colors">
-                              {entry.team_name}
+                              {rowRank ? <span className="text-turf-400">#{rowRank} </span> : ''}{entry.team_name}
                             </span>
                           </button>
                           </Tooltip>
