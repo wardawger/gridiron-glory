@@ -497,6 +497,107 @@ export function DraftRoom({
     );
   };
 
+  // Shared by mobile's Queue tab and the desktop right-column Queue tab.
+  const renderQueuePanel = () => (
+    <div className="space-y-2">
+      {queuedTeamIds.length === 0 ? (
+        <div className="card p-8 text-center text-turf-500 text-sm space-y-2">
+          <Star className="w-6 h-6 mx-auto text-turf-700" />
+          <p>No teams queued yet — tap the star next to a team to add it here.</p>
+        </div>
+      ) : (
+        queuedTeamIds
+          .map(id => teams.find(t => t.id === id))
+          .filter((t): t is CfbTeam => !!t && !pickedTeamIds.has(t.id))
+          .map(team => renderMobileTeamRow(team))
+      )}
+    </div>
+  );
+
+  // Shared by mobile's Rosters tab and the desktop right-column Rosters tab.
+  // The conference summary uses flex-wrap rather than a fixed grid-cols
+  // count, since this renders both at full mobile width and squeezed into
+  // the narrow desktop right column — a fixed column count would be wrong
+  // in one of the two.
+  const renderRostersPanel = () => (
+    <div className="space-y-3">
+      <div className="relative">
+        <select
+          className="input appearance-none pr-8"
+          value={rosterViewUserId}
+          onChange={e => setRosterViewUserId(e.target.value)}
+          aria-label="View roster for"
+        >
+          {members.map(m => (
+            <option key={m.user_id} value={m.user_id}>
+              {m.user_id === userId ? `${m.display_name} (Me)` : m.display_name}
+            </option>
+          ))}
+        </select>
+        <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-turf-500 pointer-events-none" />
+      </div>
+
+      {/* Conference summary — count/max per category, colored the same
+          way the on-the-clock conference tracker above already is. */}
+      <div className="flex flex-wrap gap-1.5">
+        {(P4_CONF_LIST as readonly string[]).map(conf => {
+          const count = rosterViewConfCounts[conf] ?? 0;
+          const atMax = count >= scoring.p4_conf_max;
+          const atMin = count >= scoring.p4_conf_min;
+          return (
+            <div
+              key={conf}
+              className={`flex flex-col items-center gap-1.5 py-3 px-2 rounded-lg border flex-1 min-w-[64px] ${
+                atMax ? 'bg-red-900/30 border-red-800/50 text-red-300' :
+                atMin ? 'bg-field-900/30 border-field-800/50 text-field-400' :
+                'bg-turf-800 border-turf-700 text-turf-300'
+              }`}
+            >
+              <TeamLogo src={CONFERENCE_LOGO[conf]} alt={`${conf} logo`} fallbackName={conf} size={32} />
+              <span className="text-xs font-mono">{count}/{scoring.p4_conf_max}</span>
+            </div>
+          );
+        })}
+        {g5Configured && (() => {
+          const atMax = rosterViewG5Count >= scoring.g5_conf_max;
+          const atMin = rosterViewG5Count >= scoring.g5_conf_min;
+          return (
+            <div
+              className={`flex flex-col items-center gap-1.5 py-3 px-2 rounded-lg border flex-1 min-w-[64px] ${
+                atMax ? 'bg-red-900/30 border-red-800/50 text-red-300' :
+                atMin ? 'bg-field-900/30 border-field-800/50 text-field-400' :
+                'bg-turf-800 border-turf-700 text-turf-300'
+              }`}
+            >
+              <TeamLogo src={ncaaLogo} alt="G5 logo" fallbackName="G5" size={32} />
+              <span className="text-xs font-mono">{rosterViewG5Count}/{scoring.g5_conf_max}</span>
+            </div>
+          );
+        })()}
+      </div>
+
+      <div className="space-y-1.5">
+        {draftPicks.filter(p => p.user_id === rosterViewUserId).length === 0 ? (
+          <div className="card p-8 text-center text-turf-500 text-sm">No teams drafted yet</div>
+        ) : (
+          draftPicks
+            .filter(p => p.user_id === rosterViewUserId)
+            .sort((a, b) => a.pick_number - b.pick_number)
+            .map(p => (
+              <div key={p.id} className="card flex items-center gap-3 p-2.5">
+                <span className="font-mono text-xs text-turf-500 w-6 flex-shrink-0">{p.pick_number}</span>
+                <TeamLogo src={p.team_logo} alt={p.team_name} fallbackName={p.team_name} size={28} />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-white truncate">{p.team_name}</p>
+                  <p className="text-xs text-turf-500 truncate">{p.team_conference}</p>
+                </div>
+              </div>
+            ))
+        )}
+      </div>
+    </div>
+  );
+
   // ── PRE-DRAFT ─────────────────────────────────────────────────────────────
   if (league.draft_status === 'pending') {
     return (
@@ -762,42 +863,12 @@ export function DraftRoom({
         </div>
       )}
 
-      {/* Desktop tab bar — Teams / Queue / Rosters. The draft board itself
-          isn't its own tab; it renders alongside the team list on Teams,
-          same as before this existed. */}
-      <div role="tablist" aria-label="Draft Room view" className="hidden lg:flex gap-1 bg-turf-900 p-1 rounded-xl border border-turf-800">
-        {([
-          { id: 'players', label: 'Teams',   count: 0 },
-          { id: 'queue',   label: 'Queue',   count: queuedTeamIds.length },
-          { id: 'rosters', label: 'Rosters', count: 0 },
-        ] as const).map(({ id, label, count }) => {
-          const active = draftTab === id || (id === 'players' && draftTab === 'board');
-          return (
-            <button
-              key={id}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              onClick={() => setDraftTab(id)}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-field-400 ${
-                active ? 'bg-field-500 text-turf-950' : 'text-turf-400 hover:text-white'
-              }`}
-            >
-              {label}
-              {!!count && (
-                <span className={`text-xs font-mono rounded-full px-1.5 ${active ? 'bg-turf-950/20' : 'bg-turf-800'}`}>
-                  {count}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Desktop Teams — two-column layout, lg: and up. Mobile gets its own
-          tabbed layout below instead of this stacking down to a single
-          column. */}
-      <div className={`hidden lg:grid lg:grid-cols-3 gap-4 ${draftTab === 'players' || draftTab === 'board' ? '' : 'lg:!hidden'}`}>
+      {/* Desktop — two-column layout, lg: and up. The team list on the left
+          is always visible (no tab can hide it); the right column has its
+          own small tab bar switching between Draft Board / Queue / Rosters.
+          Mobile gets its own separate tabbed layout below instead of this
+          stacking down to a single column. */}
+      <div className="hidden lg:grid lg:grid-cols-3 gap-4">
         {/* Available teams */}
         <div className="lg:col-span-2 space-y-3">
           <div className="flex gap-2">
@@ -925,12 +996,55 @@ export function DraftRoom({
           </div>
         </div>
 
-        {/* Draft board */}
+        {/* Right column — Draft Board / Queue / Rosters. The team list to
+            the left is never hidden behind this; only this column switches. */}
         <div className="space-y-2">
-          <p className="text-xs text-turf-500 uppercase tracking-wide font-medium">Draft Board</p>
-          <div ref={picksRef} className="space-y-1 max-h-[660px] overflow-y-auto">
-            {pickSlots.map(slot => renderPickSlot(slot, currentPick, getMemberName))}
-          </div>
+          {(() => {
+            // 'players' (mobile's default tab) has no matching button here —
+            // it falls back to Board, same idea as the desktop tab bar this
+            // replaced: draftTab is shared with mobile, and mobile always
+            // starts on 'players', so desktop needs a sensible default too.
+            const panel = draftTab === 'players' ? 'board' : draftTab;
+            return (
+              <>
+                <div role="tablist" aria-label="Draft Room right panel" className="flex gap-1 bg-turf-900 p-1 rounded-xl border border-turf-800">
+                  {([
+                    { id: 'board',   label: 'Board',   count: 0 },
+                    { id: 'queue',   label: 'Queue',   count: queuedTeamIds.length },
+                    { id: 'rosters', label: 'Rosters', count: 0 },
+                  ] as const).map(({ id, label, count }) => (
+                    <button
+                      key={id}
+                      type="button"
+                      role="tab"
+                      aria-selected={panel === id}
+                      onClick={() => setDraftTab(id)}
+                      className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-field-400 ${
+                        panel === id ? 'bg-field-500 text-turf-950' : 'text-turf-400 hover:text-white'
+                      }`}
+                    >
+                      {label}
+                      {!!count && (
+                        <span className={`text-[10px] font-mono rounded-full px-1 ${panel === id ? 'bg-turf-950/20' : 'bg-turf-800'}`}>
+                          {count}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="max-h-[660px] overflow-y-auto">
+                  {panel === 'board' && (
+                    <div ref={picksRef} className="space-y-1">
+                      {pickSlots.map(slot => renderPickSlot(slot, currentPick, getMemberName))}
+                    </div>
+                  )}
+                  {panel === 'queue' && renderQueuePanel()}
+                  {panel === 'rosters' && renderRostersPanel()}
+                </div>
+              </>
+            );
+          })()}
         </div>
       </div>
 
@@ -993,108 +1107,11 @@ export function DraftRoom({
           </>
         )}
 
+        {draftTab === 'queue' && renderQueuePanel()}
+        {draftTab === 'rosters' && renderRostersPanel()}
+
         {draftTab === 'board' && (
           <DraftBoard pickSlots={pickSlots} members={members} rounds={league.max_teams_per_user} perRound={league.draft_order.length} currentPick={currentPick} />
-        )}
-      </div>
-
-      {/* Queue / Rosters — shared between mobile and desktop, unlike the
-          Players/Board tabs above. Centered and width-capped at lg: so a
-          list of rows doesn't stretch edge-to-edge on a wide screen. */}
-      <div className="lg:max-w-2xl lg:mx-auto w-full pb-24 lg:pb-0 space-y-3">
-        {draftTab === 'queue' && (
-          <div className="space-y-2">
-            {queuedTeamIds.length === 0 ? (
-              <div className="card p-8 text-center text-turf-500 text-sm space-y-2">
-                <Star className="w-6 h-6 mx-auto text-turf-700" />
-                <p>No teams queued yet — tap the star next to a team to add it here.</p>
-              </div>
-            ) : (
-              queuedTeamIds
-                .map(id => teams.find(t => t.id === id))
-                .filter((t): t is CfbTeam => !!t && !pickedTeamIds.has(t.id))
-                .map(team => renderMobileTeamRow(team))
-            )}
-          </div>
-        )}
-
-        {draftTab === 'rosters' && (
-          <div className="space-y-3">
-            <div className="relative">
-              <select
-                className="input appearance-none pr-8"
-                value={rosterViewUserId}
-                onChange={e => setRosterViewUserId(e.target.value)}
-                aria-label="View roster for"
-              >
-                {members.map(m => (
-                  <option key={m.user_id} value={m.user_id}>
-                    {m.user_id === userId ? `${m.display_name} (Me)` : m.display_name}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-turf-500 pointer-events-none" />
-            </div>
-
-            {/* Conference summary — count/max per category, colored the same
-                way the on-the-clock conference tracker above already is. */}
-            <div className={`grid gap-1.5 ${g5Configured ? 'grid-cols-5' : 'grid-cols-4'}`}>
-              {(P4_CONF_LIST as readonly string[]).map(conf => {
-                const count = rosterViewConfCounts[conf] ?? 0;
-                const atMax = count >= scoring.p4_conf_max;
-                const atMin = count >= scoring.p4_conf_min;
-                return (
-                  <div
-                    key={conf}
-                    className={`flex flex-col items-center gap-1.5 py-3 rounded-lg border ${
-                      atMax ? 'bg-red-900/30 border-red-800/50 text-red-300' :
-                      atMin ? 'bg-field-900/30 border-field-800/50 text-field-400' :
-                      'bg-turf-800 border-turf-700 text-turf-300'
-                    }`}
-                  >
-                    <TeamLogo src={CONFERENCE_LOGO[conf]} alt={`${conf} logo`} fallbackName={conf} size={32} />
-                    <span className="text-xs font-mono">{count}/{scoring.p4_conf_max}</span>
-                  </div>
-                );
-              })}
-              {g5Configured && (() => {
-                const atMax = rosterViewG5Count >= scoring.g5_conf_max;
-                const atMin = rosterViewG5Count >= scoring.g5_conf_min;
-                return (
-                  <div
-                    className={`flex flex-col items-center gap-1.5 py-3 rounded-lg border ${
-                      atMax ? 'bg-red-900/30 border-red-800/50 text-red-300' :
-                      atMin ? 'bg-field-900/30 border-field-800/50 text-field-400' :
-                      'bg-turf-800 border-turf-700 text-turf-300'
-                    }`}
-                  >
-                    <TeamLogo src={ncaaLogo} alt="G5 logo" fallbackName="G5" size={32} />
-                    <span className="text-xs font-mono">{rosterViewG5Count}/{scoring.g5_conf_max}</span>
-                  </div>
-                );
-              })()}
-            </div>
-
-            <div className="space-y-1.5">
-              {draftPicks.filter(p => p.user_id === rosterViewUserId).length === 0 ? (
-                <div className="card p-8 text-center text-turf-500 text-sm">No teams drafted yet</div>
-              ) : (
-                draftPicks
-                  .filter(p => p.user_id === rosterViewUserId)
-                  .sort((a, b) => a.pick_number - b.pick_number)
-                  .map(p => (
-                    <div key={p.id} className="card flex items-center gap-3 p-2.5">
-                      <span className="font-mono text-xs text-turf-500 w-6 flex-shrink-0">{p.pick_number}</span>
-                      <TeamLogo src={p.team_logo} alt={p.team_name} fallbackName={p.team_name} size={28} />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-white truncate">{p.team_name}</p>
-                        <p className="text-xs text-turf-500 truncate">{p.team_conference}</p>
-                      </div>
-                    </div>
-                  ))
-              )}
-            </div>
-          </div>
         )}
       </div>
 
