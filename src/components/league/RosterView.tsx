@@ -4,6 +4,7 @@ import { Shield, TrendingUp, TrendingDown, Star, Calendar, List, X, MapPin, Tv, 
 import type { RosterEntry, CaptainPick, GameData, ScoringSettings, LeagueMember, WeeklyScore, GameResult, SpreadPick, SpreadData, FreeAgencyMove, DraftPick, ScoreCorrection, BenchPick, APRanking } from '../../types';
 import { calcWeeklyScore } from '../../services/scoring';
 import { rosterAtWeek, isGameKickedOff } from '../../services/roster';
+import { formatGameDate } from '../../lib/formatGameDate';
 import { useTabCrossfade } from '../../hooks/useCrossfade';
 import { useDialog } from '../../hooks/useDialog';
 import { useDropdownMenu } from '../../hooks/useDropdownMenu';
@@ -47,17 +48,6 @@ interface Props {
 }
 
 const WEEKS = Array.from({ length: 16 }, (_, i) => i); // weeks 0–15
-
-// Format a startDate ISO string into readable date + time
-function formatGameDate(startDate: string | null | undefined, startTimeTbd: boolean): { date: string; time: string } {
-  if (!startDate) return { date: 'TBD', time: 'TBD' };
-  const d = new Date(startDate);
-  const date = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-  const time = startTimeTbd
-    ? 'TBD'
-    : d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-  return { date, time };
-}
 
 // ── Spread helpers ────────────────────────────────────────────────────────
 
@@ -150,7 +140,7 @@ function ScheduleModal({ team, gameData, captainPicks, userId, currentWeek, team
 
             const isCaptain = captainPicks.some(p => p.user_id === userId && p.week === w && p.team_id === team.team_id);
             const isCurrent = w === currentWeek;
-            const { date, time } = formatGameDate((game as any).start_date, (game as any).start_time_tbd ?? false);
+            const { date, time } = formatGameDate((game as any).start_date, (game as any).start_time_tbd ?? false, false);
             const venue    = (game as any).venue    ?? null;
             const tv       = (game as any).tv       ?? null;
             const isHome   = (game as any).is_home  ?? true;
@@ -398,7 +388,7 @@ export function RosterView({
       !isPastWeek;
     const oppLogo = (game as any)?.opponent_logo ?? null;
     const isHome  = (game as any)?.is_home  ?? true;
-    const gameDateInfo = game ? formatGameDate(game.start_date, game.start_time_tbd) : null;
+    const gameDateInfo = game ? formatGameDate(game.start_date, game.start_time_tbd, false) : null;
     const benchKickedOff = isGameKickedOff((game as any)?.start_date);
     const benchSelected = swapSource?.week === selectedWeek && swapSource.teamId === entry.team_id;
     const isPending = pendingKey === `${selectedWeek}:${entry.team_id}`;

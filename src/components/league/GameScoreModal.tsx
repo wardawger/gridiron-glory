@@ -4,16 +4,7 @@ import { scoreGame, getSpreadOutcome, scoreSpread } from '../../services/scoring
 import { TeamLogo } from '../ui/TeamLogo';
 import { WeatherBadge } from '../ui/WeatherBadge';
 import { useDialog } from '../../hooks/useDialog';
-
-function formatGameDate(startDate: string | null | undefined, startTimeTbd: boolean): { date: string; time: string } {
-  if (!startDate) return { date: 'TBD', time: 'TBD' };
-  const d = new Date(startDate);
-  const date = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-  const time = startTimeTbd
-    ? 'TBD'
-    : d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
-  return { date, time };
-}
+import { formatGameDate } from '../../lib/formatGameDate';
 
 function formatSpread(spread: number | null | undefined): string {
   if (spread == null) return 'N/A';

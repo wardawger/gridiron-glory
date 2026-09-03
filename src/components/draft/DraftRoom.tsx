@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useId } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Search, Clock, CheckCircle2, Zap, ChevronDown, AlertCircle, AlertTriangle, X, MapPin, Tv, Loader2, CalendarClock, Star, Users, LayoutGrid } from 'lucide-react';
 import type { League, LeagueMember, DraftPick, CfbTeam, GameData, TeamRatings, APRanking } from '../../types';
@@ -9,7 +9,9 @@ import { TeamLogo } from '../ui/TeamLogo';
 import { TriviaCard } from '../ui/TriviaCard';
 import { WeatherBadge } from '../ui/WeatherBadge';
 import { fireDraftCompleteConfetti } from '../../lib/confetti';
+import { formatGameDate } from '../../lib/formatGameDate';
 import { useDraftPresence } from '../../hooks/useDraftPresence';
+import { useDialog } from '../../hooks/useDialog';
 import ncaaLogo from '../../assets/ncaa-logo.webp';
 
 const WEEKS = Array.from({ length: 16 }, (_, i) => i); // weeks 0–15
@@ -24,16 +26,6 @@ const CONFERENCE_LOGO: Record<string, string> = {
   'Big 12':  'https://a.espncdn.com/i/teamlogos/ncaa_conf/500/big_12.png',
   'ACC':     'https://a.espncdn.com/i/teamlogos/ncaa_conf/500/acc.png',
 };
-
-function formatGameDate(startDate: string | null | undefined, startTimeTbd: boolean): { date: string; time: string } {
-  if (!startDate) return { date: 'TBD', time: 'TBD' };
-  const d = new Date(startDate);
-  const date = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-  const time = startTimeTbd
-    ? 'TBD'
-    : d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
-  return { date, time };
-}
 
 // Live countdown to a commissioner-set draft time — purely informational,
 // it never starts the draft itself. Ticks locally once a second rather
@@ -63,7 +55,7 @@ function DraftCountdown({ scheduledAt }: { scheduledAt: string }) {
   return (
     <div className="card p-5 border-field-500/30 bg-field-950/10 space-y-3">
       <p className="flex items-center justify-center gap-1.5 text-turf-400 text-sm">
-        <CalendarClock className="w-4 h-4 flex-shrink-0" />
+        <CalendarClock className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
         {isPast ? "It's go time" : `Draft scheduled for ${formattedDate}`}
       </p>
       {isPast ? (
@@ -121,6 +113,7 @@ export function DraftRoom({
   // Mobile-only tabbed layout state (Players/Queue/Rosters/Board) — desktop
   // keeps its existing two-column layout untouched at lg: and up.
   const [draftTab, setDraftTab] = useState<'players' | 'queue' | 'rosters' | 'board'>('players');
+  const rightPanelId = useId();
   const [rosterViewUserId, setRosterViewUserId] = useState(userId);
   // Session-only scratchpad, not synced to the database — a personal
   // draft-day aid, not league state anyone else needs to see.
@@ -447,22 +440,22 @@ export function DraftRoom({
     return (
       <div
         key={team.id}
-        className={`card flex items-center gap-2 p-2.5 ${lastPick === team.id ? 'animate-pick-flash' : ''}`}
+        className={`card flex items-center gap-2 p-2.5 ${lastPick === team.id ? 'animate-pick-flash motion-reduce:animate-none' : ''}`}
       >
         <button
           type="button"
           onClick={() => toggleQueue(team.id)}
           aria-label={isQueued ? `Remove ${team.name} from queue` : `Add ${team.name} to queue`}
           aria-pressed={isQueued}
-          className="flex-shrink-0 p-1.5 -m-1.5"
+          className="flex-shrink-0 p-1.5 -m-1.5 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-400"
         >
-          <Star className={`w-4 h-4 transition-colors ${isQueued ? 'fill-gold-400 text-gold-400' : 'text-turf-600'}`} />
+          <Star className={`w-4 h-4 transition-colors ${isQueued ? 'fill-gold-400 text-gold-400' : 'text-turf-600'}`} aria-hidden="true" />
         </button>
 
         <button
           type="button"
           onClick={() => setScheduleModalTeam(team)}
-          className="flex-1 min-w-0 flex items-center gap-2.5 text-left"
+          className="flex-1 min-w-0 flex items-center gap-2.5 text-left rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-400"
         >
           <TeamLogo src={team.logo} alt={team.name} fallbackName={team.name} size={28} />
           <div className="min-w-0 flex-1">
@@ -489,6 +482,7 @@ export function DraftRoom({
         <button
           type="button"
           onClick={() => setScheduleModalTeam(team)}
+          aria-label={`Draft ${team.name}`}
           className={`btn-sm flex-shrink-0 ${isBlocked || !isMyTurn ? 'btn-secondary' : 'btn-primary'}`}
         >
           Draft
@@ -523,6 +517,7 @@ export function DraftRoom({
     <div className="space-y-3">
       <div className="relative">
         <select
+          name="roster_view"
           className="input appearance-none pr-8"
           value={rosterViewUserId}
           onChange={e => setRosterViewUserId(e.target.value)}
@@ -602,7 +597,7 @@ export function DraftRoom({
   if (league.draft_status === 'pending') {
     return (
       <div className="max-w-lg mx-auto py-16 text-center space-y-6 animate-fade-in">
-        <Zap className="w-12 h-12 text-field-400 mx-auto" />
+        <Zap className="w-12 h-12 text-field-400 mx-auto" aria-hidden="true" />
         <div>
           <h2 className="font-display text-3xl tracking-wide text-white">Draft Room</h2>
           <p className="text-turf-400 mt-2">
@@ -648,9 +643,13 @@ export function DraftRoom({
                   <span className="font-mono text-sm text-turf-500 w-4">{i + 1}</span>
                   <span
                     className={`w-2 h-2 rounded-full flex-shrink-0 ${online.has(uid) ? 'bg-field-400' : 'bg-turf-700'}`}
-                    title={online.has(uid) ? `${getMemberName(uid)} is in the Draft Room` : `${getMemberName(uid)} isn't here yet`}
+                    aria-hidden="true"
+                    title={online.has(uid) ? `${getMemberName(uid)} is in the Draft Room` : `${getMemberName(uid)} isn’t here yet`}
                   />
-                  <span className="text-white text-sm flex-1">{getMemberName(uid)}</span>
+                  <span className="text-white text-sm flex-1">
+                    {getMemberName(uid)}
+                    <span className="sr-only">{online.has(uid) ? ' — in the Draft Room' : ' — not here yet'}</span>
+                  </span>
                   <div className="flex gap-1">
                     <button
                       onClick={() => {
@@ -683,7 +682,7 @@ export function DraftRoom({
               disabled={draftOrder.length < 2}
               className="btn-primary w-full btn-lg"
             >
-              <Zap className="w-4 h-4" /> Start Draft
+              <Zap className="w-4 h-4" aria-hidden="true" /> Start Draft
             </button>
             {draftOrder.length < 2 && (
               <p className="text-xs text-amber-400 text-center -mt-2">
@@ -695,7 +694,7 @@ export function DraftRoom({
 
         {!isCommissioner && (
           <div className="card p-6 text-turf-400">
-            <Clock className="w-8 h-8 mx-auto mb-2 animate-pulse-slow" />
+            <Clock className="w-8 h-8 mx-auto mb-2 animate-pulse-slow motion-reduce:animate-none" aria-hidden="true" />
             <p>Waiting for commissioner to start…</p>
             <TriviaCard className="mt-6" />
           </div>
@@ -709,7 +708,7 @@ export function DraftRoom({
     return (
       <div className="space-y-6 animate-fade-in">
         <div className="card p-6 text-center">
-          <CheckCircle2 className="w-10 h-10 text-field-400 mx-auto mb-3" />
+          <CheckCircle2 className="w-10 h-10 text-field-400 mx-auto mb-3" aria-hidden="true" />
           <h2 className="font-display text-3xl text-white tracking-wide">DRAFT COMPLETE</h2>
           <p className="text-turf-400 mt-1 text-sm">{draftPicks.length} picks made</p>
         </div>
@@ -721,6 +720,7 @@ export function DraftRoom({
   // ── ACTIVE DRAFT ──────────────────────────────────────────────────────────
   return (
     <div className="space-y-4 animate-fade-in">
+      <h1 className="sr-only">Draft Room — {league.name}</h1>
       {scheduleModalTeam && (
         <DraftTeamModal
           team={scheduleModalTeam}
@@ -738,11 +738,16 @@ export function DraftRoom({
       )}
 
       {/* On the clock banner */}
-      <div className={`card p-4 flex items-center justify-between ${isMyTurn ? 'border-field-500/50 bg-field-950/30' : ''}`}>
+      <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className={`card p-4 flex items-center justify-between ${isMyTurn ? 'border-field-500/50 bg-field-950/30' : ''}`}
+      >
         <div className="flex items-center gap-3">
           {isMyTurn ? (
             <>
-              <div className="w-2.5 h-2.5 rounded-full bg-field-400 animate-pulse" />
+              <div className="w-2.5 h-2.5 rounded-full bg-field-400 animate-pulse motion-reduce:animate-none" aria-hidden="true" />
               <div>
                 <p className="font-bold text-field-300">YOUR PICK</p>
                 <p className="text-xs text-turf-500">Pick {currentPick} of {totalPicks} · {myPicksRemaining} picks remaining</p>
@@ -750,7 +755,7 @@ export function DraftRoom({
             </>
           ) : (
             <>
-              <Clock className="w-5 h-5 text-turf-500 animate-pulse-slow" />
+              <Clock className="w-5 h-5 text-turf-500 animate-pulse-slow motion-reduce:animate-none" aria-hidden="true" />
               <div>
                 <p className="font-medium text-white">{getMemberName(onTheClock!)} is on the clock</p>
                 <p className="text-xs text-turf-500">Pick {currentPick} of {totalPicks}</p>
@@ -767,7 +772,7 @@ export function DraftRoom({
       {/* Who's actually in the Draft Room right now (Supabase Presence),
           not just who's a league member — separate from draft turn order. */}
       <div className="flex items-center gap-2 flex-wrap px-1 -mt-2">
-        <Users className="w-3.5 h-3.5 text-turf-600 flex-shrink-0" />
+        <Users className="w-3.5 h-3.5 text-turf-600 flex-shrink-0" aria-hidden="true" />
         <span className="text-xs text-turf-500">
           {members.filter(m => online.has(m.user_id)).length}/{members.length} in the room:
         </span>
@@ -791,7 +796,7 @@ export function DraftRoom({
                 key={conf}
                 content={
                   atMax
-                    ? `Maximum reached — you can't draft any more ${conf} teams.`
+                    ? `Maximum reached — you can’t draft any more ${conf} teams.`
                     : atMin
                     ? `${conf} minimum met. You can draft up to ${scoring.p4_conf_max - count} more.`
                     : `You need at least ${scoring.p4_conf_min - count} more from ${conf}.`
@@ -799,11 +804,14 @@ export function DraftRoom({
                 position="bottom"
                 width="w-52"
               >
-                <div className={`text-center p-2 rounded-lg w-full cursor-default ${
-                  atMax ? 'bg-red-900/30 border border-red-800/50' :
-                  atMin ? 'bg-field-900/30 border border-field-800/50' :
-                  'bg-turf-800'
-                }`}>
+                <div
+                  tabIndex={0}
+                  className={`text-center p-2 rounded-lg w-full cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-400 ${
+                    atMax ? 'bg-red-900/30 border border-red-800/50' :
+                    atMin ? 'bg-field-900/30 border border-field-800/50' :
+                    'bg-turf-800'
+                  }`}
+                >
                   <p className="text-xs text-turf-400 truncate">{conf}</p>
                   <p className={`font-mono font-bold text-lg ${
                     atMax ? 'text-red-300' : atMin ? 'text-field-400' : 'text-white'
@@ -820,7 +828,7 @@ export function DraftRoom({
               <Tooltip
                 content={
                   atMax
-                    ? `Maximum reached — you can't draft any more G5/non-P4 teams.`
+                    ? `Maximum reached — you can’t draft any more G5/non-P4 teams.`
                     : atMin
                     ? `G5 minimum met. You can draft up to ${scoring.g5_conf_max - myG5Count} more.`
                     : `You need at least ${scoring.g5_conf_min - myG5Count} more G5/non-P4 teams.`
@@ -828,11 +836,14 @@ export function DraftRoom({
                 position="bottom"
                 width="w-52"
               >
-                <div className={`text-center p-2 rounded-lg w-full cursor-default ${
-                  atMax ? 'bg-red-900/30 border border-red-800/50' :
-                  atMin ? 'bg-field-900/30 border border-field-800/50' :
-                  'bg-turf-800'
-                }`}>
+                <div
+                  tabIndex={0}
+                  className={`text-center p-2 rounded-lg w-full cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-400 ${
+                    atMax ? 'bg-red-900/30 border border-red-800/50' :
+                    atMin ? 'bg-field-900/30 border border-field-800/50' :
+                    'bg-turf-800'
+                  }`}
+                >
                   <p className="text-xs text-turf-400 truncate">G5</p>
                   <p className={`font-mono font-bold text-lg ${
                     atMax ? 'text-red-300' : atMin ? 'text-field-400' : 'text-white'
@@ -848,7 +859,7 @@ export function DraftRoom({
       {/* Warnings */}
       {confWarnings.length > 0 && (
         <div className="card p-3 border-amber-700/50 bg-amber-950/20 flex items-start gap-2">
-          <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+          <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
           <div className="text-sm text-amber-300 space-y-0.5">
             {confWarnings.map(w => <p key={w}>{w}</p>)}
           </div>
@@ -858,7 +869,7 @@ export function DraftRoom({
       {/* Pick error */}
       {pickError && (
         <div className="card p-3 border-red-800/50 bg-red-950/20 flex items-center gap-2 text-sm text-red-300">
-          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          <AlertCircle className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
           {pickError}
         </div>
       )}
@@ -873,19 +884,26 @@ export function DraftRoom({
         <div className="lg:col-span-2 space-y-3">
           <div className="flex gap-2">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-turf-500" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-turf-500" aria-hidden="true" />
               <input
+                id="draft-search"
+                name="search"
+                type="text"
+                autoComplete="off"
                 className="input pl-9"
                 placeholder="Search teams…"
+                aria-label="Search teams"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
               />
             </div>
             <div className="relative">
               <select
+                name="conference"
                 className="input appearance-none pr-8"
                 value={confFilter}
                 onChange={e => setConf(e.target.value)}
+                aria-label="Filter by conference"
               >
                 {conferences.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
@@ -893,6 +911,7 @@ export function DraftRoom({
             </div>
             <div className="relative">
               <select
+                name="sort"
                 className="input appearance-none pr-8"
                 value={sortBy}
                 onChange={e => setSortBy(e.target.value as typeof sortBy)}
@@ -926,27 +945,28 @@ export function DraftRoom({
               const card = (
                 <div
                   key={team.id}
-                  className={`card p-3 flex items-center gap-2 transition-all group w-full ${
+                  className={`card p-3 flex items-center gap-2 transition-colors group w-full ${
                     isBlocked
                       ? 'opacity-60 border-red-900/30'
                       : isMyTurn
                       ? 'hover:border-field-500/50 hover:bg-field-950/20'
                       : 'opacity-70'
-                  } ${lastPick === team.id ? 'animate-pick-flash' : ''}`}
+                  } ${lastPick === team.id ? 'animate-pick-flash motion-reduce:animate-none' : ''}`}
                 >
                   <button
                     type="button"
                     onClick={() => toggleQueue(team.id)}
                     aria-label={isQueued ? `Remove ${team.name} from queue` : `Add ${team.name} to queue`}
                     aria-pressed={isQueued}
-                    className="flex-shrink-0 p-1.5 -m-1.5"
+                    className="flex-shrink-0 p-1.5 -m-1.5 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-400"
                   >
-                    <Star className={`w-4 h-4 transition-colors ${isQueued ? 'fill-gold-400 text-gold-400' : 'text-turf-600 hover:text-turf-400'}`} />
+                    <Star className={`w-4 h-4 transition-colors ${isQueued ? 'fill-gold-400 text-gold-400' : 'text-turf-600 hover:text-turf-400'}`} aria-hidden="true" />
                   </button>
                   <button
                     type="button"
                     onClick={() => setScheduleModalTeam(team)}
-                    className={`flex-1 min-w-0 flex items-center gap-3 text-left transition-colors ${
+                    aria-label={`${team.name} — view schedule and confirm pick`}
+                    className={`flex-1 min-w-0 flex items-center gap-3 text-left rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-400 ${
                       isMyTurn && !isBlocked ? 'cursor-pointer active:scale-[0.98]' : ''
                     }`}
                   >
@@ -1005,6 +1025,15 @@ export function DraftRoom({
             // replaced: draftTab is shared with mobile, and mobile always
             // starts on 'players', so desktop needs a sensible default too.
             const panel = draftTab === 'players' ? 'board' : draftTab;
+            const panels = ['board', 'queue', 'rosters'] as const;
+            const onRightPanelKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>, idx: number) => {
+              const delta = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+              if (!delta) return;
+              e.preventDefault();
+              const next = panels[(idx + delta + panels.length) % panels.length];
+              setDraftTab(next);
+              (e.currentTarget.parentElement?.querySelector(`#${rightPanelId}-tab-${next}`) as HTMLElement | null)?.focus();
+            };
             return (
               <>
                 <div role="tablist" aria-label="Draft Room right panel" className="flex gap-1 bg-turf-900 p-1 rounded-xl border border-turf-800">
@@ -1012,20 +1041,24 @@ export function DraftRoom({
                     { id: 'board',   label: 'Board',   count: 0 },
                     { id: 'queue',   label: 'Queue',   count: queuedTeamIds.length },
                     { id: 'rosters', label: 'Rosters', count: 0 },
-                  ] as const).map(({ id, label, count }) => (
+                  ] as const).map(({ id, label, count }, idx) => (
                     <button
                       key={id}
                       type="button"
                       role="tab"
+                      id={`${rightPanelId}-tab-${id}`}
                       aria-selected={panel === id}
+                      aria-controls={`${rightPanelId}-panel-${id}`}
+                      tabIndex={panel === id ? 0 : -1}
                       onClick={() => setDraftTab(id)}
+                      onKeyDown={e => onRightPanelKeyDown(e, idx)}
                       className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-field-400 ${
                         panel === id ? 'bg-field-500 text-turf-950' : 'text-turf-400 hover:text-white'
                       }`}
                     >
                       {label}
                       {!!count && (
-                        <span className={`text-[10px] font-mono rounded-full px-1 ${panel === id ? 'bg-turf-950/20' : 'bg-turf-800'}`}>
+                        <span className={`text-xs font-mono rounded-full px-1 ${panel === id ? 'bg-turf-950/20' : 'bg-turf-800'}`}>
                           {count}
                         </span>
                       )}
@@ -1033,7 +1066,12 @@ export function DraftRoom({
                   ))}
                 </div>
 
-                <div className="max-h-[660px] overflow-y-auto">
+                <div
+                  role="tabpanel"
+                  id={`${rightPanelId}-panel-${panel}`}
+                  aria-labelledby={`${rightPanelId}-tab-${panel}`}
+                  className="max-h-[660px] overflow-y-auto"
+                >
                   {panel === 'board' && (
                     <div ref={picksRef} className="space-y-1">
                       {pickSlots.map(slot => renderPickSlot(slot, currentPick, getMemberName))}
@@ -1057,10 +1095,15 @@ export function DraftRoom({
           <>
             <div className="space-y-2">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-turf-500" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-turf-500" aria-hidden="true" />
                 <input
+                  id="draft-search-mobile"
+                  name="search"
+                  type="text"
+                  autoComplete="off"
                   className="input pl-9"
                   placeholder="Search teams…"
+                  aria-label="Search teams"
                   value={search}
                   onChange={e => setSearch(e.target.value)}
                 />
@@ -1068,9 +1111,11 @@ export function DraftRoom({
               <div className="flex gap-2">
                 <div className="relative flex-1">
                   <select
+                    name="conference"
                     className="input appearance-none pr-8"
                     value={confFilter}
                     onChange={e => setConf(e.target.value)}
+                    aria-label="Filter by conference"
                   >
                     {conferences.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
@@ -1078,6 +1123,7 @@ export function DraftRoom({
                 </div>
                 <div className="relative flex-1">
                   <select
+                    name="sort"
                     className="input appearance-none pr-8"
                     value={sortBy}
                     onChange={e => setSortBy(e.target.value as typeof sortBy)}
@@ -1161,7 +1207,7 @@ function renderPickSlot(
   return (
     <div
       key={slot.pick}
-      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-all ${
+      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
         slot.draftPick ? 'bg-turf-800/50' :
         isNext ? 'bg-field-900/40 border border-field-700/50' :
         'opacity-40'
@@ -1175,7 +1221,7 @@ function renderPickSlot(
           <span className="text-white text-xs truncate">{slot.draftPick.team_name}</span>
         </div>
       ) : isNext ? (
-        <span className="text-field-400 text-xs animate-pulse">On the clock…</span>
+        <span className="text-field-400 text-xs animate-pulse motion-reduce:animate-none">On the clock…</span>
       ) : (
         <span className="text-turf-700 text-xs">—</span>
       )}
@@ -1209,6 +1255,10 @@ function DraftTeamModal({ team, gameData, ratings, apRank, byeConflicts, isMyTur
   const teamGames = gameData[team.id] ?? {};
   const weeks = WEEKS.filter(w => teamGames[w]);
   const byes  = WEEKS.filter(w => !teamGames[w] && w >= 1 && w <= 13);
+  // Season year comes from the schedule itself rather than a hardcoded
+  // literal, so this header stays right when next season's data loads.
+  const firstDated = weeks.map(w => (teamGames[w] as any)?.start_date).find(Boolean);
+  const seasonYear = firstDated ? new Date(firstDated).getFullYear() : new Date().getFullYear();
 
   const reason = !isMyTurn ? 'Not your turn yet' : blockReason;
   const canPick = isMyTurn && !picking && !blockReason;
@@ -1222,6 +1272,9 @@ function DraftTeamModal({ team, gameData, ratings, apRank, byeConflicts, isMyTur
     setClosing(true);
     setTimeout(onClose, SHEET_CLOSE_MS);
   };
+  // Passed to useDialog rather than raw onClose so Escape plays the same
+  // slide-down exit as clicking the backdrop or the Close button.
+  const panelRef = useDialog(requestClose);
 
   return (
     <div
@@ -1230,8 +1283,13 @@ function DraftTeamModal({ team, gameData, ratings, apRank, byeConflicts, isMyTur
       onClick={requestClose}
     >
       <div
-        className={`relative w-full sm:max-w-2xl max-h-[85vh] sm:max-h-[90vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl border border-turf-700 bg-turf-950 shadow-2xl sm:animate-none ${
-          closing ? 'animate-sheet-down' : 'animate-sheet-up'
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`${team.name} schedule — draft this team`}
+        tabIndex={-1}
+        className={`relative w-full sm:max-w-2xl max-h-[85vh] sm:max-h-[90vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl border border-turf-700 bg-turf-950 shadow-2xl sm:animate-none focus:outline-none ${
+          closing ? 'animate-sheet-down motion-reduce:animate-none' : 'animate-sheet-up motion-reduce:animate-none'
         }`}
         onClick={e => e.stopPropagation()}
       >
@@ -1241,25 +1299,27 @@ function DraftTeamModal({ team, gameData, ratings, apRank, byeConflicts, isMyTur
             <TeamLogo src={team.logo} alt={team.name} fallbackName={team.name} size={48} />
             <div className="flex-1 min-w-0">
               <h2 className="font-display text-xl font-bold text-white tracking-wide">{team.name}</h2>
-              <p className="text-sm text-turf-400">{team.conference} · 2026 Schedule</p>
+              <p className="text-sm text-turf-400">{team.conference} · {seasonYear} Schedule</p>
             </div>
             <button
+              type="button"
               onClick={requestClose}
               aria-label="Close"
-              className="rounded-lg border border-turf-700 p-1.5 text-turf-400 hover:border-turf-500 hover:text-white transition-colors flex-shrink-0"
+              className="rounded-lg border border-turf-700 p-1.5 text-turf-400 hover:border-turf-500 hover:text-white transition-colors flex-shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-400"
             >
-              <X className="h-4 w-4" />
+              <X className="h-4 w-4" aria-hidden="true" />
             </button>
           </div>
 
           <button
+            type="button"
             onClick={onConfirmPick}
             disabled={!canPick}
             className={`w-full btn-lg flex items-center justify-center gap-2 ${
               canPick ? 'btn-primary' : 'btn-secondary opacity-60 cursor-not-allowed'
             }`}
           >
-            {picking ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+            {picking ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <Zap className="w-4 h-4" aria-hidden="true" />}
             {picking ? 'Drafting…' : canPick ? `Confirm Pick: ${team.name}` : reason ?? 'Not available'}
           </button>
           {pickError && (
@@ -1281,7 +1341,7 @@ function DraftTeamModal({ team, gameData, ratings, apRank, byeConflicts, isMyTur
         {byeConflicts.length > 0 && (
           <div className="px-6 pt-4">
             <div className="flex items-start gap-2 rounded-lg border border-amber-800/40 bg-amber-950/20 px-3 py-2.5">
-              <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+              <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
               <p className="text-xs text-amber-300">
                 <span className="font-medium">Bye week overlap: </span>
                 {byeConflicts.map((c, i) => (
@@ -1363,18 +1423,18 @@ function DraftTeamModal({ team, gameData, ratings, apRank, byeConflicts, isMyTur
 
                   <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-turf-500">
                     <span className="flex items-center gap-1">
-                      <Clock className="h-3 w-3 flex-shrink-0" />
+                      <Clock className="h-3 w-3 flex-shrink-0" aria-hidden="true" />
                       {date}{time !== 'TBD' ? ` · ${time}` : ''}
                     </span>
                     {venue && (
                       <span className="flex items-center gap-1">
-                        <MapPin className="h-3 w-3 flex-shrink-0" />
+                        <MapPin className="h-3 w-3 flex-shrink-0" aria-hidden="true" />
                         <span className="truncate max-w-48">{venue}</span>
                       </span>
                     )}
                     {tv && (
                       <span className="flex items-center gap-1">
-                        <Tv className="h-3 w-3 flex-shrink-0" />
+                        <Tv className="h-3 w-3 flex-shrink-0" aria-hidden="true" />
                         {tv}
                       </span>
                     )}
@@ -1433,7 +1493,7 @@ function DraftBoard({ pickSlots, members, rounds, perRound, currentPick }: {
                       <p className="text-xs font-medium text-white truncate">{slot.draftPick.team_name}</p>
                     </div>
                   ) : isNext ? (
-                    <span className="text-field-400 text-xs animate-pulse">On the clock…</span>
+                    <span className="text-field-400 text-xs animate-pulse motion-reduce:animate-none">On the clock…</span>
                   ) : (
                     <span className="text-turf-700 text-xs">No pick yet</span>
                   )}

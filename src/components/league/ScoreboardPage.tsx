@@ -7,6 +7,7 @@ import type {
 import { normalizeScoring } from '../../types';
 import { calcWeeklyScore } from '../../services/scoring';
 import { rosterAtWeek } from '../../services/roster';
+import { formatGameDate } from '../../lib/formatGameDate';
 import { useLiveScoreboard } from '../../hooks/useLiveScoreboard';
 import { findLiveStatus, teamNameMatches } from '../../services/cfbd';
 import { TeamLogo } from '../ui/TeamLogo';
@@ -65,16 +66,6 @@ type GameCard = {
   started: boolean;
   isLive: boolean;
 };
-
-function formatGameDate(startDate: string | null, startTimeTbd: boolean): { date: string; time: string } {
-  if (!startDate) return { date: 'TBD', time: 'TBD' };
-  const d = new Date(startDate);
-  const date = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-  const time = startTimeTbd
-    ? 'TBD'
-    : d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
-  return { date, time };
-}
 
 // CFBD's /scoreboard reports quarter as a plain integer with no OT
 // distinction beyond continuing to increment past 4.
