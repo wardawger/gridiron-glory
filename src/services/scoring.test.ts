@@ -349,3 +349,110 @@ describe('calcWeeklyScore bench', () => {
     expect(score.bench_team_ids).toEqual([]);
   });
 });
+
+describe('captain scoring', () => {
+  const roster = [
+    { team_id: 't1', team_name: 'Team One', team_logo: '', team_conference: 'SEC', team_color: '' },
+    { team_id: 't2', team_name: 'Team Two', team_logo: '', team_conference: 'SEC', team_color: '' },
+  ];
+  const gameData: GameData = {
+    t1: { 1: makeGame({ week: 1, result: 'W' }) },
+    t2: { 1: makeGame({ week: 1, result: 'W' }) },
+  };
+  const WIN = DEFAULT_SCORING.win;
+
+  function cap(overrides: Partial<CaptainPick> = {}): CaptainPick {
+    return {
+      id: 'c1', league_id: 'L', user_id: 'u1', team_id: 't1', week: 1, picked_at: '',
+      locked_multiplier: 2,
+      ...overrides,
+    };
+  }
+
+  it('scoreGame multiplies by an explicit multiplier over the league setting', () => {
+    const settings = { ...DEFAULT_SCORING, captain_multiplier: 5 };
+    const game = makeGame({ result: 'W' });
+    expect(scoreGame(game, settings, true, 3)).toBe(WIN * 3);
+  });
+
+  it('scoreGame falls back to the league multiplier when none is given', () => {
+    const settings = { ...DEFAULT_SCORING, captain_multiplier: 4 };
+    expect(scoreGame(makeGame({ result: 'W' }), settings, true)).toBe(WIN * 4);
+  });
+
+  it('uses the multiplier locked onto the pick, not the current setting', () => {
+    // The league has since moved to 5x; this pick was made at 2x and must
+    // keep scoring at 2x.
+    const settings = { ...DEFAULT_SCORING, captain_multiplier: 5 };
+    const score = calcWeeklyScore('u1', 1, roster, [cap({ locked_multiplier: 2 })], gameData, settings);
+    expect(score.breakdown[0].captain_multiplier).toBe(2);
+    expect(score.breakdown[0].points).toBe(WIN * 2);
+  });
+
+  it('treats a pick with no locked multiplier as the legacy 2x', () => {
+    const settings = { ...DEFAULT_SCORING, captain_multiplier: 5 };
+    const score = calcWeeklyScore('u1', 1, roster, [cap({ locked_multiplier: null })], gameData, settings);
+    expect(score.breakdown[0].points).toBe(WIN * 2);
+  });
+
+  it('scores several captains in the same week', () => {
+    const settings = { ...DEFAULT_SCORING, captain_max_per_week: 2 };
+    const picks = [cap({ id: 'c1', team_id: 't1' }), cap({ id: 'c2', team_id: 't2' })];
+    const score = calcWeeklyScore('u1', 1, roster, picks, gameData, settings);
+    expect(score.captain_team_ids).toEqual(['t1', 't2']);
+    expect(score.points).toBe(WIN * 2 * 2);
+  });
+
+  it('forfeits every captain bonus in a week that is under the minimum', () => {
+    const settings = { ...DEFAULT_SCORING, captain_min_per_week: 2, captain_max_per_week: 2 };
+    const score = calcWeeklyScore('u1', 1, roster, [cap()], gameData, settings);
+    expect(score.captain_forfeited).toBe(true);
+    // is_captain stays true — the pick was made, it just earned nothing extra
+    expect(score.breakdown[0].is_captain).toBe(true);
+    expect(score.breakdown[0].captain_multiplier).toBe(1);
+    expect(score.points).toBe(WIN + WIN);
+  });
+
+  it('does not forfeit once the minimum is met', () => {
+    const settings = { ...DEFAULT_SCORING, captain_min_per_week: 2, captain_max_per_week: 2 };
+    const picks = [cap({ id: 'c1', team_id: 't1' }), cap({ id: 'c2', team_id: 't2' })];
+    const score = calcWeeklyScore('u1', 1, roster, picks, gameData, settings);
+    expect(score.captain_forfeited).toBe(false);
+    expect(score.points).toBe(WIN * 2 * 2);
+  });
+
+  it('does not apply a new minimum to weeks played before it took effect', () => {
+    // Minimum raised to 2 starting week 5; week 1 is already played and
+    // must keep the single captain it was scored with.
+    const settings = {
+      ...DEFAULT_SCORING,
+      captain_min_per_week: 2,
+      captain_max_per_week: 2,
+      captain_min_effective_week: 5,
+    };
+    const score = calcWeeklyScore('u1', 1, roster, [cap()], gameData, settings);
+    expect(score.captain_forfeited).toBe(false);
+    expect(score.breakdown[0].points).toBe(WIN * 2);
+  });
+
+  it('applies the minimum from the effective week onward', () => {
+    const settings = {
+      ...DEFAULT_SCORING,
+      captain_min_per_week: 2,
+      captain_max_per_week: 2,
+      captain_min_effective_week: 5,
+    };
+    const wk5Data: GameData = {
+      t1: { 5: makeGame({ week: 5, result: 'W' }) },
+      t2: { 5: makeGame({ week: 5, result: 'W' }) },
+    };
+    const score = calcWeeklyScore('u1', 5, roster, [cap({ week: 5 })], wk5Data, settings);
+    expect(score.captain_forfeited).toBe(true);
+  });
+
+  it('a minimum of 0 never forfeits', () => {
+    const settings = { ...DEFAULT_SCORING, captain_min_per_week: 0 };
+    const score = calcWeeklyScore('u1', 1, roster, [], gameData, settings);
+    expect(score.captain_forfeited).toBe(false);
+  });
+});

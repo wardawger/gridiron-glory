@@ -89,6 +89,19 @@ export interface ScoringSettings {
   spread_max_per_week: number;    // max spread picks per user per week
   spread_max_per_team: number;    // max times one team can be spread-picked all season
   spread_allow_captain_stack: boolean; // allow spread + captain on same team same week
+
+  // ── Captain scoring ──
+  captain_multiplier: number;          // whole number; 2 = double points
+  captain_min_per_week: number;        // 0 = no minimum
+  captain_max_per_week: number;        // captains allowed in a single week
+  captain_max_per_team_season: number; // times one team may be captained
+  // Week from which the weekly minimum starts being enforced. Set to the
+  // league's current week whenever the minimum changes, so raising it
+  // mid-season never retroactively forfeits a week already played.
+  captain_min_effective_week: number;
+  // Advisory only: surfaces which rostered teams have never been captained.
+  // Deliberately not enforced anywhere in scoring or pick validation.
+  captain_require_all_teams: boolean;
   spread_allow_against_pick: boolean; // let users pick a team to NOT cover, not just to cover
   spread_miss_penalty_enabled: boolean; // override the miss penalty below instead of using the negated cover reward
   spread_miss_penalty_points: number;   // flat points subtracted on a miss when the override above is on (entered as a positive number)
@@ -137,6 +150,15 @@ export const DEFAULT_SCORING: ScoringSettings = {
   spread_max_per_week: 2,
   spread_max_per_team: 3,
   spread_allow_captain_stack: false,
+
+  // Defaults reproduce the behaviour that was hardcoded before these were
+  // configurable: one captain a week, doubled, twice per team per season.
+  captain_multiplier: 2,
+  captain_min_per_week: 0,
+  captain_max_per_week: 1,
+  captain_max_per_team_season: 2,
+  captain_min_effective_week: 0,
+  captain_require_all_teams: false,
   spread_allow_against_pick: false,
   spread_miss_penalty_enabled: false,
   spread_miss_penalty_points: 2,
@@ -292,6 +314,10 @@ export interface CaptainPick {
   team_id: string;
   week: number;
   picked_at: string;
+  // Multiplier in force when the pick was made, frozen so a later settings
+  // change cannot rescore it. Null on rows created before the multiplier
+  // was configurable, which scored at 2x.
+  locked_multiplier?: number | null;
 }
 
 // Presence of a row = that team is benched for that user/week (doesn't
@@ -587,7 +613,10 @@ export interface WeeklyScore {
   user_id: string;
   week: number;
   points: number;
-  captain_team_id: string | null;
+  captain_team_ids: string[];
+  // True when the manager set fewer captains than the league minimum for
+  // this week, which forfeits every captain bonus in it.
+  captain_forfeited: boolean;
   spread_team_ids: string[];
   bench_team_ids: string[];
   breakdown: ScoreBreakdown[];
@@ -600,6 +629,9 @@ export interface ScoreBreakdown {
   team_name: string;
   points: number;
   is_captain: boolean;
+  // Multiplier actually applied: the pick's locked value, or 1 when this
+  // team is not captain or the week's captain bonuses were forfeited.
+  captain_multiplier: number;
   is_benched: boolean;
   spread_points: number;
   game: GameResult | null;

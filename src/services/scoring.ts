@@ -21,10 +21,18 @@ export function confCategory(conference: string): string {
   return isP4Conference(conference) ? conference : 'G5';
 }
 
+// What a captain pick was worth before the multiplier was configurable.
+// Rows from that era carry no locked_multiplier and must keep scoring at 2.
+export const LEGACY_CAPTAIN_MULTIPLIER = 2;
+
 export function scoreGame(
   game: GameResult,
   settings: ScoringSettings,
   isCaptain: boolean,
+  // Multiplier actually in force for this pick. calcWeeklyScore passes the
+  // value frozen onto the pick when it was made; other callers get the
+  // league's current setting.
+  captainMultiplier?: number,
 ): number {
   if (!game.result || !game.completed) return 0;
 
@@ -41,7 +49,8 @@ export function scoreGame(
     if (game.is_g5_opponent) pts += settings.loss_g5;
   }
 
-  return isCaptain ? pts * 2 : pts;
+  if (!isCaptain) return pts;
+  return pts * (captainMultiplier ?? settings.captain_multiplier ?? LEGACY_CAPTAIN_MULTIPLIER);
 }
 
 // ── Spread scoring ────────────────────────────────────────────────────────
@@ -135,10 +144,21 @@ export function calcWeeklyScore(
   scoreCorrections: ScoreCorrection[] = [],
   benchPicks: BenchPick[] = [],
 ): WeeklyScore {
-  const captainPick = captainPicks.find(
+  const weekCaptainPicks = captainPicks.filter(
     p => p.user_id === userId && p.week === week
   );
-  const captainTeamId = captainPick?.team_id ?? null;
+  const captainMultiplierByTeam = new Map(
+    weekCaptainPicks.map(p => [p.team_id, p.locked_multiplier ?? LEGACY_CAPTAIN_MULTIPLIER])
+  );
+
+  // Setting fewer captains than the league minimum forfeits every captain
+  // bonus that week. Only enforced from the week the minimum last changed,
+  // so raising it mid-season leaves finished weeks scored as they were.
+  const minPerWeek = settings.captain_min_per_week ?? 0;
+  const captainForfeited =
+    minPerWeek > 0 &&
+    week >= (settings.captain_min_effective_week ?? 0) &&
+    weekCaptainPicks.length < minPerWeek;
 
   const weekSpreadPicks = spreadPicks.filter(
     p => p.user_id === userId && p.week === week
@@ -151,12 +171,18 @@ export function calcWeeklyScore(
 
   const breakdown: ScoreBreakdown[] = roster.map(entry => {
     const game      = gameData[entry.team_id]?.[week] ?? null;
-    const isCaptain = entry.team_id === captainTeamId;
+    const isCaptain = captainMultiplierByTeam.has(entry.team_id);
+    // Forfeiting drops the multiplier to 1 rather than clearing is_captain:
+    // the manager did pick this team, and the UI needs to say so while
+    // showing that it earned nothing.
+    const captainMultiplier = isCaptain && !captainForfeited
+      ? captainMultiplierByTeam.get(entry.team_id)!
+      : 1;
     // A benched team never scores, regardless of captain status or spread
     // pick — bench overrides both rather than needing separate validation
     // to keep a benched team from also being captain/spread-picked.
     const isBenched = settings.bench_enabled && weekBenchTeamIds.has(entry.team_id);
-    const gamePts   = (game && !isBenched) ? scoreGame(game, settings, isCaptain) : 0;
+    const gamePts   = (game && !isBenched) ? scoreGame(game, settings, isCaptain, captainMultiplier) : 0;
 
     // Spread points for this team this week
     let spreadPts = 0;
@@ -180,6 +206,7 @@ export function calcWeeklyScore(
       team_name:    entry.team_name,
       points:       gamePts + spreadPts,
       is_captain:   isCaptain,
+      captain_multiplier: captainMultiplier,
       is_benched:   isBenched,
       spread_points: spreadPts,
       game,
@@ -198,7 +225,8 @@ export function calcWeeklyScore(
     user_id:         userId,
     week,
     points:          breakdown.reduce((s, b) => s + b.points, 0) + faPoints + correctionPoints,
-    captain_team_id: captainTeamId,
+    captain_team_ids: weekCaptainPicks.map(p => p.team_id),
+    captain_forfeited: captainForfeited,
     spread_team_ids: spreadTeamIds,
     bench_team_ids:  Array.from(weekBenchTeamIds),
     breakdown,

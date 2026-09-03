@@ -313,12 +313,31 @@ export function RosterView({
     [member.user_id, selectedWeek, weekRoster, captainPicks, gameData, scoring, spreadPicks, freeAgencyMoves, scoreCorrections, benchPicks]
   );
 
-  const captainThisWeek = captainPicks.find(
-    p => p.user_id === member.user_id && p.week === selectedWeek
-  )?.team_id ?? null;
+// A week can hold several captains now, so these ask "is this team a
+  // captain" and "how many are set" rather than resolving one team id.
+  const myCaptainPicks = useMemo(
+    () => captainPicks.filter(p => p.user_id === member.user_id),
+    [captainPicks, member.user_id]
+  );
+  const isCaptainForWeek = (teamId: string, week: number) =>
+    myCaptainPicks.some(p => p.week === week && p.team_id === teamId);
+  const captainCountForWeek = (week: number) =>
+    myCaptainPicks.filter(p => p.week === week).length;
 
-  const getCaptainForWeek = (week: number) =>
-    captainPicks.find(p => p.user_id === member.user_id && p.week === week)?.team_id ?? null;
+  const captainMax = scoring.captain_max_per_week;
+  const captainMin = scoring.captain_min_per_week;
+  const captainSeasonCap = scoring.captain_max_per_team_season;
+  const weekCaptainCount = captainCountForWeek(selectedWeek);
+  // Mirrors the forfeit rule in calcWeeklyScore, including the effective
+  // week, so the warning never contradicts what actually gets scored.
+  const captainShortfall =
+    captainMin > 0 &&
+    selectedWeek >= scoring.captain_min_effective_week &&
+    weekCaptainCount < captainMin;
+  // Advisory only — nothing blocks a season ending with these unused.
+  const neverCaptained = scoring.captain_require_all_teams
+    ? roster.filter(e => !myCaptainPicks.some(p => p.team_id === e.team_id))
+    : [];
 
   const isBenchedForWeek = (teamId: string, week: number) =>
     benchPicks.some(p => p.user_id === member.user_id && p.week === week && p.team_id === teamId);
@@ -356,7 +375,7 @@ export function RosterView({
   // duplicating this large per-team card body.
   const renderCard = (entry: RosterEntry, benchedFlag: boolean) => {
     const game = gameData[entry.team_id]?.[selectedWeek];
-    const isCaptain = entry.team_id === captainThisWeek;
+    const isCaptain = isCaptainForWeek(entry.team_id, selectedWeek);
     const weekBreak = currentScore.breakdown.find(b => b.team_id === entry.team_id);
     const captainUses = captainUsage.get(entry.team_id) ?? 0;
     const captainKickedOff = isGameKickedOff((game as any)?.start_date);
@@ -366,7 +385,12 @@ export function RosterView({
     // because CFBD hasn't populated it, once the league has moved on.
     const isPastWeek = selectedWeek < currentWeek;
     const teamRank = rankByTeamId.get(entry.team_id) ?? null;
-    const canBeCaptain = (captainUses < 2 || isCaptain) && !captainKickedOff && !isPastWeek;
+    const atWeekCaptainCap = !isCaptain && weekCaptainCount >= captainMax;
+    const canBeCaptain =
+      (captainUses < captainSeasonCap || isCaptain) &&
+      !atWeekCaptainCap &&
+      !captainKickedOff &&
+      !isPastWeek;
     const oppLogo = (game as any)?.opponent_logo ?? null;
     const isHome  = (game as any)?.is_home  ?? true;
     const gameDateInfo = game ? formatGameDate(game.start_date, game.start_time_tbd) : null;
@@ -504,7 +528,7 @@ export function RosterView({
           <div className="mt-3 pt-3 border-t border-turf-800/60 flex items-center justify-between gap-2">
             <div className="min-w-0">
               <span className={`text-xs font-medium flex items-center gap-1 ${isCaptain ? 'text-gold-400' : 'text-turf-300'}`}>
-                <Star className="w-3 h-3 flex-shrink-0" aria-hidden="true" /> {isCaptain ? 'Captain ×2' : 'Captain'}
+                <Star className="w-3 h-3 flex-shrink-0" aria-hidden="true" /> {isCaptain ? `Captain ×${scoring.captain_multiplier}` : 'Captain'}
               </span>
               <p className="text-xs text-turf-500">
                 {captainKickedOff
@@ -512,10 +536,12 @@ export function RosterView({
                   : isPastWeek
                   ? (isCaptain ? 'Week advanced — locked' : 'Week advanced')
                   : isCaptain
-                  ? 'Doubles points this week'
+                  ? `${scoring.captain_multiplier}× points this week`
+                  : atWeekCaptainCap
+                  ? `${captainMax} captain${captainMax === 1 ? '' : 's'} already set this week`
                   : canBeCaptain
-                  ? `${2 - captainUses} use${2 - captainUses === 1 ? '' : 's'} left`
-                  : 'Limit reached'}
+                  ? `${captainSeasonCap - captainUses} use${captainSeasonCap - captainUses === 1 ? '' : 's'} left`
+                  : 'Season limit reached'}
               </p>
             </div>
             <button
@@ -922,6 +948,27 @@ export function RosterView({
 
         {/* ── THIS WEEK VIEW ── */}
         <div id="roster-panel-week" className={`${viewPanelClass('week')} motion-reduce:animate-none`}>
+          {(captainMin > 0 || captainMax > 1 || neverCaptained.length > 0) && weekRoster.length > 0 && (
+            <div className="card p-4 mb-3 space-y-1.5">
+              <p className="text-xs text-turf-300 flex items-center gap-1.5">
+                <Star className="w-3 h-3 text-gold-400 flex-shrink-0" aria-hidden="true" />
+                {weekCaptainCount} of {captainMax} captain{captainMax === 1 ? '' : 's'} set
+                {captainMin > 0 && ` · ${captainMin} required`}
+              </p>
+              {captainShortfall && (
+                <p role="alert" className="text-xs text-red-300">
+                  Below the weekly minimum. Unless {captainMin - weekCaptainCount} more
+                  {captainMin - weekCaptainCount === 1 ? ' captain is' : ' captains are'} set before kickoff,
+                  every captain bonus this week is forfeited.
+                </p>
+              )}
+              {neverCaptained.length > 0 && (
+                <p className="text-xs text-turf-500">
+                  Not yet captained this season: {neverCaptained.map(e => e.team_name).join(', ')}
+                </p>
+              )}
+            </div>
+          )}
           {weekRoster.length === 0 ? (
             <div className="card p-12 text-center text-turf-500">
               <p>{roster.length === 0 ? 'No teams drafted yet' : 'No teams rostered that week'}</p>
@@ -1026,17 +1073,19 @@ export function RosterView({
                           </button>
                           </Tooltip>
                           <div className="text-turf-500 mt-0.5 pl-8">
-                            {captainUses}/2 captain uses
+                            {captainUses}/{captainSeasonCap} captain uses
                           </div>
                         </th>
 
                         {/* Week cells */}
                         {WEEKS.map(w => {
                           const game     = gameData[entry.team_id]?.[w];
-                          const isCap    = getCaptainForWeek(w) === entry.team_id;
+                          const isCap    = isCaptainForWeek(entry.team_id, w);
                           const isPast   = w < currentWeek;
                           const isCurr   = w === currentWeek;
-                          const canSetCap = isOwner && onSetCaptain && !isPast && (captainUses < 2 || isCap);
+                          const canSetCap = isOwner && onSetCaptain && !isPast
+                            && (captainUses < captainSeasonCap || isCap)
+                            && (isCap || captainCountForWeek(w) < captainMax);
                           const oppLogo  = (game as any)?.opponent_logo ?? null;
                           const isHome   = (game as any)?.is_home ?? true;
 
@@ -1072,7 +1121,7 @@ export function RosterView({
                                     className="rounded hover:ring-1 hover:ring-field-500/50 transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-400"
                                     onClick={e => {
                                       e.stopPropagation();
-                                      const isCaptainThisWeek = getCaptainForWeek(w) === entry.team_id;
+                                      const isCaptainThisWeek = isCaptainForWeek(entry.team_id, w);
                                       setGameScoreModal({
                                         game,
                                         teamId: entry.team_id,

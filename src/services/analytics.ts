@@ -123,25 +123,35 @@ export function computeAnalytics(
 
     // Win/loss record across every completed game any rostered team played this season
     let wins = 0, losses = 0;
-    // Captain efficiency: actual captain bonus captured vs. the best possible each week
-    // (highest-scoring eligible team), ignoring the twice-per-team season cap.
+    // Captain efficiency: base points actually captained vs. the best that
+    // were available, ignoring the per-team season cap.
+    //
+    // "Best available" is the top N base scores that week, where N is how
+    // many captains the manager actually set. A week with no captains still
+    // counts N as 1, so declining to captain reads as 0% rather than as
+    // missing data — which is how this behaved when one captain a week was
+    // the only option.
     let captainActual = 0;
     let captainOptimal = 0;
     entry.weekly_scores.forEach(ws => {
-      let weekBest = -Infinity;
-      let hasGame = false;
+      const weekBase: number[] = [];
       ws.breakdown.forEach(b => {
         if (!b.game?.completed) return;
         if (b.game.result === 'W') wins++;
         else if (b.game.result === 'L') losses++;
 
-        const gamePts  = b.points - b.spread_points;
-        const basePts  = b.is_captain ? gamePts / 2 : gamePts;
-        hasGame = true;
-        if (basePts > weekBest) weekBest = basePts;
+        const gamePts = b.points - b.spread_points;
+        // Undo whatever multiplier this pick actually locked in, rather than
+        // assuming 2. Forfeited captains carry a multiplier of 1, so their
+        // points were never doubled and need no division.
+        const basePts = b.captain_multiplier > 1 ? gamePts / b.captain_multiplier : gamePts;
+        weekBase.push(basePts);
         if (b.is_captain) captainActual += basePts;
       });
-      if (hasGame) captainOptimal += Math.max(weekBest, 0);
+      if (weekBase.length === 0) return;
+      const slots = Math.max(1, ws.captain_team_ids.length);
+      const best = weekBase.sort((a, b) => b - a).slice(0, slots);
+      captainOptimal += best.reduce((sum, v) => sum + Math.max(v, 0), 0);
     });
     const captainEfficiency = captainOptimal > 0 ? Math.round((captainActual / captainOptimal) * 100) : null;
 

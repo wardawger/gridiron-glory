@@ -123,9 +123,22 @@ export function ScoringTab({ league, teams, onUpdateScoring }: Props) {
       requestAnimationFrame(() => errorRef.current?.focus());
       return;
     }
+    if (scoring.captain_min_per_week > scoring.captain_max_per_week) {
+      setSaveError('Min captains per week cannot be more than the maximum. Adjust the Captain Scoring section and save again.');
+      requestAnimationFrame(() => errorRef.current?.focus());
+      return;
+    }
     setSaveError('');
     setSaving(true);
-    const result = await onUpdateScoring(scoring);
+
+    // Changing the weekly minimum baselines it to the current week, so a
+    // stricter rule never retroactively forfeits a week already played.
+    const saved = normalizeScoring(league.scoring);
+    const next: ScoringSettings = { ...scoring };
+    if (next.captain_min_per_week !== saved.captain_min_per_week) {
+      next.captain_min_effective_week = league.current_week;
+    }
+    const result = await onUpdateScoring(next);
     setSaving(false);
     if (result && 'error' in result && result.error) {
       setSaveError(`Couldn’t save: ${result.error}. Try again.`);
@@ -206,6 +219,64 @@ export function ScoringTab({ league, teams, onUpdateScoring }: Props) {
               />
             );
           })}
+        </div>
+      </div>
+
+      {/* Captain scoring */}
+      <div className="card p-5 space-y-4">
+        <div>
+          <h3 className="font-medium text-white text-sm">Captain Scoring</h3>
+          <p className="text-xs text-turf-400 mt-0.5">
+            A captain multiplies that team’s points for one week. None of these apply
+            retroactively: every pick keeps the multiplier it was made under, and a new weekly
+            minimum only counts from the current week forward.
+          </p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 sm:gap-4">
+          <ScoreField
+            label="Captain Multiplier"
+            min={1}
+            value={scoring.captain_multiplier}
+            onChange={v => setScoring(prev => ({ ...prev, captain_multiplier: Math.round(v) }))}
+            description={`A captained team scores ${scoring.captain_multiplier}× its normal points`}
+          />
+          <ScoreField
+            label="Max Weeks / Team / Season"
+            min={1}
+            value={scoring.captain_max_per_team_season}
+            onChange={v => setScoring(prev => ({ ...prev, captain_max_per_team_season: Math.round(v) }))}
+            description="How many times one team may be captained all season"
+          />
+          <ScoreField
+            label="Min Captains / Week"
+            min={0}
+            value={scoring.captain_min_per_week}
+            onChange={v => setScoring(prev => ({ ...prev, captain_min_per_week: Math.round(v) }))}
+            description="0 = no minimum. Set fewer than this and that week’s captain bonuses are forfeited."
+          />
+          <ScoreField
+            label="Max Captains / Week"
+            min={1}
+            value={scoring.captain_max_per_week}
+            onChange={v => setScoring(prev => ({ ...prev, captain_max_per_week: Math.round(v) }))}
+            description="Above 1, a manager may captain several teams in the same week"
+          />
+        </div>
+
+        <div className="flex items-center justify-between gap-4 pt-2 border-t border-turf-800">
+          <div>
+            <p className="text-sm text-white">Require Every Team To Be Captained</p>
+            <p className="text-xs text-turf-500 mt-0.5">
+              Shows each manager which of their teams has never been captained. Advisory only — it
+              does not block picks or change scoring.
+            </p>
+          </div>
+          <SwitchRow
+            id={`${uid}-cap-all`}
+            name="Require every team to be captained"
+            checked={scoring.captain_require_all_teams}
+            onChange={() => setScoring(prev => ({ ...prev, captain_require_all_teams: !prev.captain_require_all_teams }))}
+          />
         </div>
       </div>
 
