@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, TrendingUp, TrendingDown, Minus, Star, Calendar, List, X, MapPin, Tv, Clock, Coins, ChevronDown, UserCheck, Armchair, Lock, Eye } from 'lucide-react';
+import { Shield, TrendingUp, TrendingDown, Star, Calendar, List, X, MapPin, Tv, Clock, Coins, ChevronDown, UserCheck, Armchair, Lock, Eye } from 'lucide-react';
 import type { RosterEntry, CaptainPick, GameData, ScoringSettings, LeagueMember, WeeklyScore, GameResult, SpreadPick, SpreadData, FreeAgencyMove, DraftPick, ScoreCorrection, BenchPick, APRanking } from '../../types';
 import { calcWeeklyScore } from '../../services/scoring';
 import { rosterAtWeek, isGameKickedOff } from '../../services/roster';
@@ -55,7 +55,7 @@ function formatGameDate(startDate: string | null | undefined, startTimeTbd: bool
   const date = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   const time = startTimeTbd
     ? 'TBD'
-    : d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
+    : d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
   return { date, time };
 }
 
@@ -507,7 +507,6 @@ export function RosterView({
                     </span>
                   ) : (
                     <span className="flex items-center gap-1 text-turf-500">
-                      <Minus className="w-3 h-3 flex-shrink-0" aria-hidden="true" />
                       {isHome ? 'vs' : 'at'}{' '}
                       {game.opponent_rank ? `#${game.opponent_rank} ` : ''}{game.opponent} — {gameDateInfo!.date}
                       {gameDateInfo!.time !== 'TBD' ? ` · ${gameDateInfo!.time}` : ''}
