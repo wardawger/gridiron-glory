@@ -120,7 +120,7 @@ export function DraftRoom({
   );
   // Mobile-only tabbed layout state (Players/Queue/Rosters/Board) — desktop
   // keeps its existing two-column layout untouched at lg: and up.
-  const [mobileTab, setMobileTab] = useState<'players' | 'queue' | 'rosters' | 'board'>('players');
+  const [draftTab, setDraftTab] = useState<'players' | 'queue' | 'rosters' | 'board'>('players');
   const [rosterViewUserId, setRosterViewUserId] = useState(userId);
   // Session-only scratchpad, not synced to the database — a personal
   // draft-day aid, not league state anyone else needs to see.
@@ -762,10 +762,42 @@ export function DraftRoom({
         </div>
       )}
 
-      {/* Desktop / tablet — unchanged two-column layout, lg: and up. Mobile
-          gets its own tabbed layout below instead of this stacking down
-          to a single column. */}
-      <div className="hidden lg:grid lg:grid-cols-3 gap-4">
+      {/* Desktop tab bar — Teams / Queue / Rosters. The draft board itself
+          isn't its own tab; it renders alongside the team list on Teams,
+          same as before this existed. */}
+      <div role="tablist" aria-label="Draft Room view" className="hidden lg:flex gap-1 bg-turf-900 p-1 rounded-xl border border-turf-800">
+        {([
+          { id: 'players', label: 'Teams',   count: 0 },
+          { id: 'queue',   label: 'Queue',   count: queuedTeamIds.length },
+          { id: 'rosters', label: 'Rosters', count: 0 },
+        ] as const).map(({ id, label, count }) => {
+          const active = draftTab === id || (id === 'players' && draftTab === 'board');
+          return (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setDraftTab(id)}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-field-400 ${
+                active ? 'bg-field-500 text-turf-950' : 'text-turf-400 hover:text-white'
+              }`}
+            >
+              {label}
+              {!!count && (
+                <span className={`text-xs font-mono rounded-full px-1.5 ${active ? 'bg-turf-950/20' : 'bg-turf-800'}`}>
+                  {count}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Desktop Teams — two-column layout, lg: and up. Mobile gets its own
+          tabbed layout below instead of this stacking down to a single
+          column. */}
+      <div className={`hidden lg:grid lg:grid-cols-3 gap-4 ${draftTab === 'players' || draftTab === 'board' ? '' : 'lg:!hidden'}`}>
         {/* Available teams */}
         <div className="lg:col-span-2 space-y-3">
           <div className="flex gap-2">
@@ -819,18 +851,34 @@ export function DraftRoom({
               const fpiRank = teamRatings.get(team.id)?.fpi_rank ?? null;
               const apRank = apRankByTeam.get(team.id) ?? null;
 
+              const isQueued = queuedTeamIds.includes(team.id);
               const card = (
-                <button
+                <div
                   key={team.id}
-                  onClick={() => setScheduleModalTeam(team)}
-                  className={`card text-left p-3 flex items-center gap-3 transition-all group w-full ${
+                  className={`card p-3 flex items-center gap-2 transition-all group w-full ${
                     isBlocked
                       ? 'opacity-60 border-red-900/30'
                       : isMyTurn
-                      ? 'hover:border-field-500/50 hover:bg-field-950/20 cursor-pointer active:scale-[0.98]'
+                      ? 'hover:border-field-500/50 hover:bg-field-950/20'
                       : 'opacity-70'
                   } ${lastPick === team.id ? 'animate-pick-flash' : ''}`}
                 >
+                  <button
+                    type="button"
+                    onClick={() => toggleQueue(team.id)}
+                    aria-label={isQueued ? `Remove ${team.name} from queue` : `Add ${team.name} to queue`}
+                    aria-pressed={isQueued}
+                    className="flex-shrink-0 p-1.5 -m-1.5"
+                  >
+                    <Star className={`w-4 h-4 transition-colors ${isQueued ? 'fill-gold-400 text-gold-400' : 'text-turf-600 hover:text-turf-400'}`} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setScheduleModalTeam(team)}
+                    className={`flex-1 min-w-0 flex items-center gap-3 text-left transition-colors ${
+                      isMyTurn && !isBlocked ? 'cursor-pointer active:scale-[0.98]' : ''
+                    }`}
+                  >
                   <TeamLogo src={team.logo} alt={team.name} fallbackName={team.name} size={32} />
                   <div className="flex-1 min-w-0">
                     <p className={`text-sm font-medium truncate transition-colors ${
@@ -863,7 +911,8 @@ export function DraftRoom({
                       View →
                     </span>
                   )}
-                </button>
+                  </button>
+                </div>
               );
 
               // Wrap blocked teams in a styled tooltip
@@ -885,11 +934,12 @@ export function DraftRoom({
         </div>
       </div>
 
-      {/* Mobile — tabbed layout: Players / Queue / Rosters / Board, matched
-          to a bottom tab bar rather than everything stacked on one long
-          scroll. Bottom padding clears the fixed bar below. */}
+      {/* Mobile — tabbed layout: Players / Board are mobile-only tabs,
+          matched to the bottom tab bar below. Desktop reaches Teams (with
+          the board alongside it) and Board is not a reachable tab at lg:.
+          Bottom padding clears the fixed bar below. */}
       <div className="lg:hidden pb-24 space-y-3">
-        {mobileTab === 'players' && (
+        {draftTab === 'players' && (
           <>
             <div className="space-y-2">
               <div className="relative">
@@ -943,7 +993,16 @@ export function DraftRoom({
           </>
         )}
 
-        {mobileTab === 'queue' && (
+        {draftTab === 'board' && (
+          <DraftBoard pickSlots={pickSlots} members={members} rounds={league.max_teams_per_user} perRound={league.draft_order.length} currentPick={currentPick} />
+        )}
+      </div>
+
+      {/* Queue / Rosters — shared between mobile and desktop, unlike the
+          Players/Board tabs above. Centered and width-capped at lg: so a
+          list of rows doesn't stretch edge-to-edge on a wide screen. */}
+      <div className="lg:max-w-2xl lg:mx-auto w-full pb-24 lg:pb-0 space-y-3">
+        {draftTab === 'queue' && (
           <div className="space-y-2">
             {queuedTeamIds.length === 0 ? (
               <div className="card p-8 text-center text-turf-500 text-sm space-y-2">
@@ -959,7 +1018,7 @@ export function DraftRoom({
           </div>
         )}
 
-        {mobileTab === 'rosters' && (
+        {draftTab === 'rosters' && (
           <div className="space-y-3">
             <div className="relative">
               <select
@@ -1037,10 +1096,6 @@ export function DraftRoom({
             </div>
           </div>
         )}
-
-        {mobileTab === 'board' && (
-          <DraftBoard pickSlots={pickSlots} members={members} rounds={league.max_teams_per_user} perRound={league.draft_order.length} currentPick={currentPick} />
-        )}
       </div>
 
       {/* Mobile bottom tab bar */}
@@ -1058,9 +1113,9 @@ export function DraftRoom({
             <button
               key={id}
               type="button"
-              onClick={() => setMobileTab(id)}
+              onClick={() => setDraftTab(id)}
               className={`flex flex-col items-center gap-0.5 py-2.5 text-xs font-medium transition-colors ${
-                mobileTab === id ? 'text-field-400' : 'text-turf-500'
+                draftTab === id ? 'text-field-400' : 'text-turf-500'
               }`}
             >
               <span className="relative">
