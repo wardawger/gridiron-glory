@@ -105,6 +105,7 @@ export function useLeagueCore(user: User | null) {
   }, [user]);
 
   const loadLeagueData = useCallback(async (leagueId: string) => {
+    const tables = ['league_members', 'draft_picks', 'captain_picks', 'manual_bonuses', 'spread_picks', 'free_agency_moves', 'waiver_claims', 'score_corrections', 'bench_picks', 'invites', 'season_history'] as const;
     const [membersRes, picksRes, captainRes, bonusRes, spreadRes, faRes, waiverRes, correctionRes, benchRes, invitesRes, historyRes] = await Promise.all([
       supabase.from('league_members').select('*').eq('league_id', leagueId),
       supabase.from('draft_picks').select('*').eq('league_id', leagueId).order('pick_number'),
@@ -120,6 +121,7 @@ export function useLeagueCore(user: User | null) {
       supabase.from('invites').select('*').eq('league_id', leagueId).order('created_at', { ascending: false }),
       supabase.from('season_history').select('*').eq('league_id', leagueId).order('archived_at', { ascending: false }),
     ]);
+    const results = [membersRes, picksRes, captainRes, bonusRes, spreadRes, faRes, waiverRes, correctionRes, benchRes, invitesRes, historyRes];
 
     if (membersRes.data)    setMembers(membersRes.data);
     if (picksRes.data)      setDraftPicks(picksRes.data);
@@ -132,6 +134,16 @@ export function useLeagueCore(user: User | null) {
     if (benchRes.data)      setBenchPicks(benchRes.data);
     if (invitesRes.data)    setInvites(invitesRes.data);
     if (historyRes.data)    setSeasonHistory(historyRes.data);
+
+    // A canceled/failed query here (e.g. a Postgres statement timeout) leaves
+    // its `data` null, so the `if` above silently skips that slice of state
+    // instead of updating it — without this, the failure produces no error
+    // and no visible symptom beyond stale or missing data for that one table.
+    const failed = results.map((r, i) => r.error ? tables[i] : null).filter(Boolean) as string[];
+    if (failed.length > 0) {
+      console.error(`loadLeagueData: failed to load ${failed.join(', ')}`, results.filter(r => r.error).map(r => r.error));
+      setError(`Some league data failed to load (${failed.join(', ')}). Try refreshing the page.`);
+    }
   }, []);
 
   useEffect(() => { loadAllLeagues(); }, [loadAllLeagues]);
