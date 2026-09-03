@@ -488,7 +488,7 @@ export function RosterView({
             type="button"
             className="mt-3 w-full text-left group/game rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-400"
             onClick={openGameModal}
-            aria-label={`${isHome ? 'vs' : 'at'} ${game.opponent} — view scoring details`}
+            aria-label={`View matchup: ${isHome ? 'vs' : 'at'} ${game.opponent}`}
           >
             <span className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-turf-800/60 transition-colors">
               <span className="flex items-center gap-2 min-w-0">
@@ -521,7 +521,9 @@ export function RosterView({
                     {game.home_score}–{game.away_score}
                   </span>
                 )}
-                <span aria-hidden="true" className="text-turf-700 group-hover/game:text-turf-500 transition-colors text-xs">↗</span>
+                <span className="text-xs text-turf-600 group-hover/game:text-field-400 transition-colors whitespace-nowrap">
+                  View matchup<span aria-hidden="true"> ↗</span>
+                </span>
               </span>
             </span>
           </button>
