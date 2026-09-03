@@ -408,13 +408,24 @@ export function useLeagueCore(user: User | null) {
       : [...prev, pick as DraftPick].sort((a, b) => a.pick_number - b.pick_number));
 
     const next = pickNum + 1;
-    const { data: updatedLeague, error: leagueErr } = await supabase.from('leagues').update({
+    const advance = () => supabase.from('leagues').update({
       draft_current_pick: next,
       draft_status: next > totalPicks ? 'complete' : 'active',
     }).eq('id', league.id).select().single();
 
+    let { data: updatedLeague, error: leagueErr } = await advance();
+    // The draft_picks insert above already committed — retry once rather
+    // than leaving the draft silently stuck on the same pick number if this
+    // second write hits a transient failure (e.g. a statement timeout).
+    if (leagueErr) {
+      ({ data: updatedLeague, error: leagueErr } = await advance());
+    }
+
     if (!leagueErr && updatedLeague) {
       setAllLeagues(prev => prev.map(l => l.id === league.id ? updatedLeague as League : l));
+    } else if (leagueErr) {
+      console.error('makeDraftPick: failed to advance draft_current_pick', leagueErr);
+      return { error: 'Your pick was saved, but the turn failed to advance. Refresh the page — if it’s still stuck, ask your commissioner to check the draft.' };
     }
     posthog.capture('draft_pick_made', {
       pick_number: pickNum,
