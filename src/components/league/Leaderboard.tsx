@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   Cell, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Legend,
-  LineChart, Line, ScatterChart, Scatter, ReferenceLine, ReferenceArea,
+  LineChart, Line, ScatterChart, Scatter, ReferenceLine, ReferenceArea, CartesianGrid,
 } from 'recharts';
 import { Crown, TrendingUp, TrendingDown, Star } from 'lucide-react';
 import type { LeaderboardEntry, DraftPick, APRanking, CfbTeam } from '../../types';
@@ -746,6 +746,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                 >
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={weeklyData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                      <CartesianGrid horizontal vertical={false} stroke={CHART_GRID} strokeOpacity={0.3} strokeDasharray="3 3" />
                       {/* Alternating bands, one per week, so a wide multi-manager
                           chart still reads as distinct week groups rather than
                           one continuous strip of bars. */}
