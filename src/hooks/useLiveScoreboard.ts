@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { fetchScoreboard, type LiveScoreboardEntry } from '../services/cfbd';
 
-const POLL_MS = 20_000;
+const POLL_MS = 10_000;
 
 // Only polls while `enabled` (the Scoreboard page being mounted) — unlike
 // useCfbData's 30-minute background cycle, this hits CFBD's live endpoint
