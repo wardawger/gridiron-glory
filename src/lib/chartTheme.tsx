@@ -28,5 +28,6 @@ export const seriesColor = (i: number) => PLAYER_COLORS[i % PLAYER_COLORS.length
 export const CHART_GRID = '#495057';              // turf-700 — grids, cursors, reference lines
 export const CHART_MUTED = '#adb5bd';             // turf-500 — legend/secondary label text
 export const CHART_SURFACE = '#0d1117';           // turf-950 — page behind the chart
+export const CHART_BAND = '#ffffff';              // low-opacity fill for alternating-week bands
 
 export const legendFormatter = (value: string) => <span style={{ color: '#adb5bd' }}>{value}</span>;

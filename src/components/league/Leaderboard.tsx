@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   Cell, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Legend,
-  LineChart, Line, ScatterChart, Scatter, ReferenceLine,
+  LineChart, Line, ScatterChart, Scatter, ReferenceLine, ReferenceArea,
 } from 'recharts';
 import { Crown, TrendingUp, TrendingDown, Star } from 'lucide-react';
 import type { LeaderboardEntry, DraftPick, APRanking, CfbTeam } from '../../types';
@@ -15,7 +15,7 @@ import { InfoTooltip } from '../ui/Tooltip';
 import { Toggle } from '../ui/Toggle';
 import {
   seriesColor, CHART_TOOLTIP_STYLE, CHART_TOOLTIP_LABEL, CHART_TOOLTIP_ITEM, legendFormatter,
-  CHART_AXIS_TICK, CHART_GRID, CHART_MUTED, CHART_SURFACE,
+  CHART_AXIS_TICK, CHART_GRID, CHART_MUTED, CHART_SURFACE, CHART_BAND,
 } from '../../lib/chartTheme';
 
 interface Props {
@@ -746,6 +746,12 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                 >
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={weeklyData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                      {/* Alternating bands, one per week, so a wide multi-manager
+                          chart still reads as distinct week groups rather than
+                          one continuous strip of bars. */}
+                      {weeklyData.map((row, i) => i % 2 === 1 && (
+                        <ReferenceArea key={row.week} x1={row.week} x2={row.week} fill={CHART_BAND} fillOpacity={0.04} stroke="none" ifOverflow="visible" />
+                      ))}
                       <XAxis dataKey="week" tick={CHART_AXIS_TICK} axisLine={false} tickLine={false} />
                       <YAxis tick={CHART_AXIS_TICK} axisLine={false} tickLine={false} />
                       {/* shared={false} => only the hovered bar. cursor={false}
