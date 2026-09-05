@@ -354,6 +354,14 @@ export function DraftRoom({
 
   const byeWeeksByTeam = useMemo(() => {
     const map = new Map<string, number[]>();
+    // gameData[team.id] starts as {} until the games fetch populates it, and
+    // a transient proxy/CFBD failure can leave it that way for every team
+    // (rather than throwing). Computing byes from an empty map would mark
+    // every team on bye every week — never real, since no FBS team plays a
+    // season with zero games — so treat "nobody has any games yet" as
+    // "not loaded" and skip rather than show that false signal.
+    const hasAnyGames = teams.some(t => Object.keys(gameData[t.id] ?? {}).length > 0);
+    if (!hasAnyGames) return map;
     teams.forEach(t => {
       const g = gameData[t.id] ?? {};
       // Weeks 14–15 are excluded: week 14 is conference championship week,
