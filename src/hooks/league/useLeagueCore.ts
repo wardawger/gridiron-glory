@@ -105,45 +105,30 @@ export function useLeagueCore(user: User | null) {
   }, [user]);
 
   const loadLeagueData = useCallback(async (leagueId: string) => {
-    const tables = ['league_members', 'draft_picks', 'captain_picks', 'manual_bonuses', 'spread_picks', 'free_agency_moves', 'waiver_claims', 'score_corrections', 'bench_picks', 'invites', 'season_history'] as const;
-    const [membersRes, picksRes, captainRes, bonusRes, spreadRes, faRes, waiverRes, correctionRes, benchRes, invitesRes, historyRes] = await Promise.all([
-      supabase.from('league_members').select('*').eq('league_id', leagueId),
-      supabase.from('draft_picks').select('*').eq('league_id', leagueId).order('pick_number'),
-      supabase.from('captain_picks').select('*').eq('league_id', leagueId),
-      supabase.from('manual_bonuses').select('*').eq('league_id', leagueId),
-      supabase.from('spread_picks').select('*').eq('league_id', leagueId),
-      supabase.from('free_agency_moves').select('*').eq('league_id', leagueId),
-      supabase.from('waiver_claims').select('*').eq('league_id', leagueId),
-      supabase.from('score_corrections').select('*').eq('league_id', leagueId),
-      supabase.from('bench_picks').select('*').eq('league_id', leagueId),
-      // Empty for a non-commissioner — RLS scopes SELECT to commissioners
-      // only, so this is a silent no-op rather than an error for members.
-      supabase.from('invites').select('*').eq('league_id', leagueId).order('created_at', { ascending: false }),
-      supabase.from('season_history').select('*').eq('league_id', leagueId).order('archived_at', { ascending: false }),
-    ]);
-    const results = [membersRes, picksRes, captainRes, bonusRes, spreadRes, faRes, waiverRes, correctionRes, benchRes, invitesRes, historyRes];
-
-    if (membersRes.data)    setMembers(membersRes.data);
-    if (picksRes.data)      setDraftPicks(picksRes.data);
-    if (captainRes.data)    setCaptainPicks(captainRes.data);
-    if (bonusRes.data)      setManualBonuses(bonusRes.data);
-    if (spreadRes.data)     setSpreadPicks(spreadRes.data);
-    if (faRes.data)         setFreeAgencyMoves(faRes.data);
-    if (waiverRes.data)     setWaiverClaims(waiverRes.data);
-    if (correctionRes.data) setScoreCorrections(correctionRes.data);
-    if (benchRes.data)      setBenchPicks(benchRes.data);
-    if (invitesRes.data)    setInvites(invitesRes.data);
-    if (historyRes.data)    setSeasonHistory(historyRes.data);
-
-    // A canceled/failed query here (e.g. a Postgres statement timeout) leaves
-    // its `data` null, so the `if` above silently skips that slice of state
-    // instead of updating it — without this, the failure produces no error
-    // and no visible symptom beyond stale or missing data for that one table.
-    const failed = results.map((r, i) => r.error ? tables[i] : null).filter(Boolean) as string[];
-    if (failed.length > 0) {
-      console.error(`loadLeagueData: failed to load ${failed.join(', ')}`, results.filter(r => r.error).map(r => r.error));
-      setError(`Some league data failed to load (${failed.join(', ')}). Try refreshing the page.`);
+    // A single RPC round-trip instead of 11 separate table queries — see
+    // supabase-migration-league-data-rpc.sql. get_league_data() runs
+    // SECURITY INVOKER (the default), so every table's own RLS still
+    // applies exactly as before (e.g. invites still comes back empty for a
+    // non-commissioner); this only collapses the round-trips, not the
+    // access rules.
+    const { data, error } = await supabase.rpc('get_league_data', { p_league_id: leagueId });
+    if (error || !data) {
+      console.error('loadLeagueData: get_league_data failed', error);
+      setError('Failed to load league data. Try refreshing the page.');
+      return;
     }
+
+    setMembers(data.members);
+    setDraftPicks(data.draft_picks);
+    setCaptainPicks(data.captain_picks);
+    setManualBonuses(data.manual_bonuses);
+    setSpreadPicks(data.spread_picks);
+    setFreeAgencyMoves(data.free_agency_moves);
+    setWaiverClaims(data.waiver_claims);
+    setScoreCorrections(data.score_corrections);
+    setBenchPicks(data.bench_picks);
+    setInvites(data.invites);
+    setSeasonHistory(data.season_history);
   }, []);
 
   useEffect(() => { loadAllLeagues(); }, [loadAllLeagues]);
