@@ -9,6 +9,14 @@
 //   SUPABASE_URL         — your Supabase project URL  (already set for your app)
 //   SUPABASE_SERVICE_KEY — your Supabase service role key (NOT the anon key)
 //
+// Optional but recommended:
+//   SUPABASE_JWT_SECRET  — Settings → API → JWT Secret in the Supabase
+//                          dashboard. Lets verifyUser() check the caller's
+//                          token locally instead of a network round-trip to
+//                          Supabase on every single one of the ~12 parallel
+//                          requests a page refresh fires. Falls back to the
+//                          network check if this isn't set.
+//
 // Supabase table required — run this once in the Supabase SQL editor:
 //   CREATE TABLE IF NOT EXISTS cfbd_cache (
 //     cache_key   TEXT PRIMARY KEY,
