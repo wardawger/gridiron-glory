@@ -6,9 +6,21 @@
 @layer base {
   * { box-sizing: border-box; }
 
+  /* Chart-heavy pages (Standings) mount several Recharts
+     ResponsiveContainers that measure their width via ResizeObserver right
+     as the page fades in — if that measurement is ever a frame wider than
+     the real viewport, mobile Safari/Chrome permanently expand the page's
+     layout viewport to fit it, leaving the whole app looking zoomed out
+     until reload. Clamping horizontal overflow at the document root stops
+     that at the source; anything that needs its own horizontal scroll
+     already wraps itself in a dedicated overflow-x-auto container, so this
+     doesn't take scrolling away from them. */
+  html { overflow-x: hidden; }
+
   body {
     @apply bg-turf-950 text-white font-sans antialiased;
     min-height: 100dvh;
+    overflow-x: hidden;
   }
 
   /* Scrollbar */
