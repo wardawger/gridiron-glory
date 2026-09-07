@@ -110,10 +110,10 @@ function AnimatedRoutes({ lg, league, auth, cfb }: AnimatedRoutesProps) {
   // when that data is still empty, indistinguishable from a genuine empty
   // state (e.g. Scoreboard's "No active teams have a game this week", Stat
   // Bonuses' "No season stats available yet") — this swaps in the route's
-  // own skeleton for that window instead. HomePage is the one exception:
-  // it already takes a `cfbLoading` prop and shows an inline "loading live
-  // game data" banner without blanking the page, since its leaderboard has
-  // real member entries regardless of cfb data readiness.
+  // own skeleton for that window instead — including HomePage, whose
+  // leaderboard still shows a real "loading live game data" banner via its
+  // `cfbLoading` prop for the ongoing (non-initial) refreshes this flag
+  // deliberately never re-triggers on.
   const cfbInitialLoading = !cfb.hasLoadedOnce;
 
   return (
@@ -121,23 +121,25 @@ function AnimatedRoutes({ lg, league, auth, cfb }: AnimatedRoutesProps) {
       <Suspense fallback={<RouteFallback pathname={displayedLocation.pathname} />}>
         <Routes location={displayedLocation}>
           <Route path="/" element={
-            <HomePage
-              league={lg}
-              members={league.members}
-              draftPicks={league.draftPicks}
-              captainPicks={league.captainPicks}
-              manualBonuses={league.manualBonuses}
-              spreadPicks={league.spreadPicks}
-              freeAgencyMoves={league.freeAgencyMoves}
-              scoreCorrections={league.scoreCorrections}
-              benchPicks={league.benchPicks}
-              gameData={cfb.gameData}
-              seasonStats={cfb.seasonStats}
-              rankings={cfb.rankings}
-              teams={cfb.teams}
-              userId={auth.user!.id}
-              cfbLoading={cfb.loading}
-            />
+            cfbInitialLoading ? <HomePageSkeleton /> : (
+              <HomePage
+                league={lg}
+                members={league.members}
+                draftPicks={league.draftPicks}
+                captainPicks={league.captainPicks}
+                manualBonuses={league.manualBonuses}
+                spreadPicks={league.spreadPicks}
+                freeAgencyMoves={league.freeAgencyMoves}
+                scoreCorrections={league.scoreCorrections}
+                benchPicks={league.benchPicks}
+                gameData={cfb.gameData}
+                seasonStats={cfb.seasonStats}
+                rankings={cfb.rankings}
+                teams={cfb.teams}
+                userId={auth.user!.id}
+                cfbLoading={cfb.loading}
+              />
+            )
           } />
           <Route path="/roster"         element={cfbInitialLoading ? <RosterPageSkeleton /> : <RosterPage league={lg} members={league.members} draftPicks={league.draftPicks} captainPicks={league.captainPicks} gameData={cfb.gameData} rankings={cfb.rankings} spreadData={cfb.spreadData} spreadPicks={league.spreadPicks} freeAgencyMoves={league.freeAgencyMoves} scoreCorrections={league.scoreCorrections} benchPicks={league.benchPicks} userId={auth.user!.id} onSetCaptain={league.setCaptain} onSetSpread={league.setSpreadPick} onRemoveSpread={league.removeSpreadPick} onRefreshSpreads={cfb.refreshSpreads} onSwapBench={league.swapBench} onEnsureBenchSeeded={league.ensureBenchSeeded} />} />
           <Route path="/roster/:userId" element={cfbInitialLoading ? <RosterPageSkeleton /> : <RosterPage league={lg} members={league.members} draftPicks={league.draftPicks} captainPicks={league.captainPicks} gameData={cfb.gameData} rankings={cfb.rankings} spreadData={cfb.spreadData} spreadPicks={league.spreadPicks} freeAgencyMoves={league.freeAgencyMoves} scoreCorrections={league.scoreCorrections} benchPicks={league.benchPicks} userId={auth.user!.id} onSetCaptain={league.setCaptain} onSetSpread={league.setSpreadPick} onRemoveSpread={league.removeSpreadPick} onRefreshSpreads={cfb.refreshSpreads} onSwapBench={league.swapBench} onEnsureBenchSeeded={league.ensureBenchSeeded} />} />
