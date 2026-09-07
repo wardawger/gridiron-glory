@@ -262,11 +262,27 @@ export function calcStatRankingBonuses(
       .sort((a, b) => (b.val as number) - (a.val as number));
 
     const total = ranked.length;
+    if (total === 0) continue;
+
+    // Tie at the cutoff boundary: every team matching the boundary value
+    // qualifies, not just whichever one happened to land first in sort
+    // order. Two teams can easily post the identical value for a stat
+    // (rushing TDs, sacks, etc.), and picking one winner by incidental
+    // array-iteration order isn't a rule any manager could ever verify —
+    // Math.min(...) clamps the boundary index for the degenerate case
+    // where top_count/bottom_count is >= the number of ranked teams, which
+    // should still mean "everyone qualifies" exactly as before.
+    const topBoundaryVal = cat.top_enabled && cat.top_count > 0
+      ? ranked[Math.min(cat.top_count, total) - 1].val as number
+      : null;
+    const botBoundaryVal = cat.bottom_enabled && cat.bottom_count > 0
+      ? ranked[total - Math.min(cat.bottom_count, total)].val as number
+      : null;
 
     ranked.forEach((entry, idx) => {
       const rank = idx + 1;
-      const isTop = cat.top_enabled && rank <= cat.top_count;
-      const isBot = !isTop && cat.bottom_enabled && rank > total - cat.bottom_count;
+      const isTop = topBoundaryVal !== null && (entry.val as number) >= topBoundaryVal;
+      const isBot = !isTop && botBoundaryVal !== null && (entry.val as number) <= botBoundaryVal;
       if (!isTop && !isBot) return;
 
       const pts = isTop ? cat.top_points : cat.bottom_points;

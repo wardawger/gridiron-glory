@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
   isP4Conference, confCategory, scoreGame, getSpreadOutcome, scoreSpread, buildLeaderboard, calcWeeklyScore,
+  calcStatRankingBonuses,
 } from './scoring';
 import { DEFAULT_SCORING } from '../types';
-import type { GameResult, GameData, LeagueMember, DraftPick, CaptainPick, TeamSeasonStats, ScoreCorrection, BenchPick, SpreadPick } from '../types';
+import type { GameResult, GameData, LeagueMember, DraftPick, CaptainPick, TeamSeasonStats, ScoreCorrection, BenchPick, SpreadPick, RosterEntry } from '../types';
 
 function makeGame(overrides: Partial<GameResult> = {}): GameResult {
   return {
@@ -454,5 +455,95 @@ describe('captain scoring', () => {
     const settings = { ...DEFAULT_SCORING, captain_min_per_week: 0 };
     const score = calcWeeklyScore('u1', 1, roster, [], gameData, settings);
     expect(score.captain_forfeited).toBe(false);
+  });
+});
+
+describe('calcStatRankingBonuses tie-at-boundary', () => {
+  const team = (id: string): RosterEntry => ({ team_id: id, team_name: id, team_logo: '', team_conference: 'SEC', team_color: '' });
+
+  // 5 teams, one per user, ranked by rushing_tds: t1=10, t2=8, t3=8, t4=8, t5=1
+  // top_count=2 would normally cut off after t2, but t3/t4 are tied with it.
+  const rosters = new Map<string, RosterEntry[]>([
+    ['u1', [team('t1')]],
+    ['u2', [team('t2')]],
+    ['u3', [team('t3')]],
+    ['u4', [team('t4')]],
+    ['u5', [team('t5')]],
+  ]);
+  const seasonStats = new Map<string, TeamSeasonStats>([
+    ['t1', { rushing_tds: 10 } as TeamSeasonStats],
+    ['t2', { rushing_tds: 8 } as TeamSeasonStats],
+    ['t3', { rushing_tds: 8 } as TeamSeasonStats],
+    ['t4', { rushing_tds: 8 } as TeamSeasonStats],
+    ['t5', { rushing_tds: 1 } as TeamSeasonStats],
+  ]);
+
+  it('awards the top bonus to every team tied for the last qualifying spot, not just one', () => {
+    const settings = {
+      ...DEFAULT_SCORING,
+      stat_bonus_categories: {
+        ...DEFAULT_SCORING.stat_bonus_categories,
+        rushing_tds: { top_enabled: true, top_count: 2, top_points: 3, bottom_enabled: false, bottom_count: 3, bottom_points: -3 },
+      },
+    };
+    const bonuses = calcStatRankingBonuses(rosters, seasonStats, false, settings);
+
+    expect(bonuses.get('u1')).toHaveLength(1); // val 10 — clear #1
+    expect(bonuses.get('u2')).toHaveLength(1); // val 8 — tied at the boundary
+    expect(bonuses.get('u3')).toHaveLength(1); // val 8 — tied at the boundary
+    expect(bonuses.get('u4')).toHaveLength(1); // val 8 — tied at the boundary
+    expect(bonuses.get('u5')).toHaveLength(0); // val 1 — not close
+
+    for (const uid of ['u1', 'u2', 'u3', 'u4']) {
+      expect(bonuses.get(uid)![0].points).toBe(3);
+    }
+  });
+
+  it('awards the bottom bonus to every team tied for the last qualifying spot', () => {
+    const settings = {
+      ...DEFAULT_SCORING,
+      stat_bonus_categories: {
+        ...DEFAULT_SCORING.stat_bonus_categories,
+        rushing_tds: { top_enabled: false, top_count: 3, top_points: 3, bottom_enabled: true, bottom_count: 1, bottom_points: -3 },
+      },
+    };
+    // Bottom slot (1) would normally only catch t5 (val 1), but bump the
+    // bottom_count to 2 so it lands exactly on the t2/t3/t4 three-way tie.
+    settings.stat_bonus_categories.rushing_tds.bottom_count = 3;
+    const bonuses = calcStatRankingBonuses(rosters, seasonStats, false, settings);
+
+    expect(bonuses.get('u1')).toHaveLength(0); // val 10 — not in the bottom group
+    expect(bonuses.get('u2')).toHaveLength(1); // val 8 — tied for the last bottom spot
+    expect(bonuses.get('u3')).toHaveLength(1);
+    expect(bonuses.get('u4')).toHaveLength(1);
+    expect(bonuses.get('u5')).toHaveLength(1); // val 1 — clearly last
+
+    for (const uid of ['u2', 'u3', 'u4', 'u5']) {
+      expect(bonuses.get(uid)![0].points).toBe(-3);
+    }
+  });
+
+  it('a team qualifying for both top and bottom (tiny league) only counts as top', () => {
+    const tinyRosters = new Map<string, RosterEntry[]>([
+      ['u1', [team('t1')]],
+      ['u2', [team('t2')]],
+    ]);
+    const tinyStats = new Map<string, TeamSeasonStats>([
+      ['t1', { rushing_tds: 5 } as TeamSeasonStats],
+      ['t2', { rushing_tds: 3 } as TeamSeasonStats],
+    ]);
+    const settings = {
+      ...DEFAULT_SCORING,
+      stat_bonus_categories: {
+        ...DEFAULT_SCORING.stat_bonus_categories,
+        rushing_tds: { top_enabled: true, top_count: 5, top_points: 3, bottom_enabled: true, bottom_count: 5, bottom_points: -3 },
+      },
+    };
+    const bonuses = calcStatRankingBonuses(tinyRosters, tinyStats, false, settings);
+
+    expect(bonuses.get('u1')![0].points).toBe(3);
+    expect(bonuses.get('u2')![0].points).toBe(3);
+    expect(bonuses.get('u1')).toHaveLength(1);
+    expect(bonuses.get('u2')).toHaveLength(1);
   });
 });
