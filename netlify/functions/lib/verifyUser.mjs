@@ -68,8 +68,10 @@ export async function verifyUser(req, supabaseUrl, apiKey) {
   // is added.
   const jwtSecret = process.env.SUPABASE_JWT_SECRET;
   if (jwtSecret) {
+    console.log('[verifyUser] verifying locally (SUPABASE_JWT_SECRET is set)');
     return verifyJwtHS256(token, jwtSecret);
   }
+  console.log('[verifyUser] SUPABASE_JWT_SECRET not set — falling back to network check');
 
   try {
     // Supabase validates the JWT (signature and expiry) for us here.
