@@ -247,7 +247,7 @@ function WeeklyBreakdownTable({
           className="max-w-md border-t border-turf-800/50"
         >
           {score.breakdown.map(b => (
-            <div key={b.team_id} role="row" className="flex items-center gap-2 py-1.5 border-b border-turf-800/50 last:border-b-0">
+            <div key={b.team_id} role="row" className="flex items-center gap-2 py-1.5 px-1 -mx-1 rounded border-b border-turf-800/50 last:border-b-0 hover:bg-turf-800/40 transition-colors">
               <button
                 type="button"
                 disabled={!b.game}
@@ -259,11 +259,15 @@ function WeeklyBreakdownTable({
                   b.game ? 'hover:text-field-300' : 'cursor-default'
                 }`}
               >
-                <TeamLogo src={teamsById.get(b.team_id)?.logo} alt="" fallbackName={b.team_name} size={16} className={`flex-shrink-0 ${b.is_benched ? 'opacity-50' : ''}`} />
+                <TeamLogo src={teamsById.get(b.team_id)?.logo} alt="" fallbackName={b.team_name} size={24} className={`flex-shrink-0 ${b.is_benched ? 'opacity-50' : ''}`} />
                 <span className={`truncate ${b.is_benched ? 'text-turf-600 line-through' : 'text-turf-300'}`}>{b.team_name}</span>
               </button>
               {b.is_benched && <span className="badge-gray flex-shrink-0">Benched</span>}
-              {b.is_captain && <span className="badge-gold flex-shrink-0">C×{b.captain_multiplier}</span>}
+              {b.is_captain && (
+                <span className="badge-gold flex-shrink-0 inline-flex items-center gap-0.5">
+                  <Star className="w-3 h-3 fill-current" aria-hidden="true" />×{b.captain_multiplier}
+                </span>
+              )}
               {b.spread_points !== 0 && <span className="badge-purple flex-shrink-0">Spread {signed(b.spread_points)}</span>}
               <span className={`ml-auto flex-shrink-0 font-mono tabular-nums ${b.points > 0 ? 'text-field-400' : b.points < 0 ? 'text-red-300' : 'text-turf-500'}`}>
                 {signed(b.points)}
@@ -759,29 +763,29 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                   <div className="px-5 pb-5 pt-1 space-y-4 border-t border-turf-800/60">
                     <div className="pt-3">
                       <p className="text-xs text-turf-500 uppercase tracking-wide mb-1.5">Totals</p>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                        <div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="card-inner px-3 py-2">
                           <p className="text-xs text-turf-600">Season</p>
                           <p className="font-mono font-bold text-white">{signed(displayTotal(entry))}</p>
                         </div>
-                        <div>
-                          <p className="text-xs text-turf-600">Manual Bonuses</p>
-                          <p className={`font-mono font-bold ${entry.bonus_points > 0 ? 'text-amber-400' : entry.bonus_points < 0 ? 'text-red-300' : 'text-turf-400'}`}>
-                            {signed(entry.bonus_points)}
-                          </p>
-                        </div>
                         {includeStatBonuses && (
-                          <div>
+                          <div className="card-inner px-3 py-2">
                             <p className="text-xs text-turf-600">Stat Bonuses</p>
                             <p className={`font-mono font-bold ${statPts > 0 ? 'text-blue-400' : statPts < 0 ? 'text-red-300' : 'text-turf-400'}`}>
                               {signed(statPts)}
                             </p>
                           </div>
                         )}
+                        <div className="card-inner px-3 py-2">
+                          <p className="text-xs text-turf-600">Manual Bonuses</p>
+                          <p className={`font-mono font-bold ${entry.bonus_points > 0 ? 'text-amber-400' : entry.bonus_points < 0 ? 'text-red-300' : 'text-turf-400'}`}>
+                            {signed(entry.bonus_points)}
+                          </p>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-4 gap-y-4">
                       <WeeklyBreakdownTable
                         entry={entry}
                         currentWeek={currentWeek}
@@ -790,7 +794,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                       />
 
                       {includeStatBonuses && entry.stat_bonuses.length > 0 && (
-                        <div>
+                        <div className="lg:border-l lg:border-turf-800/60 lg:pl-4">
                           <p className="text-xs text-turf-500 uppercase tracking-wide mb-2">
                             Stat Bonus Breakdown{!confChampComplete ? ' (provisional)' : ''}
                           </p>
@@ -806,10 +810,10 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                                         {isTop
                                           ? <TrendingUp className="w-3 h-3 text-field-400 flex-shrink-0" aria-hidden="true" />
                                           : <TrendingDown className="w-3 h-3 text-red-300 flex-shrink-0" aria-hidden="true" />}
-                                        <TeamLogo src={teamsById.get(b.team_id)?.logo} alt="" fallbackName={b.team_name} size={16} className="flex-shrink-0" />
+                                        <TeamLogo src={teamsById.get(b.team_id)?.logo} alt="" fallbackName={b.team_name} size={24} className="flex-shrink-0" />
                                         <span className="text-turf-300 truncate min-w-0 flex-1">{b.team_name}</span>
-                                        <span className="text-turf-500 font-mono text-xs flex-shrink-0">{formatStatValue(stat, b.value)}</span>
-                                        <span className={`font-mono tabular-nums flex-shrink-0 ${isTop ? 'text-field-400' : 'text-red-300'}`}>{signed(b.points)}</span>
+                                        <span className="text-turf-500 font-mono text-xs flex-shrink-0 w-14 text-center">{formatStatValue(stat, b.value)}</span>
+                                        <span className={`font-mono tabular-nums flex-shrink-0 w-10 text-right ${isTop ? 'text-field-400' : 'text-red-300'}`}>{signed(b.points)}</span>
                                       </div>
                                     );
                                   })}
