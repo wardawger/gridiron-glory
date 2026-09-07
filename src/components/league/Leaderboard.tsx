@@ -5,8 +5,9 @@ import {
   Cell, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Legend,
   LineChart, Line, ScatterChart, Scatter, ReferenceLine, ReferenceArea, CartesianGrid,
 } from 'recharts';
-import { Crown, TrendingUp, TrendingDown, Star } from 'lucide-react';
-import type { LeaderboardEntry, DraftPick, APRanking, CfbTeam } from '../../types';
+import { Crown, TrendingUp, TrendingDown, Star, ChevronDown } from 'lucide-react';
+import type { LeaderboardEntry, DraftPick, APRanking, CfbTeam, WeeklyScore } from '../../types';
+import { STAT_BONUS_LABELS } from '../../types';
 import { computeAnalytics, scalePosition, tierFor } from '../../services/analytics';
 import type { RosterAnalytics, MetricTier } from '../../services/analytics';
 import { Avatar } from '../ui/Avatar';
@@ -180,6 +181,48 @@ interface MetricDef {
 }
 
 const signed = (n: number) => `${n > 0 ? '+' : ''}${n}`;
+
+// Per-team scoring breakdown for one week, used by the expandable standings
+// row. spread_points is a component already folded into `points` (see
+// calcWeeklyScore) — shown as an annotation, not added again.
+function WeekBreakdownSection({ label, score }: { label: string; score: WeeklyScore | undefined }) {
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1.5">
+        <p className="text-xs text-turf-500 uppercase tracking-wide">{label}</p>
+        {score && (
+          <span className={`font-mono text-sm font-bold ${score.points > 0 ? 'text-field-400' : score.points < 0 ? 'text-red-300' : 'text-turf-400'}`}>
+            {signed(score.points)}
+          </span>
+        )}
+      </div>
+      {!score || score.breakdown.length === 0 ? (
+        <p className="text-sm text-turf-600">No games this week</p>
+      ) : (
+        <div className="space-y-1">
+          {score.breakdown.map(b => (
+            <div key={b.team_id} className="flex items-center justify-between text-sm gap-3">
+              <span className={`truncate ${b.is_benched ? 'text-turf-600 line-through' : 'text-turf-300'}`}>
+                {b.team_name}
+                {b.is_captain && <span className="text-amber-400"> (C×{b.captain_multiplier})</span>}
+                {b.spread_points !== 0 && <span className="text-purple-400"> spread {signed(b.spread_points)}</span>}
+              </span>
+              <span className={`font-mono flex-shrink-0 ${b.points > 0 ? 'text-field-400' : b.points < 0 ? 'text-red-300' : 'text-turf-500'}`}>
+                {signed(b.points)}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+      {score && score.fa_points !== 0 && (
+        <p className="text-xs text-red-300 mt-1">Free agency penalty: {score.fa_points}</p>
+      )}
+      {score && score.correction_points !== 0 && (
+        <p className="text-xs text-turf-400 mt-1">Commissioner correction: {signed(score.correction_points)}</p>
+      )}
+    </div>
+  );
+}
 
 const METRICS: MetricDef[] = [
   {
@@ -373,6 +416,16 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
   const displayTotal = (e: LeaderboardEntry) =>
     includeStatBonuses ? e.total_points : e.total_points - ((e as any).stat_points ?? 0);
 
+  // Which standings-list rows are expanded to show their points breakdown.
+  // A Set (not a single id) so more than one manager's breakdown can be
+  // open at once for side-by-side comparison.
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const toggleExpanded = (rowUserId: string) => setExpandedIds(prev => {
+    const next = new Set(prev);
+    if (next.has(rowUserId)) next.delete(rowUserId); else next.add(rowUserId);
+    return next;
+  });
+
   const rankedEntries = useMemo(
     () => [...entries].sort((a, b) => displayTotal(b) - displayTotal(a)),
     [entries, includeStatBonuses]
@@ -523,82 +576,155 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
           const weekScore = entry.weekly_scores.find(w => w.week === currentWeek);
           const lastWeek  = entry.weekly_scores.find(w => w.week === currentWeek - 1);
           const statPts   = (entry as any).stat_points ?? 0;
+          const isExpanded = expandedIds.has(entry.user_id);
+          const panelId    = `standings-breakdown-${entry.user_id}`;
 
           return (
-            <Link
-              key={entry.user_id}
-              to={`/roster/${entry.user_id}`}
-              className={`w-full flex items-center gap-4 px-5 py-4 hover:bg-turf-800/50 transition-colors text-left group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-field-400 ${isMe ? 'bg-field-950/30' : ''}`}
-            >
-              <div className="w-8 flex-shrink-0 text-center">
-                {idx === 0
-                  ? <><Crown className="w-5 h-5 text-gold-400 mx-auto" aria-hidden="true" /><span className="sr-only">1st place</span></>
-                  : <span className={`font-mono font-bold text-lg ${idx === 1 ? 'text-slate-400' : idx === 2 ? 'text-amber-700' : 'text-turf-600'}`}>{idx + 1}</span>
-                }
-              </div>
-              <Avatar
-                displayName={entry.display_name}
-                avatarType={entry.avatar_type}
-                avatarValue={entry.avatar_value}
-                size={36}
-                bgClassName={isMe ? 'bg-field-500' : 'bg-turf-700'}
-                textClassName={isMe ? 'text-turf-950' : 'text-turf-300'}
-              />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className={`font-medium truncate ${isMe ? 'text-field-300' : 'text-white'}`}>{entry.display_name}</span>
-                  {isMe && <span className="badge-green text-xs">You</span>}
-                  {idx === 0 && <Star className="w-3 h-3 text-gold-400 fill-gold-400" aria-hidden="true" />}
+            <div key={entry.user_id} className={isMe ? 'bg-field-950/30' : ''}>
+              <button
+                type="button"
+                onClick={() => toggleExpanded(entry.user_id)}
+                aria-expanded={isExpanded}
+                aria-controls={panelId}
+                className="w-full flex items-center gap-4 px-5 py-4 hover:bg-turf-800/50 transition-colors text-left group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-field-400"
+              >
+                <div className="w-8 flex-shrink-0 text-center">
+                  {idx === 0
+                    ? <><Crown className="w-5 h-5 text-gold-400 mx-auto" aria-hidden="true" /><span className="sr-only">1st place</span></>
+                    : <span className={`font-mono font-bold text-lg ${idx === 1 ? 'text-slate-400' : idx === 2 ? 'text-amber-700' : 'text-turf-600'}`}>{idx + 1}</span>
+                  }
                 </div>
-                <div className="text-xs text-turf-500 flex items-center gap-2 mt-0.5 flex-wrap">
-                  {entry.roster.length > 0 ? (
-                    <div className="flex items-center -space-x-1.5">
-                      {entry.roster.slice(0, 6).map(t => (
-                        <TeamLogo
-                          key={t.team_id}
-                          src={t.team_logo}
-                          alt={t.team_name}
-                          fallbackName={t.team_name}
-                          size={18}
-                          className="ring-2 ring-turf-950"
-                        />
-                      ))}
-                      {entry.roster.length > 6 && (
-                        <span className="pl-2 text-xs text-turf-500">+{entry.roster.length - 6} more</span>
+                <Avatar
+                  displayName={entry.display_name}
+                  avatarType={entry.avatar_type}
+                  avatarValue={entry.avatar_value}
+                  size={36}
+                  bgClassName={isMe ? 'bg-field-500' : 'bg-turf-700'}
+                  textClassName={isMe ? 'text-turf-950' : 'text-turf-300'}
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className={`font-medium truncate ${isMe ? 'text-field-300' : 'text-white'}`}>{entry.display_name}</span>
+                    {isMe && <span className="badge-green text-xs">You</span>}
+                    {idx === 0 && <Star className="w-3 h-3 text-gold-400 fill-gold-400" aria-hidden="true" />}
+                  </div>
+                  <div className="text-xs text-turf-500 flex items-center gap-2 mt-0.5 flex-wrap">
+                    {entry.roster.length > 0 ? (
+                      <div className="flex items-center -space-x-1.5">
+                        {entry.roster.slice(0, 6).map(t => (
+                          <TeamLogo
+                            key={t.team_id}
+                            src={t.team_logo}
+                            alt={t.team_name}
+                            fallbackName={t.team_name}
+                            size={18}
+                            className="ring-2 ring-turf-950"
+                          />
+                        ))}
+                        {entry.roster.length > 6 && (
+                          <span className="pl-2 text-xs text-turf-500">+{entry.roster.length - 6} more</span>
+                        )}
+                      </div>
+                    ) : (
+                      <span>No teams</span>
+                    )}
+                    {entry.bonus_points !== 0 && (
+                      <span className={entry.bonus_points > 0 ? 'text-amber-500' : 'text-red-300'}>
+                        {entry.bonus_points > 0 ? '+' : ''}{entry.bonus_points} bonus
+                      </span>
+                    )}
+                    {statPts !== 0 && (
+                      <span className={(statPts > 0 ? 'text-blue-400' : 'text-red-300') + (!includeStatBonuses ? ' opacity-50' : '')}>
+                        {statPts > 0 ? '+' : ''}{statPts} stats
+                        {!includeStatBonuses && <span className="sr-only"> (excluded from total below)</span>}
+                        {!confChampComplete && (
+                          <span title="Provisional — final once conference championships are complete">
+                            {' ◎'}<span className="sr-only"> (provisional)</span>
+                          </span>
+                        )}
+                      </span>
+                    )}
+                    {lastWeek && lastWeek.points !== 0 && (
+                      <span className="flex items-center gap-0.5">
+                        {lastWeek.points > 0 ? <TrendingUp className="w-3 h-3" aria-hidden="true" /> : <TrendingDown className="w-3 h-3" aria-hidden="true" />}
+                        {lastWeek.points > 0 ? '+' : ''}{lastWeek.points} last wk
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <div className="font-mono font-bold text-xl text-white group-hover:text-field-400 transition-colors tabular-nums">{displayTotal(entry)}</div>
+                  <div className="text-xs text-turf-500">{weekScore ? `${weekScore.points > 0 ? '+' : ''}${weekScore.points} wk` : '—'}</div>
+                </div>
+                <ChevronDown
+                  className={`w-4 h-4 text-turf-500 flex-shrink-0 transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none ${isExpanded ? 'rotate-180' : ''}`}
+                  aria-hidden="true"
+                />
+              </button>
+
+              {/* Grid-rows 0fr/1fr collapse trick — animates from a real
+                  content height without a layout-shifting `height` transition.
+                  Always rendered so it can animate in both directions. */}
+              <div
+                id={panelId}
+                className={`grid transition-[grid-template-rows] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none ${
+                  isExpanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+                }`}
+              >
+                <div className="overflow-hidden">
+                  <div className="px-5 pb-5 pt-1 space-y-4 border-t border-turf-800/60">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3">
+                      <div>
+                        <p className="text-xs text-turf-500 uppercase tracking-wide">Season Total</p>
+                        <p className="font-mono font-bold text-white">{signed(displayTotal(entry))}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-turf-500 uppercase tracking-wide">Manual Bonuses</p>
+                        <p className={`font-mono font-bold ${entry.bonus_points > 0 ? 'text-amber-400' : entry.bonus_points < 0 ? 'text-red-300' : 'text-turf-400'}`}>
+                          {signed(entry.bonus_points)}
+                        </p>
+                      </div>
+                      {includeStatBonuses && (
+                        <div>
+                          <p className="text-xs text-turf-500 uppercase tracking-wide">Stat Bonuses</p>
+                          <p className={`font-mono font-bold ${statPts > 0 ? 'text-blue-400' : statPts < 0 ? 'text-red-300' : 'text-turf-400'}`}>
+                            {signed(statPts)}
+                          </p>
+                        </div>
                       )}
                     </div>
-                  ) : (
-                    <span>No teams</span>
-                  )}
-                  {entry.bonus_points !== 0 && (
-                    <span className={entry.bonus_points > 0 ? 'text-amber-500' : 'text-red-300'}>
-                      {entry.bonus_points > 0 ? '+' : ''}{entry.bonus_points} bonus
-                    </span>
-                  )}
-                  {statPts !== 0 && (
-                    <span className={(statPts > 0 ? 'text-blue-400' : 'text-red-300') + (!includeStatBonuses ? ' opacity-50' : '')}>
-                      {statPts > 0 ? '+' : ''}{statPts} stats
-                      {!includeStatBonuses && <span className="sr-only"> (excluded from total below)</span>}
-                      {!confChampComplete && (
-                        <span title="Provisional — final once conference championships are complete">
-                          {' ◎'}<span className="sr-only"> (provisional)</span>
-                        </span>
-                      )}
-                    </span>
-                  )}
-                  {lastWeek && lastWeek.points !== 0 && (
-                    <span className="flex items-center gap-0.5">
-                      {lastWeek.points > 0 ? <TrendingUp className="w-3 h-3" aria-hidden="true" /> : <TrendingDown className="w-3 h-3" aria-hidden="true" />}
-                      {lastWeek.points > 0 ? '+' : ''}{lastWeek.points} last wk
-                    </span>
-                  )}
+
+                    <WeekBreakdownSection label={`Week ${currentWeek} (current)`} score={weekScore} />
+                    {currentWeek > 0 && <WeekBreakdownSection label={`Week ${currentWeek - 1}`} score={lastWeek} />}
+
+                    {includeStatBonuses && entry.stat_bonuses.length > 0 && (
+                      <div>
+                        <p className="text-xs text-turf-500 uppercase tracking-wide mb-1.5">
+                          Stat Bonus Breakdown{!confChampComplete ? ' (provisional)' : ''}
+                        </p>
+                        <div className="space-y-1">
+                          {entry.stat_bonuses.map((b, i) => (
+                            <div key={`${b.team_id}-${b.stat}-${i}`} className="flex items-center justify-between text-sm gap-3">
+                              <span className="text-turf-300 truncate">
+                                {b.team_name} — {STAT_BONUS_LABELS[b.stat]} <span className="text-turf-500">({b.value})</span>
+                              </span>
+                              <span className={`font-mono flex-shrink-0 ${b.points > 0 ? 'text-blue-400' : 'text-red-300'}`}>{signed(b.points)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <Link
+                      to={`/roster/${entry.user_id}`}
+                      className="btn-secondary btn-sm inline-flex"
+                    >
+                      View Roster
+                    </Link>
+                  </div>
                 </div>
               </div>
-              <div className="text-right flex-shrink-0">
-                <div className="font-mono font-bold text-xl text-white group-hover:text-field-400 transition-colors tabular-nums">{displayTotal(entry)}</div>
-                <div className="text-xs text-turf-500">{weekScore ? `${weekScore.points > 0 ? '+' : ''}${weekScore.points} wk` : '—'}</div>
-              </div>
-            </Link>
+            </div>
           );
         })}
       </div>
