@@ -112,8 +112,8 @@ export function AdminPanel({
   // Snapshotted alongside finalStandings so End Season can freeze both at
   // once — trophies are unrecoverable once the underlying tables are wiped.
   const trophySnapshot = useMemo(
-    () => computeTrophies(members, draftPicks, captainPicks, spreadPicks, freeAgencyMoves, manualBonuses, gameData, league.scoring, scoreCorrections),
-    [members, draftPicks, captainPicks, spreadPicks, freeAgencyMoves, manualBonuses, gameData, league.scoring, scoreCorrections]
+    () => computeTrophies(members, draftPicks, captainPicks, spreadPicks, freeAgencyMoves, manualBonuses, gameData, league.scoring, scoreCorrections, league.current_week),
+    [members, draftPicks, captainPicks, spreadPicks, freeAgencyMoves, manualBonuses, gameData, league.scoring, scoreCorrections, league.current_week]
   );
 
   if (!isCommissioner) {

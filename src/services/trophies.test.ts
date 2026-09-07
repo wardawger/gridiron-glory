@@ -61,11 +61,24 @@ describe('computeTrophies', () => {
       t2: { 1: makeGame({ result: 'W' }), 2: makeGame({ week: 2, result: 'L' }) },
     };
 
-    const snapshot = computeTrophies(members, draftPicks, [], [], [], [], gameData, DEFAULT_SCORING);
+    const snapshot = computeTrophies(members, draftPicks, [], [], [], [], gameData, DEFAULT_SCORING, [], 5);
     const category = snapshot.categories.find(c => c.id === 'undefeated_team')!;
 
     expect(category.winners.map(w => w.user_id)).toEqual(['u1']);
     expect(category.winners[0].teams[0].team_name).toBe('Undefeated U');
+  });
+
+  it('suppresses the undefeated trophy entirely before week 5, even for a team that would otherwise qualify', () => {
+    const draftPicks = [pick({ team_id: 't1', team_name: 'Hot Start U', user_id: 'u1' })];
+    const gameData: GameData = {
+      t1: { 1: makeGame({ result: 'W' }), 2: makeGame({ week: 2, result: 'W' }), 3: makeGame({ week: 3, result: 'W' }) },
+    };
+
+    const early = computeTrophies(members, draftPicks, [], [], [], [], gameData, DEFAULT_SCORING, [], 4);
+    expect(early.categories.find(c => c.id === 'undefeated_team')!.winners).toHaveLength(0);
+
+    const atThreshold = computeTrophies(members, draftPicks, [], [], [], [], gameData, DEFAULT_SCORING, [], 5);
+    expect(atThreshold.categories.find(c => c.id === 'undefeated_team')!.winners.map(w => w.user_id)).toEqual(['u1']);
   });
 
   it('tiers P4 conference champions by distinct conference count', () => {

@@ -60,7 +60,14 @@ function buildTeamInfoMap(draftPicks: DraftPick[], freeAgencyMoves: FreeAgencyMo
   return map;
 }
 
-function computeUndefeated(members: LeagueMember[], draftPicks: DraftPick[], gameData: GameData): TrophyWinner[] {
+// A team going 2-0 or 3-0 isn't meaningfully "undefeated" yet — too small a
+// sample, and it flickers on and off the trophy case as soon as a 4-0 team
+// takes its first loss. Suppressed entirely before week 5.
+const UNDEFEATED_TROPHY_MIN_WEEK = 5;
+
+function computeUndefeated(members: LeagueMember[], draftPicks: DraftPick[], gameData: GameData, currentWeek: number): TrophyWinner[] {
+  if (currentWeek < UNDEFEATED_TROPHY_MIN_WEEK) return [];
+
   const winners: TrophyWinner[] = [];
   members.forEach(member => {
     const seen = new Set<string>();
@@ -264,6 +271,7 @@ export function computeTrophies(
   gameData: GameData,
   rawScoring: ScoringSettings,
   scoreCorrections: ScoreCorrection[] = [],
+  currentWeek = 0,
 ): TrophySnapshot {
   const scoring = normalizeScoring(rawScoring);
   const teamInfo = buildTeamInfoMap(draftPicks, freeAgencyMoves);
@@ -274,7 +282,7 @@ export function computeTrophies(
     categories.push({ id, label: TROPHY_META[id].label, description: TROPHY_META[id].description, winners });
   };
 
-  add('undefeated_team', computeUndefeated(members, draftPicks, gameData));
+  add('undefeated_team', computeUndefeated(members, draftPicks, gameData, currentWeek));
   if (scoring.spread_enabled) add('beat_spread', computeBeatSpread(members, spreadPicks, teamInfo));
   if (scoring.free_agency_enabled) add('used_free_agency', computeUsedFreeAgency(members, freeAgencyMoves));
   add('heisman_winner', computeBonusCategory(members, manualBonuses, teamInfo, 'heisman_winner'));
