@@ -185,7 +185,7 @@ const signed = (n: number) => `${n > 0 ? '+' : ''}${n}`;
 // Per-team scoring breakdown for one week, used by the expandable standings
 // row. spread_points is a component already folded into `points` (see
 // calcWeeklyScore) — shown as an annotation, not added again.
-function WeekBreakdownSection({ label, score }: { label: string; score: WeeklyScore | undefined }) {
+function WeekBreakdownSection({ label, score, teamsById }: { label: string; score: WeeklyScore | undefined; teamsById: Map<string, CfbTeam> }) {
   return (
     <div>
       <div className="flex items-center justify-between mb-1.5">
@@ -201,8 +201,15 @@ function WeekBreakdownSection({ label, score }: { label: string; score: WeeklySc
       ) : (
         <div className="space-y-1">
           {score.breakdown.map(b => (
-            <div key={b.team_id} className="flex items-center justify-between text-sm gap-3">
-              <span className={`truncate ${b.is_benched ? 'text-turf-600 line-through' : 'text-turf-300'}`}>
+            <div key={b.team_id} className="flex items-center gap-2 text-sm">
+              <TeamLogo
+                src={teamsById.get(b.team_id)?.logo}
+                alt=""
+                fallbackName={b.team_name}
+                size={16}
+                className={`flex-shrink-0 ${b.is_benched ? 'opacity-50' : ''}`}
+              />
+              <span className={`truncate flex-1 ${b.is_benched ? 'text-turf-600 line-through' : 'text-turf-300'}`}>
                 {b.team_name}
                 {b.is_captain && <span className="text-amber-400"> (C×{b.captain_multiplier})</span>}
                 {b.spread_points !== 0 && <span className="text-purple-400"> spread {signed(b.spread_points)}</span>}
@@ -700,8 +707,8 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                     <div>
                       <p className="text-xs text-turf-500 uppercase tracking-wide mb-2">Weekly Points</p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
-                        <WeekBreakdownSection label={`This Week · Wk ${currentWeek}`} score={weekScore} />
-                        {currentWeek > 0 && <WeekBreakdownSection label={`Last Week · Wk ${currentWeek - 1}`} score={lastWeek} />}
+                        <WeekBreakdownSection label={`This Week · Wk ${currentWeek}`} score={weekScore} teamsById={teamsById} />
+                        {currentWeek > 0 && <WeekBreakdownSection label={`Last Week · Wk ${currentWeek - 1}`} score={lastWeek} teamsById={teamsById} />}
                       </div>
                     </div>
 
