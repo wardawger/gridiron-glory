@@ -50,29 +50,7 @@ function verifyJwtHS256(token, secret) {
   return { id: payload.sub };
 }
 
-export async function verifyUser(req, supabaseUrl, apiKey) {
-  const header = req.headers.get('authorization') ?? '';
-  const token = header.replace(/^Bearer\s+/i, '').trim();
-  if (!token) return null;
-
-  // Local verification (no network round-trip) once SUPABASE_JWT_SECRET is
-  // configured. A page refresh fires roughly a dozen of these Functions in
-  // parallel (one per CFBD endpoint) — each one previously paid a full
-  // network round-trip to Supabase's /auth/v1/user just to check who was
-  // calling, on top of the cache lookup and possible CFBD call it also
-  // needs. Verifying the signature locally removes that round-trip
-  // entirely. A failed local check (bad signature, expired, wrong
-  // audience) is unauthorized either way, so it never falls through to the
-  // network path — only *not having the secret configured yet* falls back,
-  // so this can't silently break an existing deployment before the secret
-  // is added.
-  const jwtSecret = process.env.SUPABASE_JWT_SECRET;
-  if (jwtSecret) {
-    console.log('[verifyUser] verifying locally (SUPABASE_JWT_SECRET is set)');
-    return verifyJwtHS256(token, jwtSecret);
-  }
-  console.log('[verifyUser] SUPABASE_JWT_SECRET not set — falling back to network check');
-
+async function verifyViaNetwork(token, supabaseUrl, apiKey) {
   try {
     // Supabase validates the JWT (signature and expiry) for us here.
     const res = await fetch(`${supabaseUrl}/auth/v1/user`, {
@@ -84,4 +62,40 @@ export async function verifyUser(req, supabaseUrl, apiKey) {
   } catch {
     return null;
   }
+}
+
+export async function verifyUser(req, supabaseUrl, apiKey) {
+  const header = req.headers.get('authorization') ?? '';
+  const token = header.replace(/^Bearer\s+/i, '').trim();
+  if (!token) return null;
+
+  // Local verification (no network round-trip) once SUPABASE_JWT_SECRET is
+  // configured. A page refresh fires roughly a dozen of these Functions in
+  // parallel (one per CFBD endpoint) — each one previously paid a full
+  // network round-trip to Supabase's /auth/v1/user just to check who was
+  // calling, on top of the cache lookup and possible CFBD call it also
+  // needs. Verifying the signature locally removes that round-trip
+  // entirely.
+  //
+  // A local rejection always falls back to the network check rather than
+  // failing closed — a wrong/legacy-vs-current secret, or a project that's
+  // moved to Supabase's newer asymmetric (RS256/ES256) signing keys instead
+  // of the shared HS256 secret this only handles, would otherwise reject
+  // every real, valid session and take the whole app down. The network
+  // check is the authoritative source of truth either way; local
+  // verification is purely a fast path when it agrees with that source, not
+  // a stricter gate that can override it.
+  const jwtSecret = process.env.SUPABASE_JWT_SECRET;
+  if (jwtSecret) {
+    const local = verifyJwtHS256(token, jwtSecret);
+    if (local) {
+      console.log('[verifyUser] verified locally');
+      return local;
+    }
+    console.log('[verifyUser] local verification did not match — falling back to network check');
+  } else {
+    console.log('[verifyUser] SUPABASE_JWT_SECRET not set — falling back to network check');
+  }
+
+  return verifyViaNetwork(token, supabaseUrl, apiKey);
 }
