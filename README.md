@@ -96,7 +96,7 @@ Note: `npm run dev` runs the Vite dev server only — the Netlify Functions (CFB
 | Beat Top 15 | +2 bonus |
 | Beat Top 5 | +3 bonus |
 | Loss | −1 |
-| Loss to G5 team | −5 bonus |
+| Loss to a G6-conference team (not an FBS independent) | −5 bonus |
 | Captain (weekly, max 2× per team) | 2× multiplier |
 | Spread pick miss | configurable penalty |
 

@@ -162,11 +162,11 @@ export function ScoringTab({ league, teams, onUpdateScoring }: Props) {
         <div className="grid grid-cols-1 sm:grid-cols-2 sm:gap-4">
           <ScoreField label="P4 Min (per conference)" min={0} value={scoring.p4_conf_min} onChange={v => setScoring(prev => ({ ...prev, p4_conf_min: v }))} />
           <ScoreField label="P4 Max (per conference)" min={1} value={scoring.p4_conf_max} onChange={v => setScoring(prev => ({ ...prev, p4_conf_max: v }))} />
-          <ScoreField label="G5 Min (combined)" min={0} value={scoring.g5_conf_min} onChange={v => setScoring(prev => ({ ...prev, g5_conf_min: v }))} />
-          <ScoreField label="G5 Max (combined)" min={1} value={scoring.g5_conf_max} onChange={v => setScoring(prev => ({ ...prev, g5_conf_max: v }))} />
+          <ScoreField label="G6 Min (combined)" min={0} value={scoring.g6_conf_min} onChange={v => setScoring(prev => ({ ...prev, g6_conf_min: v }))} />
+          <ScoreField label="G6 Max (combined)" min={1} value={scoring.g6_conf_max} onChange={v => setScoring(prev => ({ ...prev, g6_conf_max: v }))} />
         </div>
         <p className="text-xs text-turf-500">
-          P4 = SEC, Big Ten, Big 12, ACC — each conference is capped separately. G5/non-P4 teams share one combined limit.
+          P4 = SEC, Big Ten, Big 12, ACC — each conference is capped separately. G6/non-P4 teams share one combined limit.
         </p>
       </div>
 
@@ -204,10 +204,10 @@ export function ScoringTab({ league, teams, onUpdateScoring }: Props) {
         <h3 className="font-medium text-white text-sm">Base Scoring</h3>
         <p className="text-xs text-turf-400">Adjust scoring settings for this league. Changes apply to all weeks.</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 sm:gap-4">
-          {(['win', 'win_ranked', 'win_top15', 'win_top5', 'loss', 'loss_g5'] as const).map(key => {
+          {(['win', 'win_ranked', 'win_top15', 'win_top5', 'loss', 'loss_g6'] as const).map(key => {
             const labels: Record<string, string> = {
               win: 'Win', win_ranked: 'Beat Ranked', win_top15: 'Beat Top 15',
-              win_top5: 'Beat Top 5', loss: 'Loss', loss_g5: 'Loss to G5',
+              win_top5: 'Beat Top 5', loss: 'Loss', loss_g6: 'Loss to G6',
             };
             return (
               <ScoreField

@@ -57,15 +57,15 @@ export function AccountPage({
     return teams.filter(t => {
       if (logoSearch && !t.name.toLowerCase().includes(logoSearch.toLowerCase())) return false;
       if (logoConf === 'P4' && !(P4_CONFERENCES as readonly string[]).includes(t.conference)) return false;
-      if (logoConf === 'G5' && (P4_CONFERENCES as readonly string[]).includes(t.conference)) return false;
-      if (logoConf !== 'ALL' && logoConf !== 'P4' && logoConf !== 'G5' && t.conference !== logoConf) return false;
+      if (logoConf === 'G6' && (P4_CONFERENCES as readonly string[]).includes(t.conference)) return false;
+      if (logoConf !== 'ALL' && logoConf !== 'P4' && logoConf !== 'G6' && t.conference !== logoConf) return false;
       return true;
     });
   }, [teams, logoSearch, logoConf]);
 
   const conferences = useMemo(() => {
     const set = new Set(teams.map(t => t.conference));
-    return ['ALL', 'P4', 'G5', ...Array.from(set).sort()];
+    return ['ALL', 'P4', 'G6', ...Array.from(set).sort()];
   }, [teams]);
 
   const handleSaveName = async (e: React.FormEvent) => {

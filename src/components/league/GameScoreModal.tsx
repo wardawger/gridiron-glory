@@ -50,7 +50,7 @@ export function GameScoreModal({ game, teamName, teamLogo, teamRank = null, week
       lines.push({ label: 'Win vs Top 5',           pts: scoring.win_top5,   active: (game.opponent_rank ?? 99) <= 5,  color: 'text-field-400' });
     } else {
       lines.push({ label: 'Loss',                   pts: scoring.loss,      active: true,                              color: 'text-red-300' });
-      lines.push({ label: 'Loss to G5',             pts: scoring.loss_g5,   active: game.is_g5_opponent,               color: 'text-red-300' });
+      lines.push({ label: 'Loss to G6',             pts: scoring.loss_g6,   active: game.is_g6_opponent,               color: 'text-red-300' });
     }
   }
 

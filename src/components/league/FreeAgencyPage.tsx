@@ -104,15 +104,15 @@ export function FreeAgencyPage({
       if (scoring.excluded_conferences.includes(t.conference)) return false;
       if (search && !t.name.toLowerCase().includes(search.toLowerCase())) return false;
       if (confFilter === 'P4' && !(P4_CONFERENCES as readonly string[]).includes(t.conference)) return false;
-      if (confFilter === 'G5' && (P4_CONFERENCES as readonly string[]).includes(t.conference)) return false;
-      if (confFilter !== 'ALL' && confFilter !== 'P4' && confFilter !== 'G5' && t.conference !== confFilter) return false;
+      if (confFilter === 'G6' && (P4_CONFERENCES as readonly string[]).includes(t.conference)) return false;
+      if (confFilter !== 'ALL' && confFilter !== 'P4' && confFilter !== 'G6' && t.conference !== confFilter) return false;
       return true;
     });
   }, [teams, rosteredTeamIds, search, confFilter, scoring.excluded_conferences]);
 
   const conferences = useMemo(() => {
     const set = new Set(teams.map(t => t.conference));
-    return ['ALL', 'P4', 'G5', ...Array.from(set).sort()];
+    return ['ALL', 'P4', 'G6', ...Array.from(set).sort()];
   }, [teams]);
 
   const dropTeam = myRoster.find(t => t.team_id === dropId) ?? null;
@@ -134,13 +134,13 @@ export function FreeAgencyPage({
       return `${team.conference} is excluded by your commissioner`;
     }
     const category = confCategory(team.conference);
-    const max = category === 'G5' ? scoring.g5_conf_max : scoring.p4_conf_max;
-    const currentCount = category === 'G5'
+    const max = category === 'G6' ? scoring.g6_conf_max : scoring.p4_conf_max;
+    const currentCount = category === 'G6'
       ? myRoster.filter(t => !isP4Conference(t.team_conference)).length
       : myRoster.filter(t => t.team_conference === team.conference).length;
     const droppingSameCategory = dropTeam ? confCategory(dropTeam.team_conference) === category : false;
     const newCount = currentCount - (droppingSameCategory ? 1 : 0) + 1;
-    if (newCount > max) return `Max ${max} ${category === 'G5' ? 'G5/non-P4' : category} teams`;
+    if (newCount > max) return `Max ${max} ${category === 'G6' ? 'G6/non-P4' : category} teams`;
     return null;
   };
 
@@ -150,19 +150,19 @@ export function FreeAgencyPage({
   const minBlock = useMemo(() => {
     if (!dropTeam) return null;
     const category = confCategory(dropTeam.team_conference);
-    const min = category === 'G5' ? scoring.g5_conf_min : scoring.p4_conf_min;
+    const min = category === 'G6' ? scoring.g6_conf_min : scoring.p4_conf_min;
     if (min <= 0) return null;
-    const currentCount = category === 'G5'
+    const currentCount = category === 'G6'
       ? myRoster.filter(t => !isP4Conference(t.team_conference)).length
       : myRoster.filter(t => t.team_conference === dropTeam.team_conference).length;
     const addTeam = teams.find(t => t.id === addId);
     const addingSameCategory = addTeam ? confCategory(addTeam.conference) === category : false;
     if (!addingSameCategory && currentCount - 1 < min) {
-      const label = category === 'G5' ? 'G5/non-P4' : category;
+      const label = category === 'G6' ? 'G6/non-P4' : category;
       return `Dropping ${dropTeam.team_name} would leave you below the ${min}-team ${label} minimum — add another ${label} team instead`;
     }
     return null;
-  }, [dropTeam, addId, teams, myRoster, scoring.p4_conf_min, scoring.g5_conf_min]);
+  }, [dropTeam, addId, teams, myRoster, scoring.p4_conf_min, scoring.g6_conf_min]);
 
   const getMemberName = (uid: string) => members.find(m => m.user_id === uid)?.display_name ?? 'Unknown';
 

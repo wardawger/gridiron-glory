@@ -3,7 +3,7 @@ import type {
   GameData, ScoringSettings, BonusType, TrophyCategoryId, TrophyCategory,
   TrophySnapshot, TrophyTeamRef, TrophyWinner, ScoreCorrection,
 } from '../types';
-import { normalizeScoring } from '../types';
+import { normalizeScoring, G6_CONFERENCES } from '../types';
 import { isP4Conference } from './scoring';
 import { calcWeeklyScore, didWinSpreadPick } from './scoring';
 import { rosterAtWeek } from './roster';
@@ -16,7 +16,7 @@ export const TROPHY_META: Record<TrophyCategoryId, { label: string; description:
   p4_conf_champion:            { label: 'Conference Champion', description: 'Drafted Power 4 conference champions' },
   negative_week:                { label: 'Underwater',          description: 'Posted a negative-point week' },
   first_losing_record_draft:  { label: 'First to Fall',       description: 'First in the league to draft a team with a losing record' },
-  g5_team:                      { label: 'G5 Gambler',          description: 'Drafted a Group of 5 team' },
+  g6_team:                      { label: 'G6 Gambler',          description: 'Drafted a Group of 6 team' },
   independent_team:            { label: 'Lone Wolf',           description: 'Drafted an FBS independent' },
   bad_week_tier:                { label: 'Rock Bottom',         description: 'Dropped a brutal single-week score' },
   made_cfp:                     { label: 'Playoff Bound',       description: 'Drafted a team that made the CFP' },
@@ -281,7 +281,7 @@ export function computeTrophies(
   add('p4_conf_champion', computeP4ConfChampion(members, manualBonuses, teamInfo));
   add('negative_week', computeNegativeWeek(members, weeklyExtremes));
   add('first_losing_record_draft', computeFirstLosingRecordDraft(members, draftPicks, gameData));
-  add('g5_team', computeConferenceDraft(members, draftPicks, conf => !isP4Conference(conf) && conf !== 'FBS Independents'));
+  add('g6_team', computeConferenceDraft(members, draftPicks, conf => (G6_CONFERENCES as readonly string[]).includes(conf)));
   add('independent_team', computeConferenceDraft(members, draftPicks, conf => conf === 'FBS Independents'));
   add('bad_week_tier', computeBadWeekTier(members, weeklyExtremes));
   add('made_cfp', computeBonusCategory(members, manualBonuses, teamInfo, 'make_cfp'));

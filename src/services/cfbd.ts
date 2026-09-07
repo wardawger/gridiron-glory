@@ -1,5 +1,5 @@
 import type { CfbTeam, GameData, GameResult, APRanking, TeamSeasonStats, SpreadData, TeamRatings, LiveGameStatus } from '../types';
-import { P4_CONFERENCES as P4_CONF_LIST } from '../types';
+import { P4_CONFERENCES as P4_CONF_LIST, G6_CONFERENCES as G6_CONF_LIST } from '../types';
 import { supabase } from '../lib/supabase';
 
 // All CFBD API calls are routed through a Netlify serverless proxy to avoid
@@ -29,9 +29,16 @@ async function cfbdFetch(path: string, params: Record<string, string | number> =
 
 // Canonical P4 list (types/index.ts) — previously diverged here (also
 // treated FBS Independents/Pac-12 as P4), which meant losses to teams like
-// Notre Dame never triggered the loss_g5 scoring penalty. Consolidated so
-// P4/G5 classification agrees everywhere in the app.
+// Notre Dame never triggered the loss penalty at all. Consolidated so P4
+// classification agrees everywhere in the app.
 const P4_CONFERENCES = new Set(P4_CONF_LIST as readonly string[]);
+
+// Strict membership in the six named G6 conferences — NOT "everything that
+// isn't P4". An FBS Independent (Notre Dame, UMass, etc.) is neither P4 nor
+// G6; losing to one no longer triggers the loss-to-G6 scoring penalty,
+// since an independent isn't genuinely the same competitive tier as a true
+// G6-conference opponent.
+const G6_CONFERENCES = new Set(G6_CONF_LIST as readonly string[]);
 
 // CFB seasons run Aug–Jan. We want to show the UPCOMING season's schedule
 // as soon as it exists (~spring before the season). The CFBD API has 2026
@@ -94,7 +101,7 @@ export async function fetchFbsTeams(): Promise<CfbTeam[]> {
       logo:       t.logos?.[0] ?? `https://ui-avatars.com/api/?name=${encodeURIComponent(t.school)}&background=052e16&color=22c55e`,
       color:      t.color     ?? '#052e16',
       alt_color:  t.alt_color ?? '#22c55e',
-      is_g5:      !P4_CONFERENCES.has(t.conference ?? ''),
+      is_g6:      G6_CONFERENCES.has(t.conference ?? ''),
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -308,7 +315,7 @@ export async function fetchSeasonData(teams: CfbTeam[]): Promise<GameData> {
 
     if (home) {
       const oppRank    = getRankAtWeek(awayTeam, week);
-      const isG5Opp    = away ? away.is_g5 : !P4_CONFERENCES.has(awayConference);
+      const isG6Opp    = away ? away.is_g6 : G6_CONFERENCES.has(awayConference);
       const oppLogo    = away?.logo ?? teamNameToLogo.get(awayTeam) ?? null;
       const oppColor   = away?.color ?? teamNameToColor.get(awayTeam) ?? null;
       const oppId      = awayId;
@@ -320,7 +327,7 @@ export async function fetchSeasonData(teams: CfbTeam[]): Promise<GameData> {
         opponent_color:  oppColor,
         opponent_rank:   oppRank,
         result:          completed ? (homePoints > awayPoints ? 'W' : 'L') : null,
-        is_g5_opponent:  isG5Opp,
+        is_g6_opponent:  isG6Opp,
         home_score:      homePoints,
         away_score:      awayPoints,
         completed,
@@ -338,7 +345,7 @@ export async function fetchSeasonData(teams: CfbTeam[]): Promise<GameData> {
 
     if (away) {
       const oppRank    = getRankAtWeek(homeTeam, week);
-      const isG5Opp    = home ? home.is_g5 : !P4_CONFERENCES.has(homeConference);
+      const isG6Opp    = home ? home.is_g6 : G6_CONFERENCES.has(homeConference);
       const oppLogo    = home?.logo ?? teamNameToLogo.get(homeTeam) ?? null;
       const oppColor   = home?.color ?? teamNameToColor.get(homeTeam) ?? null;
       const oppId      = homeId;
@@ -350,7 +357,7 @@ export async function fetchSeasonData(teams: CfbTeam[]): Promise<GameData> {
         opponent_color:  oppColor,
         opponent_rank:   oppRank,
         result:          completed ? (awayPoints > homePoints ? 'W' : 'L') : null,
-        is_g5_opponent:  isG5Opp,
+        is_g6_opponent:  isG6Opp,
         home_score:      homePoints,
         away_score:      awayPoints,
         completed,

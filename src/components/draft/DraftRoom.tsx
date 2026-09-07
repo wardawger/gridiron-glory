@@ -18,7 +18,7 @@ const WEEKS = Array.from({ length: 16 }, (_, i) => i); // weeks 0–15
 
 // Same ESPN conference-logo CDN already trusted elsewhere in the app (Draft
 // Recap's conference breakdown) — CFBD has no conference logo data of its
-// own. G5/non-P4 gets the NCAA's own mark, same as everywhere else that
+// own. G6/non-P4 gets the NCAA's own mark, same as everywhere else that
 // combined bucket needs a stand-in identity.
 const CONFERENCE_LOGO: Record<string, string> = {
   'SEC':     'https://a.espncdn.com/i/teamlogos/ncaa_conf/500/sec.png',
@@ -182,7 +182,7 @@ export function DraftRoom({
   const myPicks = draftPicks.filter(p => p.user_id === userId);
   const myPicksRemaining = league.max_teams_per_user - myPicks.length;
 
-  // Conference counts for MY roster — P4 tracked per-conference, G5 tracked
+  // Conference counts for MY roster — P4 tracked per-conference, G6 tracked
   // as one combined bucket (a single min/max across every non-P4 conference).
   const myConfCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -191,13 +191,13 @@ export function DraftRoom({
     });
     return counts;
   }, [myPicks]);
-  const myG5Count = useMemo(
+  const myG6Count = useMemo(
     () => myPicks.filter(p => !isP4Conference(p.team_conference)).length,
     [myPicks]
   );
-  const g5Configured = scoring.g5_conf_min > 0 || scoring.g5_conf_max < 99;
+  const g6Configured = scoring.g6_conf_min > 0 || scoring.g6_conf_max < 99;
 
-  // Same conference-count shape as myConfCounts/myG5Count above, but for
+  // Same conference-count shape as myConfCounts/myG6Count above, but for
   // whichever member is selected in the mobile Rosters tab (defaults to
   // the current user) — a compact "count/max" readout, not the full
   // Draft Recap breakdown, per-conference min/max included only via color.
@@ -212,12 +212,12 @@ export function DraftRoom({
     });
     return counts;
   }, [rosterViewPicks]);
-  const rosterViewG5Count = useMemo(
+  const rosterViewG6Count = useMemo(
     () => rosterViewPicks.filter(p => !isP4Conference(p.team_conference)).length,
     [rosterViewPicks]
   );
 
-  // Categories (P4 conference names, or the 'G5' sentinel for the combined
+  // Categories (P4 conference names, or the 'G6' sentinel for the combined
   // non-P4 bucket) still short of their minimum, and how many more each
   // needs. Deliberately keyed by remaining need summed ACROSS categories,
   // not checked one category at a time — a single conference needing 1
@@ -234,10 +234,10 @@ export function DraftRoom({
       const needed = Math.max(0, scoring.p4_conf_min - current);
       if (needed > 0) needs.push({ category: conf, needed });
     });
-    const g5Needed = Math.max(0, scoring.g5_conf_min - myG5Count);
-    if (g5Needed > 0) needs.push({ category: 'G5', needed: g5Needed });
+    const g6Needed = Math.max(0, scoring.g6_conf_min - myG6Count);
+    if (g6Needed > 0) needs.push({ category: 'G6', needed: g6Needed });
     return needs;
-  }, [myConfCounts, myG5Count, scoring.p4_conf_min, scoring.g5_conf_min]);
+  }, [myConfCounts, myG6Count, scoring.p4_conf_min, scoring.g6_conf_min]);
 
   // Once the total still-needed across every category equals (or somehow
   // exceeds) the picks left, every remaining pick is precious — none of
@@ -260,8 +260,8 @@ export function DraftRoom({
       if (count >= scoring.p4_conf_max) {
         return `Max ${scoring.p4_conf_max} from ${team.conference}`;
       }
-    } else if (myG5Count >= scoring.g5_conf_max) {
-      return `Max ${scoring.g5_conf_max} G5/non-P4 teams`;
+    } else if (myG6Count >= scoring.g6_conf_max) {
+      return `Max ${scoring.g6_conf_max} G6/non-P4 teams`;
     }
     if (mustPickCategories.length > 0 && !mustPickCategories.includes(confCategory(team.conference))) {
       return `You must pick from: ${mustPickCategories.join(', ')}`;
@@ -278,8 +278,8 @@ export function DraftRoom({
     return categoryNeeds
       .filter(n => mustPickCategories.includes(n.category))
       .map(n =>
-        n.category === 'G5'
-          ? `Must pick ${n.needed} more G5/non-P4 team${n.needed === 1 ? '' : 's'}`
+        n.category === 'G6'
+          ? `Must pick ${n.needed} more G6/non-P4 team${n.needed === 1 ? '' : 's'}`
           : `Must pick ${n.needed} more from ${n.category}`
       );
   }, [categoryNeeds, mustPickCategories, isMyTurn]);
@@ -310,8 +310,8 @@ export function DraftRoom({
       if (scoring.excluded_conferences.includes(t.conference)) return false;
       if (search && !t.name.toLowerCase().includes(search.toLowerCase())) return false;
       if (confFilter === 'P4' && !(P4_CONF_LIST as readonly string[]).includes(t.conference)) return false;
-      if (confFilter === 'G5' && (P4_CONF_LIST as readonly string[]).includes(t.conference)) return false;
-      if (confFilter !== 'ALL' && confFilter !== 'P4' && confFilter !== 'G5' && t.conference !== confFilter) return false;
+      if (confFilter === 'G6' && (P4_CONF_LIST as readonly string[]).includes(t.conference)) return false;
+      if (confFilter !== 'ALL' && confFilter !== 'P4' && confFilter !== 'G6' && t.conference !== confFilter) return false;
       return true;
     });
 
@@ -349,7 +349,7 @@ export function DraftRoom({
 
   const conferences = useMemo(() => {
     const set = new Set(teams.map(t => t.conference));
-    return ['ALL', 'P4', 'G5', ...Array.from(set).sort()];
+    return ['ALL', 'P4', 'G6', ...Array.from(set).sort()];
   }, [teams]);
 
   const byeWeeksByTeam = useMemo(() => {
@@ -549,9 +549,9 @@ export function DraftRoom({
             </div>
           );
         })}
-        {g5Configured && (() => {
-          const atMax = rosterViewG5Count >= scoring.g5_conf_max;
-          const atMin = rosterViewG5Count >= scoring.g5_conf_min;
+        {g6Configured && (() => {
+          const atMax = rosterViewG6Count >= scoring.g6_conf_max;
+          const atMin = rosterViewG6Count >= scoring.g6_conf_min;
           return (
             <div
               className={`flex flex-col items-center gap-1.5 py-3 px-2 rounded-lg border flex-1 min-w-[64px] ${
@@ -560,8 +560,8 @@ export function DraftRoom({
                 'bg-turf-800 border-turf-700 text-turf-300'
               }`}
             >
-              <TeamLogo src={ncaaLogo} alt="G5 logo" fallbackName="G5" size={32} />
-              <span className="text-xs font-mono">{rosterViewG5Count}/{scoring.g5_conf_max}</span>
+              <TeamLogo src={ncaaLogo} alt="G6 logo" fallbackName="G6" size={32} />
+              <span className="text-xs font-mono">{rosterViewG6Count}/{scoring.g6_conf_max}</span>
             </div>
           );
         })()}
@@ -613,13 +613,13 @@ export function DraftRoom({
               <strong className="text-white">{scoring.p4_conf_max}</strong> teams from each P4 conference
               (SEC, Big Ten, Big 12, ACC)
             </li>
-            {g5Configured ? (
+            {g6Configured ? (
               <li>
-                • Min <strong className="text-white">{scoring.g5_conf_min}</strong> and max{' '}
-                <strong className="text-white">{scoring.g5_conf_max}</strong> combined G5/non-P4 teams
+                • Min <strong className="text-white">{scoring.g6_conf_min}</strong> and max{' '}
+                <strong className="text-white">{scoring.g6_conf_max}</strong> combined G6/non-P4 teams
               </li>
             ) : (
-              <li>• No limit on G5/non-P4 teams</li>
+              <li>• No limit on G6/non-P4 teams</li>
             )}
             <li>• Snake draft order</li>
           </ul>
@@ -782,7 +782,7 @@ export function DraftRoom({
 
       {/* Conference tracker */}
       {isMyTurn && (
-        <div className={`card p-3 grid gap-2 ${g5Configured ? 'grid-cols-5' : 'grid-cols-4'}`}>
+        <div className={`card p-3 grid gap-2 ${g6Configured ? 'grid-cols-5' : 'grid-cols-4'}`}>
           {(P4_CONF_LIST as readonly string[]).map(conf => {
             const count = myConfCounts[conf] ?? 0;
             const atMax = count >= scoring.p4_conf_max;
@@ -817,17 +817,17 @@ export function DraftRoom({
               </Tooltip>
             );
           })}
-          {g5Configured && (() => {
-            const atMax = myG5Count >= scoring.g5_conf_max;
-            const atMin = myG5Count >= scoring.g5_conf_min;
+          {g6Configured && (() => {
+            const atMax = myG6Count >= scoring.g6_conf_max;
+            const atMin = myG6Count >= scoring.g6_conf_min;
             return (
               <Tooltip
                 content={
                   atMax
-                    ? `Maximum reached — you can’t draft any more G5/non-P4 teams.`
+                    ? `Maximum reached — you can’t draft any more G6/non-P4 teams.`
                     : atMin
-                    ? `G5 minimum met. You can draft up to ${scoring.g5_conf_max - myG5Count} more.`
-                    : `You need at least ${scoring.g5_conf_min - myG5Count} more G5/non-P4 teams.`
+                    ? `G6 minimum met. You can draft up to ${scoring.g6_conf_max - myG6Count} more.`
+                    : `You need at least ${scoring.g6_conf_min - myG6Count} more G6/non-P4 teams.`
                 }
                 position="bottom"
                 width="w-52"
@@ -840,11 +840,11 @@ export function DraftRoom({
                     'bg-turf-800'
                   }`}
                 >
-                  <p className="text-xs text-turf-400 truncate">G5</p>
+                  <p className="text-xs text-turf-400 truncate">G6</p>
                   <p className={`font-mono font-bold text-lg ${
                     atMax ? 'text-red-300' : atMin ? 'text-field-400' : 'text-white'
-                  }`}>{myG5Count}/{scoring.g5_conf_max}</p>
-                  <p className="text-xs text-turf-500">min {scoring.g5_conf_min}</p>
+                  }`}>{myG6Count}/{scoring.g6_conf_max}</p>
+                  <p className="text-xs text-turf-500">min {scoring.g6_conf_min}</p>
                 </div>
               </Tooltip>
             );

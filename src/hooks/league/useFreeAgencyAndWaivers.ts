@@ -11,7 +11,7 @@ import { isP4Conference, confCategory } from '../../services/scoring';
 import type { SetState } from './useLeagueCore';
 
 // Shared by makeFreeAgencyMove and submitWaiverClaim — both are a drop+add
-// swap with identical conference-limit rules (P4 per-conference, G5
+// swap with identical conference-limit rules (P4 per-conference, G6
 // combined), they just differ in whether the swap executes immediately or
 // queues as a waiver claim pending priority resolution.
 function checkConferenceLimits(
@@ -23,25 +23,25 @@ function checkConferenceLimits(
 
   const droppedTeam = myRoster.find(t => t.team_id === droppedTeamId);
   const addCategory = confCategory(addedTeamConference);
-  const addMax = addCategory === 'G5' ? settings.g5_conf_max : settings.p4_conf_max;
-  const addCurrentCount = addCategory === 'G5'
+  const addMax = addCategory === 'G6' ? settings.g6_conf_max : settings.p4_conf_max;
+  const addCurrentCount = addCategory === 'G6'
     ? myRoster.filter(t => !isP4Conference(t.team_conference)).length
     : myRoster.filter(t => t.team_conference === addedTeamConference).length;
   const droppingSameCategory = droppedTeam ? confCategory(droppedTeam.team_conference) === addCategory : false;
   const newCount = addCurrentCount - (droppingSameCategory ? 1 : 0) + 1;
   if (newCount > addMax) {
-    return { error: `Max ${addMax} ${addCategory === 'G5' ? 'G5/non-P4' : addCategory} teams` };
+    return { error: `Max ${addMax} ${addCategory === 'G6' ? 'G6/non-P4' : addCategory} teams` };
   }
 
   if (droppedTeam) {
     const dropCategory = confCategory(droppedTeam.team_conference);
-    const dropMin = dropCategory === 'G5' ? settings.g5_conf_min : settings.p4_conf_min;
+    const dropMin = dropCategory === 'G6' ? settings.g6_conf_min : settings.p4_conf_min;
     if (dropMin > 0 && !droppingSameCategory) {
-      const dropCurrentCount = dropCategory === 'G5'
+      const dropCurrentCount = dropCategory === 'G6'
         ? myRoster.filter(t => !isP4Conference(t.team_conference)).length
         : myRoster.filter(t => t.team_conference === droppedTeam.team_conference).length;
       if (dropCurrentCount - 1 < dropMin) {
-        const label = dropCategory === 'G5' ? 'G5/non-P4' : dropCategory;
+        const label = dropCategory === 'G6' ? 'G6/non-P4' : dropCategory;
         return { error: `Dropping ${droppedTeam.team_name} would leave you below the ${dropMin}-team ${label} minimum` };
       }
     }

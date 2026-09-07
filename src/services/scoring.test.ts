@@ -15,7 +15,7 @@ function makeGame(overrides: Partial<GameResult> = {}): GameResult {
     opponent_logo: null,
     opponent_color: null,
     result: 'W',
-    is_g5_opponent: false,
+    is_g6_opponent: false,
     home_score: 30,
     away_score: 10,
     completed: true,
@@ -46,11 +46,11 @@ describe('isP4Conference / confCategory', () => {
     expect(isP4Conference('Pac-12')).toBe(false);
   });
 
-  it('confCategory returns the conference name itself for P4, and the G5 sentinel otherwise', () => {
+  it('confCategory returns the conference name itself for P4, and the G6 sentinel otherwise', () => {
     expect(confCategory('SEC')).toBe('SEC');
     expect(confCategory('ACC')).toBe('ACC');
-    expect(confCategory('Sun Belt')).toBe('G5');
-    expect(confCategory('FBS Independents')).toBe('G5');
+    expect(confCategory('Sun Belt')).toBe('G6');
+    expect(confCategory('FBS Independents')).toBe('G6');
   });
 });
 
@@ -75,11 +75,11 @@ describe('scoreGame', () => {
     );
   });
 
-  it('applies the G5 loss penalty only on losses to G5 opponents', () => {
-    const lossToG5 = makeGame({ result: 'L', is_g5_opponent: true, home_score: 10, away_score: 30 });
-    expect(scoreGame(lossToG5, DEFAULT_SCORING, false)).toBe(DEFAULT_SCORING.loss + DEFAULT_SCORING.loss_g5);
+  it('applies the G6 loss penalty only on losses to G6 opponents', () => {
+    const lossToG6 = makeGame({ result: 'L', is_g6_opponent: true, home_score: 10, away_score: 30 });
+    expect(scoreGame(lossToG6, DEFAULT_SCORING, false)).toBe(DEFAULT_SCORING.loss + DEFAULT_SCORING.loss_g6);
 
-    const lossToP4 = makeGame({ result: 'L', is_g5_opponent: false, home_score: 10, away_score: 30 });
+    const lossToP4 = makeGame({ result: 'L', is_g6_opponent: false, home_score: 10, away_score: 30 });
     expect(scoreGame(lossToP4, DEFAULT_SCORING, false)).toBe(DEFAULT_SCORING.loss);
   });
 
@@ -222,7 +222,7 @@ describe('buildLeaderboard', () => {
 
   const gameData: GameData = {
     t1: { 1: makeGame({ week: 1, result: 'W', opponent_rank: 20 }) }, // win + ranked bonus, then doubled (captain)
-    t2: { 1: makeGame({ week: 1, result: 'L', is_g5_opponent: true, home_score: 10, away_score: 30 }) }, // loss + G5 penalty
+    t2: { 1: makeGame({ week: 1, result: 'L', is_g6_opponent: true, home_score: 10, away_score: 30 }) }, // loss + G6 penalty
   };
 
   const seasonStats = new Map<string, TeamSeasonStats>();
@@ -243,8 +243,8 @@ describe('buildLeaderboard', () => {
 
     // Alice: win (1) + ranked bonus (1) = 2, doubled for captain = 4
     expect(alice.total_points).toBe((DEFAULT_SCORING.win + DEFAULT_SCORING.win_ranked) * 2);
-    // Bob: loss (-1) + G5 penalty (-5) = -6, plus a +5 manual bonus = -1
-    expect(bob.total_points).toBe(DEFAULT_SCORING.loss + DEFAULT_SCORING.loss_g5 + 5);
+    // Bob: loss (-1) + G6 penalty (-5) = -6, plus a +5 manual bonus = -1
+    expect(bob.total_points).toBe(DEFAULT_SCORING.loss + DEFAULT_SCORING.loss_g6 + 5);
 
     // Sorted descending by total_points
     expect(board[0].user_id).toBe('u1');
@@ -545,5 +545,53 @@ describe('calcStatRankingBonuses tie-at-boundary', () => {
     expect(bonuses.get('u2')![0].points).toBe(3);
     expect(bonuses.get('u1')).toHaveLength(1);
     expect(bonuses.get('u2')).toHaveLength(1);
+  });
+});
+
+describe('calcStatRankingBonuses bottom-eligibility floor (weeks 0-4)', () => {
+  const team = (id: string): RosterEntry => ({ team_id: id, team_name: id, team_logo: '', team_conference: 'SEC', team_color: '' });
+
+  // 4 teams: t1=10, t2=8, t3=0.5 (exactly at the floor), t4=0 (below it)
+  const rosters = new Map<string, RosterEntry[]>([
+    ['u1', [team('t1')]],
+    ['u2', [team('t2')]],
+    ['u3', [team('t3')]],
+    ['u4', [team('t4')]],
+  ]);
+  const seasonStats = new Map<string, TeamSeasonStats>([
+    ['t1', { rushing_tds: 10 } as TeamSeasonStats],
+    ['t2', { rushing_tds: 8 } as TeamSeasonStats],
+    ['t3', { rushing_tds: 0.5 } as TeamSeasonStats],
+    ['t4', { rushing_tds: 0 } as TeamSeasonStats],
+  ]);
+  const settings = {
+    ...DEFAULT_SCORING,
+    stat_bonus_categories: {
+      ...DEFAULT_SCORING.stat_bonus_categories,
+      rushing_tds: { top_enabled: false, top_count: 3, top_points: 3, bottom_enabled: true, bottom_count: 2, bottom_points: -3 },
+    },
+  };
+
+  it('before week 5, excludes anyone under 0.5 from bottom eligibility — the floor value itself still qualifies', () => {
+    const bonuses = calcStatRankingBonuses(rosters, seasonStats, false, settings, 4);
+
+    // bottom_count=2 would normally catch t4 (0) and t3 (0.5), but t4 is
+    // below the floor so only t3 qualifies.
+    expect(bonuses.get('u3')).toHaveLength(1);
+    expect(bonuses.get('u3')![0].points).toBe(-3);
+    expect(bonuses.get('u4')).toHaveLength(0);
+  });
+
+  it('from week 5 on, a value of 0 is countable again', () => {
+    const bonuses = calcStatRankingBonuses(rosters, seasonStats, false, settings, 5);
+
+    expect(bonuses.get('u3')).toHaveLength(1);
+    expect(bonuses.get('u4')).toHaveLength(1);
+    expect(bonuses.get('u4')![0].points).toBe(-3);
+  });
+
+  it('defaults to week 0 (floor active) when currentWeek is omitted', () => {
+    const bonuses = calcStatRankingBonuses(rosters, seasonStats, false, settings);
+    expect(bonuses.get('u4')).toHaveLength(0);
   });
 });

@@ -20,7 +20,7 @@ create table leagues (
     "win_top15": 2,
     "win_top5": 3,
     "loss": -1,
-    "loss_g5": -5
+    "loss_g6": -5
   }'::jsonb,
   created_at          timestamptz default now()
 );

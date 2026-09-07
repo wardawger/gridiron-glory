@@ -81,7 +81,7 @@ export interface ScoringSettings {
   win_top15: number;
   win_top5: number;
   loss: number;
-  loss_g5: number;
+  loss_g6: number;
   // Spread betting settings
   spread_enabled: boolean;
   spread_points: number;          // flat pts for covering, or multiplier base
@@ -120,8 +120,8 @@ export interface ScoringSettings {
   // Roster conference limits — enforced during the draft and free agency/waivers
   p4_conf_min: number;   // min teams required per P4 conference (SEC/Big Ten/Big 12/ACC), each
   p4_conf_max: number;   // max teams allowed per P4 conference, each
-  g5_conf_min: number;   // min teams required from the combined G5/non-P4 pool (0 = no minimum)
-  g5_conf_max: number;   // max teams allowed from the combined G5/non-P4 pool (99 = effectively unlimited)
+  g6_conf_min: number;   // min teams required from the combined G6/non-P4 pool (0 = no minimum)
+  g6_conf_max: number;   // max teams allowed from the combined G6/non-P4 pool (99 = effectively unlimited)
   excluded_conferences: string[]; // conference names entirely banned from the draft/free-agency pool (empty = no restriction)
   // Waiver wire settings — when disabled, free agency stays instant (first-come-first-served)
   waiver_enabled: boolean;
@@ -142,7 +142,7 @@ export const DEFAULT_SCORING: ScoringSettings = {
   win_top15: 2,
   win_top5: 3,
   loss: -1,
-  loss_g5: -5,
+  loss_g6: -5,
   // Spread defaults — off until commissioner enables
   spread_enabled: false,
   spread_points: 2,
@@ -178,8 +178,8 @@ export const DEFAULT_SCORING: ScoringSettings = {
   },
   p4_conf_min: 2,
   p4_conf_max: 3,
-  g5_conf_min: 0,
-  g5_conf_max: 99,
+  g6_conf_min: 0,
+  g6_conf_max: 99,
   excluded_conferences: [],
   // Real values are filled in by normalizeScoring() from BONUS_DEFAULT_POINTS,
   // declared further down this file — referencing it directly here would be a
@@ -224,8 +224,26 @@ export function normalizeScoring(raw: Partial<ScoringSettings> | null | undefine
     if (typeof rawValue === 'number') bonusPoints[type] = rawValue;
   });
 
+  // Reads the pre-rename field names (loss_g5/g5_conf_min/g5_conf_max) as a
+  // fallback for any league row a migration hasn't reached yet — every
+  // currently-known row is migrated (see supabase-migration-g6-rename.sql),
+  // but this keeps a league's real customizations from silently reverting
+  // to defaults in that gap rather than depending on migration timing alone.
+  const legacy = (raw ?? {}) as Record<string, unknown>;
+  const legacyFallback: Partial<ScoringSettings> = {};
+  if ((raw as any)?.loss_g6 === undefined && typeof legacy.loss_g5 === 'number') {
+    legacyFallback.loss_g6 = legacy.loss_g5 as number;
+  }
+  if ((raw as any)?.g6_conf_min === undefined && typeof legacy.g5_conf_min === 'number') {
+    legacyFallback.g6_conf_min = legacy.g5_conf_min as number;
+  }
+  if ((raw as any)?.g6_conf_max === undefined && typeof legacy.g5_conf_max === 'number') {
+    legacyFallback.g6_conf_max = legacy.g5_conf_max as number;
+  }
+
   return {
     ...DEFAULT_SCORING,
+    ...legacyFallback,
     ...(raw ?? {}),
     stat_bonus_categories: categories,
     bonus_points: bonusPoints,
@@ -235,8 +253,19 @@ export function normalizeScoring(raw: Partial<ScoringSettings> | null | undefine
 // ─── Draft ─────────────────────────────────────────────────────────────────
 
 // P4 conferences for draft/free-agency enforcement — the one canonical list;
-// min/max team counts per category live on ScoringSettings (p4_conf_*/g5_conf_*).
+// min/max team counts per category live on ScoringSettings (p4_conf_*/g6_conf_*).
 export const P4_CONFERENCES = ['SEC', 'Big Ten', 'Big 12', 'ACC'] as const;
+
+// The six named "Group of 6" conferences. Distinct from the broader
+// draft/free-agency "combined non-P4 pool" (confCategory in services/
+// scoring.ts), which also folds in FBS Independents — this list is used
+// specifically for the loss-to-a-G6-opponent scoring penalty, where an
+// Independent (e.g. Notre Dame) is deliberately NOT the same tier as a true
+// G6-conference opponent.
+export const G6_CONFERENCES = [
+  'American Athletic', 'Conference USA', 'Mid-American', 'Mountain West', 'Pac-12', 'Sun Belt',
+] as const;
+export type G6Conference = typeof G6_CONFERENCES[number];
 export type P4Conference = typeof P4_CONFERENCES[number];
 
 export interface DraftPick {
@@ -499,7 +528,7 @@ export interface CfbTeam {
   logo: string;
   color: string;
   alt_color: string;
-  is_g5: boolean;
+  is_g6: boolean;
 }
 
 // Team strength ratings (FPI + SP+), all as 1-N ranks (1 = best), null if
@@ -519,7 +548,7 @@ export interface GameResult {
   opponent_logo: string | null;
   opponent_color: string | null;
   result: 'W' | 'L' | null;
-  is_g5_opponent: boolean;
+  is_g6_opponent: boolean;
   home_score: number | null;
   away_score: number | null;
   completed: boolean;
@@ -685,7 +714,7 @@ export type TrophyCategoryId =
   | 'p4_conf_champion'
   | 'negative_week'
   | 'first_losing_record_draft'
-  | 'g5_team'
+  | 'g6_team'
   | 'independent_team'
   | 'bad_week_tier'
   | 'made_cfp'

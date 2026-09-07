@@ -19,68 +19,68 @@ const logo = (id: string) => `http://a.espncdn.com/i/teamlogos/ncaa/500/${id}.pn
 // immediately; the rest pads out the pool for realistic weekly pairings and
 // a fuller fake Top 25.
 export const MOCK_TEAMS: CfbTeam[] = [
-  { id: '2005', name: 'Air Force',       conference: 'Mountain West', logo: logo('2005'), color: '#004a7c', alt_color: '#ffffff', is_g5: true },
-  { id: '2026', name: 'App State',       conference: 'Sun Belt',      logo: logo('2026'), color: '#000000', alt_color: '#ffcc00', is_g5: true },
-  { id: '333',  name: 'Alabama',         conference: 'SEC',           logo: logo('333'),  color: '#9e1b32', alt_color: '#ffffff', is_g5: false },
-  { id: '152',  name: 'NC State',        conference: 'ACC',           logo: logo('152'),  color: '#cc0000', alt_color: '#ffffff', is_g5: false },
-  { id: '2628', name: 'TCU',             conference: 'Big 12',        logo: logo('2628'), color: '#4d1979', alt_color: '#a3a9ac', is_g5: false },
-  { id: '153',  name: 'North Carolina',  conference: 'ACC',           logo: logo('153'),  color: '#7bafd4', alt_color: '#ffffff', is_g5: false },
-  { id: '127',  name: 'Michigan State',  conference: 'Big Ten',       logo: logo('127'),  color: '#18453b', alt_color: '#ffffff', is_g5: false },
-  { id: '254',  name: 'Utah',            conference: 'Big 12',        logo: logo('254'),  color: '#cc0000', alt_color: '#ffffff', is_g5: false },
-  { id: '194',  name: 'Ohio State',      conference: 'Big Ten',       logo: logo('194'),  color: '#bb0000', alt_color: '#ffffff', is_g5: false },
-  { id: '84',   name: 'Indiana',         conference: 'Big Ten',       logo: logo('84'),   color: '#990000', alt_color: '#ffffff', is_g5: false },
-  { id: '252',  name: 'BYU',             conference: 'Big 12',        logo: logo('252'),  color: '#002e5d', alt_color: '#ffffff', is_g5: false },
-  { id: '57',   name: 'Florida',         conference: 'SEC',           logo: logo('57'),   color: '#0021a5', alt_color: '#fa4616', is_g5: false },
-  { id: '61',   name: 'Georgia',         conference: 'SEC',           logo: logo('61'),   color: '#ba0c2f', alt_color: '#000000', is_g5: false },
-  { id: '251',  name: 'Texas',           conference: 'SEC',           logo: logo('251'),  color: '#bf5700', alt_color: '#ffffff', is_g5: false },
-  { id: '9',    name: 'Arizona State',   conference: 'Big 12',        logo: logo('9'),    color: '#8c1d40', alt_color: '#ffc627', is_g5: false },
-  { id: '2483', name: 'Oregon',          conference: 'Big Ten',       logo: logo('2483'), color: '#154733', alt_color: '#fee123', is_g5: false },
-  { id: '213',  name: 'Penn State',      conference: 'Big Ten',       logo: logo('213'),  color: '#041e42', alt_color: '#ffffff', is_g5: false },
-  { id: '97',   name: 'Louisville',      conference: 'ACC',           logo: logo('97'),   color: '#ad0000', alt_color: '#ffffff', is_g5: false },
-  { id: '154',  name: 'Wake Forest',     conference: 'ACC',           logo: logo('154'),  color: '#9e7e38', alt_color: '#000000', is_g5: false },
-  { id: '258',  name: 'Virginia',        conference: 'ACC',           logo: logo('258'),  color: '#232d4b', alt_color: '#f84c1e', is_g5: false },
+  { id: '2005', name: 'Air Force',       conference: 'Mountain West', logo: logo('2005'), color: '#004a7c', alt_color: '#ffffff', is_g6: true },
+  { id: '2026', name: 'App State',       conference: 'Sun Belt',      logo: logo('2026'), color: '#000000', alt_color: '#ffcc00', is_g6: true },
+  { id: '333',  name: 'Alabama',         conference: 'SEC',           logo: logo('333'),  color: '#9e1b32', alt_color: '#ffffff', is_g6: false },
+  { id: '152',  name: 'NC State',        conference: 'ACC',           logo: logo('152'),  color: '#cc0000', alt_color: '#ffffff', is_g6: false },
+  { id: '2628', name: 'TCU',             conference: 'Big 12',        logo: logo('2628'), color: '#4d1979', alt_color: '#a3a9ac', is_g6: false },
+  { id: '153',  name: 'North Carolina',  conference: 'ACC',           logo: logo('153'),  color: '#7bafd4', alt_color: '#ffffff', is_g6: false },
+  { id: '127',  name: 'Michigan State',  conference: 'Big Ten',       logo: logo('127'),  color: '#18453b', alt_color: '#ffffff', is_g6: false },
+  { id: '254',  name: 'Utah',            conference: 'Big 12',        logo: logo('254'),  color: '#cc0000', alt_color: '#ffffff', is_g6: false },
+  { id: '194',  name: 'Ohio State',      conference: 'Big Ten',       logo: logo('194'),  color: '#bb0000', alt_color: '#ffffff', is_g6: false },
+  { id: '84',   name: 'Indiana',         conference: 'Big Ten',       logo: logo('84'),   color: '#990000', alt_color: '#ffffff', is_g6: false },
+  { id: '252',  name: 'BYU',             conference: 'Big 12',        logo: logo('252'),  color: '#002e5d', alt_color: '#ffffff', is_g6: false },
+  { id: '57',   name: 'Florida',         conference: 'SEC',           logo: logo('57'),   color: '#0021a5', alt_color: '#fa4616', is_g6: false },
+  { id: '61',   name: 'Georgia',         conference: 'SEC',           logo: logo('61'),   color: '#ba0c2f', alt_color: '#000000', is_g6: false },
+  { id: '251',  name: 'Texas',           conference: 'SEC',           logo: logo('251'),  color: '#bf5700', alt_color: '#ffffff', is_g6: false },
+  { id: '9',    name: 'Arizona State',   conference: 'Big 12',        logo: logo('9'),    color: '#8c1d40', alt_color: '#ffc627', is_g6: false },
+  { id: '2483', name: 'Oregon',          conference: 'Big Ten',       logo: logo('2483'), color: '#154733', alt_color: '#fee123', is_g6: false },
+  { id: '213',  name: 'Penn State',      conference: 'Big Ten',       logo: logo('213'),  color: '#041e42', alt_color: '#ffffff', is_g6: false },
+  { id: '97',   name: 'Louisville',      conference: 'ACC',           logo: logo('97'),   color: '#ad0000', alt_color: '#ffffff', is_g6: false },
+  { id: '154',  name: 'Wake Forest',     conference: 'ACC',           logo: logo('154'),  color: '#9e7e38', alt_color: '#000000', is_g6: false },
+  { id: '258',  name: 'Virginia',        conference: 'ACC',           logo: logo('258'),  color: '#232d4b', alt_color: '#f84c1e', is_g6: false },
   // Padding for pairing variety and a fuller fake poll — not tied to any
   // specific drafted roster.
-  { id: '2641', name: 'Texas Tech',      conference: 'Big 12',        logo: logo('2641'), color: '#cc0000', alt_color: '#000000', is_g5: false },
-  { id: '8',    name: 'Arkansas',        conference: 'SEC',           logo: logo('8'),    color: '#9d2235', alt_color: '#ffffff', is_g5: false },
-  { id: '130',  name: 'Michigan',        conference: 'Big Ten',       logo: logo('130'),  color: '#00274c', alt_color: '#ffcb05', is_g5: false },
-  { id: '87',   name: 'Notre Dame',      conference: 'FBS Independents', logo: logo('87'), color: '#0c2340', alt_color: '#ae9142', is_g5: false },
-  { id: '228',  name: 'Clemson',         conference: 'ACC',           logo: logo('228'),  color: '#f56600', alt_color: '#522d80', is_g5: false },
-  { id: '99',   name: 'LSU',             conference: 'SEC',           logo: logo('99'),   color: '#461d7c', alt_color: '#fdd023', is_g5: false },
-  { id: '201',  name: 'Oklahoma',        conference: 'SEC',           logo: logo('201'),  color: '#841617', alt_color: '#ffffff', is_g5: false },
-  { id: '2',    name: 'Auburn',          conference: 'SEC',           logo: logo('2'),    color: '#0c2340', alt_color: '#e87722', is_g5: false },
-  { id: '2633', name: 'Tennessee',       conference: 'SEC',           logo: logo('2633'), color: '#ff8200', alt_color: '#ffffff', is_g5: false },
-  { id: '275',  name: 'Wisconsin',       conference: 'Big Ten',       logo: logo('275'),  color: '#c5050c', alt_color: '#ffffff', is_g5: false },
-  { id: '52',   name: 'Florida State',   conference: 'ACC',           logo: logo('52'),   color: '#782f40', alt_color: '#ceb888', is_g5: false },
-  { id: '245',  name: 'Texas A&M',       conference: 'SEC',           logo: logo('245'),  color: '#500000', alt_color: '#ffffff', is_g5: false },
-  { id: '2390', name: 'Miami',           conference: 'ACC',           logo: logo('2390'), color: '#f47321', alt_color: '#005030', is_g5: false },
-  { id: '30',   name: 'USC',             conference: 'Big Ten',       logo: logo('30'),   color: '#990000', alt_color: '#ffcc00', is_g5: false },
+  { id: '2641', name: 'Texas Tech',      conference: 'Big 12',        logo: logo('2641'), color: '#cc0000', alt_color: '#000000', is_g6: false },
+  { id: '8',    name: 'Arkansas',        conference: 'SEC',           logo: logo('8'),    color: '#9d2235', alt_color: '#ffffff', is_g6: false },
+  { id: '130',  name: 'Michigan',        conference: 'Big Ten',       logo: logo('130'),  color: '#00274c', alt_color: '#ffcb05', is_g6: false },
+  { id: '87',   name: 'Notre Dame',      conference: 'FBS Independents', logo: logo('87'), color: '#0c2340', alt_color: '#ae9142', is_g6: false },
+  { id: '228',  name: 'Clemson',         conference: 'ACC',           logo: logo('228'),  color: '#f56600', alt_color: '#522d80', is_g6: false },
+  { id: '99',   name: 'LSU',             conference: 'SEC',           logo: logo('99'),   color: '#461d7c', alt_color: '#fdd023', is_g6: false },
+  { id: '201',  name: 'Oklahoma',        conference: 'SEC',           logo: logo('201'),  color: '#841617', alt_color: '#ffffff', is_g6: false },
+  { id: '2',    name: 'Auburn',          conference: 'SEC',           logo: logo('2'),    color: '#0c2340', alt_color: '#e87722', is_g6: false },
+  { id: '2633', name: 'Tennessee',       conference: 'SEC',           logo: logo('2633'), color: '#ff8200', alt_color: '#ffffff', is_g6: false },
+  { id: '275',  name: 'Wisconsin',       conference: 'Big Ten',       logo: logo('275'),  color: '#c5050c', alt_color: '#ffffff', is_g6: false },
+  { id: '52',   name: 'Florida State',   conference: 'ACC',           logo: logo('52'),   color: '#782f40', alt_color: '#ceb888', is_g6: false },
+  { id: '245',  name: 'Texas A&M',       conference: 'SEC',           logo: logo('245'),  color: '#500000', alt_color: '#ffffff', is_g6: false },
+  { id: '2390', name: 'Miami',           conference: 'ACC',           logo: logo('2390'), color: '#f47321', alt_color: '#005030', is_g6: false },
+  { id: '30',   name: 'USC',             conference: 'Big Ten',       logo: logo('30'),   color: '#990000', alt_color: '#ffcc00', is_g6: false },
   // Extra padding — enough undrafted supply for two more full 10-team
   // rosters (preview data only, not tied to any specific league draft).
-  { id: '2294', name: 'Iowa',            conference: 'Big Ten',       logo: logo('2294'), color: '#000000', alt_color: '#ffcd00', is_g5: false },
-  { id: '158',  name: 'Nebraska',        conference: 'Big Ten',       logo: logo('158'),  color: '#e41c38', alt_color: '#ffffff', is_g5: false },
-  { id: '135',  name: 'Minnesota',       conference: 'Big Ten',       logo: logo('135'),  color: '#7a0019', alt_color: '#ffcc33', is_g5: false },
-  { id: '2306', name: 'Kansas State',    conference: 'Big 12',        logo: logo('2306'), color: '#512888', alt_color: '#ffffff', is_g5: false },
-  { id: '66',   name: 'Iowa State',      conference: 'Big 12',        logo: logo('66'),   color: '#c8102e', alt_color: '#f1be48', is_g5: false },
-  { id: '239',  name: 'Baylor',          conference: 'Big 12',        logo: logo('239'),  color: '#003015', alt_color: '#ffb81c', is_g5: false },
-  { id: '248',  name: 'Houston',         conference: 'Big 12',        logo: logo('248'),  color: '#c8102e', alt_color: '#ffffff', is_g5: false },
-  { id: '2132', name: 'Cincinnati',      conference: 'Big 12',        logo: logo('2132'), color: '#000000', alt_color: '#e00122', is_g5: false },
-  { id: '277',  name: 'West Virginia',   conference: 'Big 12',        logo: logo('277'),  color: '#002855', alt_color: '#eaaa00', is_g5: false },
-  { id: '38',   name: 'Colorado',        conference: 'Big 12',        logo: logo('38'),   color: '#000000', alt_color: '#cfb87c', is_g5: false },
-  { id: '12',   name: 'Arizona',         conference: 'Big 12',        logo: logo('12'),   color: '#0c234b', alt_color: '#ab0520', is_g5: false },
-  { id: '150',  name: 'Duke',            conference: 'ACC',           logo: logo('150'),  color: '#003087', alt_color: '#ffffff', is_g5: false },
-  { id: '59',   name: 'Georgia Tech',    conference: 'ACC',           logo: logo('59'),   color: '#b3a369', alt_color: '#003057', is_g5: false },
-  { id: '221',  name: 'Pittsburgh',      conference: 'ACC',           logo: logo('221'),  color: '#003594', alt_color: '#ffb81c', is_g5: false },
-  { id: '183',  name: 'Syracuse',        conference: 'ACC',           logo: logo('183'),  color: '#d44500', alt_color: '#ffffff', is_g5: false },
-  { id: '24',   name: 'Stanford',        conference: 'ACC',           logo: logo('24'),   color: '#8c1515', alt_color: '#ffffff', is_g5: false },
-  { id: '25',   name: 'California',      conference: 'ACC',           logo: logo('25'),   color: '#003262', alt_color: '#fdb515', is_g5: false },
-  { id: '2567', name: 'SMU',             conference: 'ACC',           logo: logo('2567'), color: '#c8102e', alt_color: '#354ca1', is_g5: false },
-  { id: '238',  name: 'Vanderbilt',      conference: 'SEC',           logo: logo('238'),  color: '#000000', alt_color: '#866d4b', is_g5: false },
-  { id: '145',  name: 'Ole Miss',        conference: 'SEC',           logo: logo('145'),  color: '#14213d', alt_color: '#ce1126', is_g5: false },
-  { id: '142',  name: 'Missouri',        conference: 'SEC',           logo: logo('142'),  color: '#000000', alt_color: '#f1b82d', is_g5: false },
-  { id: '96',   name: 'Kentucky',        conference: 'SEC',           logo: logo('96'),   color: '#0033a0', alt_color: '#ffffff', is_g5: false },
-  { id: '26',   name: 'UCLA',            conference: 'Big Ten',       logo: logo('26'),   color: '#2d68c4', alt_color: '#f2a900', is_g5: false },
-  { id: '264',  name: 'Washington',      conference: 'Big Ten',       logo: logo('264'),  color: '#4b2e83', alt_color: '#b7a57a', is_g5: false },
+  { id: '2294', name: 'Iowa',            conference: 'Big Ten',       logo: logo('2294'), color: '#000000', alt_color: '#ffcd00', is_g6: false },
+  { id: '158',  name: 'Nebraska',        conference: 'Big Ten',       logo: logo('158'),  color: '#e41c38', alt_color: '#ffffff', is_g6: false },
+  { id: '135',  name: 'Minnesota',       conference: 'Big Ten',       logo: logo('135'),  color: '#7a0019', alt_color: '#ffcc33', is_g6: false },
+  { id: '2306', name: 'Kansas State',    conference: 'Big 12',        logo: logo('2306'), color: '#512888', alt_color: '#ffffff', is_g6: false },
+  { id: '66',   name: 'Iowa State',      conference: 'Big 12',        logo: logo('66'),   color: '#c8102e', alt_color: '#f1be48', is_g6: false },
+  { id: '239',  name: 'Baylor',          conference: 'Big 12',        logo: logo('239'),  color: '#003015', alt_color: '#ffb81c', is_g6: false },
+  { id: '248',  name: 'Houston',         conference: 'Big 12',        logo: logo('248'),  color: '#c8102e', alt_color: '#ffffff', is_g6: false },
+  { id: '2132', name: 'Cincinnati',      conference: 'Big 12',        logo: logo('2132'), color: '#000000', alt_color: '#e00122', is_g6: false },
+  { id: '277',  name: 'West Virginia',   conference: 'Big 12',        logo: logo('277'),  color: '#002855', alt_color: '#eaaa00', is_g6: false },
+  { id: '38',   name: 'Colorado',        conference: 'Big 12',        logo: logo('38'),   color: '#000000', alt_color: '#cfb87c', is_g6: false },
+  { id: '12',   name: 'Arizona',         conference: 'Big 12',        logo: logo('12'),   color: '#0c234b', alt_color: '#ab0520', is_g6: false },
+  { id: '150',  name: 'Duke',            conference: 'ACC',           logo: logo('150'),  color: '#003087', alt_color: '#ffffff', is_g6: false },
+  { id: '59',   name: 'Georgia Tech',    conference: 'ACC',           logo: logo('59'),   color: '#b3a369', alt_color: '#003057', is_g6: false },
+  { id: '221',  name: 'Pittsburgh',      conference: 'ACC',           logo: logo('221'),  color: '#003594', alt_color: '#ffb81c', is_g6: false },
+  { id: '183',  name: 'Syracuse',        conference: 'ACC',           logo: logo('183'),  color: '#d44500', alt_color: '#ffffff', is_g6: false },
+  { id: '24',   name: 'Stanford',        conference: 'ACC',           logo: logo('24'),   color: '#8c1515', alt_color: '#ffffff', is_g6: false },
+  { id: '25',   name: 'California',      conference: 'ACC',           logo: logo('25'),   color: '#003262', alt_color: '#fdb515', is_g6: false },
+  { id: '2567', name: 'SMU',             conference: 'ACC',           logo: logo('2567'), color: '#c8102e', alt_color: '#354ca1', is_g6: false },
+  { id: '238',  name: 'Vanderbilt',      conference: 'SEC',           logo: logo('238'),  color: '#000000', alt_color: '#866d4b', is_g6: false },
+  { id: '145',  name: 'Ole Miss',        conference: 'SEC',           logo: logo('145'),  color: '#14213d', alt_color: '#ce1126', is_g6: false },
+  { id: '142',  name: 'Missouri',        conference: 'SEC',           logo: logo('142'),  color: '#000000', alt_color: '#f1b82d', is_g6: false },
+  { id: '96',   name: 'Kentucky',        conference: 'SEC',           logo: logo('96'),   color: '#0033a0', alt_color: '#ffffff', is_g6: false },
+  { id: '26',   name: 'UCLA',            conference: 'Big Ten',       logo: logo('26'),   color: '#2d68c4', alt_color: '#f2a900', is_g6: false },
+  { id: '264',  name: 'Washington',      conference: 'Big Ten',       logo: logo('264'),  color: '#4b2e83', alt_color: '#b7a57a', is_g6: false },
 ];
 
 // Small deterministic PRNG (mulberry32) seeded from a string, so mock games
@@ -141,7 +141,7 @@ export function buildMockSeasonData(teams: CfbTeam[]): {
       const condition = MOCK_CONDITIONS[Math.floor(rand() * MOCK_CONDITIONS.length)];
       const windSpeed = Math.round(rand() * 25);
 
-      const base: Omit<GameResult, 'opponent' | 'opponent_id' | 'opponent_logo' | 'opponent_color' | 'result' | 'is_g5_opponent' | 'is_home'> = {
+      const base: Omit<GameResult, 'opponent' | 'opponent_id' | 'opponent_logo' | 'opponent_color' | 'result' | 'is_g6_opponent' | 'is_home'> = {
         week,
         opponent_rank: null, // backfilled below once rankings exist
         home_score: homeScore,
@@ -164,7 +164,7 @@ export function buildMockSeasonData(teams: CfbTeam[]): {
         opponent_logo: away.logo,
         opponent_color: away.color,
         result: homeWon ? 'W' : 'L',
-        is_g5_opponent: away.is_g5,
+        is_g6_opponent: away.is_g6,
         is_home: true,
       };
       gameData[away.id][week] = {
@@ -174,7 +174,7 @@ export function buildMockSeasonData(teams: CfbTeam[]): {
         opponent_logo: home.logo,
         opponent_color: home.color,
         result: homeWon ? 'L' : 'W',
-        is_g5_opponent: home.is_g5,
+        is_g6_opponent: home.is_g6,
         is_home: false,
       };
     }
@@ -194,7 +194,7 @@ export function buildMockSeasonData(teams: CfbTeam[]): {
   });
 
   const rankedTeams = [...teams]
-    .filter(t => !t.is_g5) // keep the fake poll Power-4-flavored, like a real early-season AP poll
+    .filter(t => !t.is_g6) // keep the fake poll Power-4-flavored, like a real early-season AP poll
     .sort((a, b) => {
       const ra = records.get(a.id)!, rb = records.get(b.id)!;
       return (rb.wins - rb.losses) - (ra.wins - ra.losses) || a.id.localeCompare(b.id);

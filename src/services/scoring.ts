@@ -14,11 +14,14 @@ export function isP4Conference(conference: string): boolean {
   return (P4_CONF_LIST as readonly string[]).includes(conference);
 }
 
-// Every non-P4 conference shares one combined G5 limit rather than each
-// having its own — this collapses any non-P4 conference name to the 'G5'
-// bucket so callers can track counts/minimums per category uniformly.
+// Every non-P4 conference shares one combined G6 draft-quota limit rather
+// than each having its own — this collapses any non-P4 conference name
+// (including FBS Independents) to the 'G6' bucket so callers can track
+// counts/minimums per category uniformly. Distinct from is_g6_opponent
+// below, which strictly means one of the six named G6 conferences and
+// deliberately excludes independents.
 export function confCategory(conference: string): string {
-  return isP4Conference(conference) ? conference : 'G5';
+  return isP4Conference(conference) ? conference : 'G6';
 }
 
 // What a captain pick was worth before the multiplier was configurable.
@@ -46,7 +49,7 @@ export function scoreGame(
     }
   } else {
     pts += settings.loss;
-    if (game.is_g5_opponent) pts += settings.loss_g5;
+    if (game.is_g6_opponent) pts += settings.loss_g6;
   }
 
   if (!isCaptain) return pts;
@@ -237,11 +240,23 @@ export function calcWeeklyScore(
 
 // ─── Stat ranking bonuses ─────────────────────────────────────────────────
 
+// Before week 5, a team sitting at (or near) 0 in a stat category more
+// often reflects a bye week or a short early-season sample than genuinely
+// being the league's worst performer. Bottom-ranking eligibility excludes
+// anything below this floor until there's been enough season to make that
+// a fair read; top-ranking eligibility is unaffected (a high value early
+// is real regardless of sample size — only a bottom "cliff" from small
+// samples needs the guard). From week 5 on, 0 is a real, countable value
+// again.
+const BOTTOM_STAT_ELIGIBILITY_FLOOR = 0.5;
+const BOTTOM_STAT_FLOOR_LAST_WEEK = 4;
+
 export function calcStatRankingBonuses(
   rosters: Map<string, RosterEntry[]>,
   seasonStats: Map<string, TeamSeasonStats>,
   isPreview: boolean,
   rawSettings: ScoringSettings,
+  currentWeek = 0,
 ): Map<string, StatRankingBonus[]> {
   const settings = normalizeScoring(rawSettings);
   const result = new Map<string, StatRankingBonus[]>();
@@ -252,6 +267,8 @@ export function calcStatRankingBonuses(
   const allDraftedIds = new Set<string>();
   rosters.forEach(roster => roster.forEach(t => allDraftedIds.add(t.team_id)));
 
+  const bottomFloorActive = currentWeek <= BOTTOM_STAT_FLOOR_LAST_WEEK;
+
   for (const stat of STAT_BONUS_CATEGORIES) {
     const cat = settings.stat_bonus_categories[stat];
     if (!cat.top_enabled && !cat.bottom_enabled) continue;
@@ -259,7 +276,7 @@ export function calcStatRankingBonuses(
     const ranked = Array.from(allDraftedIds)
       .map(id => ({ id, val: seasonStats.get(id)?.[stat] ?? null }))
       .filter(x => x.val !== null)
-      .sort((a, b) => (b.val as number) - (a.val as number));
+      .sort((a, b) => (b.val as number) - (a.val as number)) as { id: string; val: number }[];
 
     const total = ranked.length;
     if (total === 0) continue;
@@ -273,16 +290,22 @@ export function calcStatRankingBonuses(
     // where top_count/bottom_count is >= the number of ranked teams, which
     // should still mean "everyone qualifies" exactly as before.
     const topBoundaryVal = cat.top_enabled && cat.top_count > 0
-      ? ranked[Math.min(cat.top_count, total) - 1].val as number
+      ? ranked[Math.min(cat.top_count, total) - 1].val
       : null;
-    const botBoundaryVal = cat.bottom_enabled && cat.bottom_count > 0
-      ? ranked[total - Math.min(cat.bottom_count, total)].val as number
+
+    const bottomEligible = bottomFloorActive
+      ? ranked.filter(x => x.val >= BOTTOM_STAT_ELIGIBILITY_FLOOR)
+      : ranked;
+    const bottomTotal = bottomEligible.length;
+    const botBoundaryVal = cat.bottom_enabled && cat.bottom_count > 0 && bottomTotal > 0
+      ? bottomEligible[bottomTotal - Math.min(cat.bottom_count, bottomTotal)].val
       : null;
 
     ranked.forEach((entry, idx) => {
       const rank = idx + 1;
-      const isTop = topBoundaryVal !== null && (entry.val as number) >= topBoundaryVal;
-      const isBot = !isTop && botBoundaryVal !== null && (entry.val as number) <= botBoundaryVal;
+      const isTop = topBoundaryVal !== null && entry.val >= topBoundaryVal;
+      const bottomOk = !bottomFloorActive || entry.val >= BOTTOM_STAT_ELIGIBILITY_FLOOR;
+      const isBot = !isTop && bottomOk && botBoundaryVal !== null && entry.val <= botBoundaryVal;
       if (!isTop && !isBot) return;
 
       const pts = isTop ? cat.top_points : cat.bottom_points;
@@ -324,7 +347,7 @@ export function buildLeaderboard(
   benchPicks: BenchPick[] = [],
 ): LeaderboardEntry[] {
   const rosters = currentRosters(members, draftPicks, freeAgencyMoves, currentWeek);
-  const statBonuses = calcStatRankingBonuses(rosters, seasonStats, !confChampComplete, settings);
+  const statBonuses = calcStatRankingBonuses(rosters, seasonStats, !confChampComplete, settings, currentWeek);
 
   return members
     .map(member => {

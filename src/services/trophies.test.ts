@@ -14,7 +14,7 @@ function makeGame(overrides: Partial<GameResult> = {}): GameResult {
     opponent_logo: null,
     opponent_color: null,
     result: 'W',
-    is_g5_opponent: false,
+    is_g6_opponent: false,
     home_score: 30,
     away_score: 10,
     completed: true,
@@ -117,8 +117,8 @@ describe('computeTrophies', () => {
   it('flags negative and tiered bad weeks from calcWeeklyScore, using only game/spread/FA points', () => {
     const draftPicks = [pick({ team_id: 't1', user_id: 'u1' })];
     const gameData: GameData = {
-      // loss (-1) + G5 penalty (-5) = -6, not a "bad week" tier hit (threshold is -10)
-      t1: { 1: makeGame({ result: 'L', is_g5_opponent: true, home_score: 10, away_score: 30 }) },
+      // loss (-1) + G6 penalty (-5) = -6, not a "bad week" tier hit (threshold is -10)
+      t1: { 1: makeGame({ result: 'L', is_g6_opponent: true, home_score: 10, away_score: 30 }) },
     };
 
     const snapshot = computeTrophies(members, draftPicks, [], [], [], [], gameData, DEFAULT_SCORING);

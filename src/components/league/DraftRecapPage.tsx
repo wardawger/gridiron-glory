@@ -22,7 +22,7 @@ interface Props {
 // Each P4 conference gets its own bucket; every non-P4 conference is
 // combined into one "Other" bucket, matching how the rest of the app
 // (roster conference limits, the excluded-conferences setting) already
-// treats G5/non-P4 as one combined category.
+// treats G6/non-P4 as one combined category.
 const CONFERENCE_CATEGORIES = [...P4_CONFERENCES, 'Other'] as const;
 
 function conferenceCategory(conference: string): string {
@@ -70,7 +70,7 @@ export function DraftRecapPage({ league, members, draftPicks, teams }: Props) {
   const { active: view, select: selectView, panelClass: viewPanelClass } = useTabCrossfade<View>('timeline');
   const [search, setSearch] = useState('');
   const scoring = normalizeScoring(league.scoring);
-  const g5Configured = scoring.g5_conf_min > 0 || scoring.g5_conf_max < 99;
+  const g6Configured = scoring.g6_conf_min > 0 || scoring.g6_conf_max < 99;
 
   // Total real FBS teams per category — the denominator for the league-wide
   // breakdown (e.g. "SEC: 10/14").
@@ -205,8 +205,8 @@ export function DraftRecapPage({ league, members, draftPicks, teams }: Props) {
               const total = conferenceTotals[cat];
               const pct = total > 0 ? Math.min(100, Math.round((drafted / total) * 100)) : 0;
               // 'Other' isn't a real conference — the Draft Room's own filter
-              // already collapses every non-P4 conference into a 'G5' option.
-              const draftFilter = cat === 'Other' ? 'G5' : cat;
+              // already collapses every non-P4 conference into a 'G6' option.
+              const draftFilter = cat === 'Other' ? 'G6' : cat;
               const tileContent = (
                 <>
                   <TeamLogo src={badge.logo} alt={`${cat} logo`} fallbackName={badge.short} size={36} className="mx-auto mb-2" />
@@ -247,7 +247,7 @@ export function DraftRecapPage({ league, members, draftPicks, teams }: Props) {
                       {CONFERENCE_CATEGORIES.map(cat => {
                         const badge = CONFERENCE_BADGE[cat];
                         const denom = cat === 'Other'
-                          ? (g5Configured ? scoring.g5_conf_max : null)
+                          ? (g6Configured ? scoring.g6_conf_max : null)
                           : scoring.p4_conf_max;
                         const count = counts[cat] ?? 0;
                         return (

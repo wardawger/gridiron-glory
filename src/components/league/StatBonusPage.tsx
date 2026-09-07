@@ -64,9 +64,9 @@ export function StatBonusPage({ league, members, rosters, seasonStats }: Props) 
   const scoring = useMemo(() => normalizeScoring(league.scoring), [league.scoring]);
 
   const fullBoard = useMemo(() => {
-    const byUser = calcStatRankingBonuses(rosters, seasonStats, !confChampComplete, scoring);
+    const byUser = calcStatRankingBonuses(rosters, seasonStats, !confChampComplete, scoring, league.current_week);
     return buildStatBonusBoard(byUser, rosters, members);
-  }, [rosters, seasonStats, confChampComplete, scoring, members]);
+  }, [rosters, seasonStats, confChampComplete, scoring, members, league.current_week]);
 
   // Defaults to every manager. Filtering narrows each category's top/bottom
   // lists down to one manager's rows rather than hiding whole categories,

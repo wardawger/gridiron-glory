@@ -20,7 +20,7 @@ function pts(n: number): string {
 export function LeagueSettingsPage({ league, members }: Props) {
   const scoring = normalizeScoring(league.scoring);
   const postseasonGroups = BONUS_GROUPS.filter(g => !g.label.startsWith('Statistical Rankings'));
-  const g5Configured = scoring.g5_conf_min > 0 || scoring.g5_conf_max < 99;
+  const g6Configured = scoring.g6_conf_min > 0 || scoring.g6_conf_max < 99;
 
   return (
     <div className="space-y-5 animate-fade-in max-w-3xl mx-auto">
@@ -61,9 +61,9 @@ export function LeagueSettingsPage({ league, members }: Props) {
         <p className="text-xs text-turf-500">
           Every roster needs at least {scoring.p4_conf_min} and at most {scoring.p4_conf_max} teams from each Power 4
           conference (SEC, Big Ten, Big 12, ACC).{' '}
-          {g5Configured
-            ? `Combined, G5/Independent/non-P4 teams must total between ${scoring.g5_conf_min} and ${scoring.g5_conf_max}.`
-            : 'No limit on G5, Independent, or non-P4 teams.'}
+          {g6Configured
+            ? `Combined, G6/Independent/non-P4 teams must total between ${scoring.g6_conf_min} and ${scoring.g6_conf_max}.`
+            : 'No limit on G6, Independent, or non-P4 teams.'}
         </p>
       </div>
 
@@ -80,7 +80,7 @@ export function LeagueSettingsPage({ league, members }: Props) {
           <div className="card-inner px-3 py-2 flex items-center justify-between"><span className="text-turf-300">Beat Top 15</span><span className="font-mono font-medium text-field-400">{pts(scoring.win_top15)}</span></div>
           <div className="card-inner px-3 py-2 flex items-center justify-between"><span className="text-turf-300">Beat Top 5</span><span className="font-mono font-medium text-field-400">{pts(scoring.win_top5)}</span></div>
           <div className="card-inner px-3 py-2 flex items-center justify-between"><span className="text-turf-300">Loss</span><span className="font-mono font-medium text-red-300">{pts(scoring.loss)}</span></div>
-          <div className="card-inner px-3 py-2 flex items-center justify-between"><span className="text-turf-300">Loss to a G5 team</span><span className="font-mono font-medium text-red-300">{pts(scoring.loss_g5)}</span></div>
+          <div className="card-inner px-3 py-2 flex items-center justify-between"><span className="text-turf-300">Loss to a G6 team</span><span className="font-mono font-medium text-red-300">{pts(scoring.loss_g6)}</span></div>
         </div>
       </div>
 
