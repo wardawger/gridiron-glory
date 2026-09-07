@@ -199,27 +199,39 @@ function WeekBreakdownSection({ label, score, teamsById }: { label: string; scor
       {!score || score.breakdown.length === 0 ? (
         <p className="text-sm text-turf-600">No games this week</p>
       ) : (
-        <div className="space-y-1">
-          {score.breakdown.map(b => (
-            <div key={b.team_id} className="flex items-center gap-2 text-sm">
-              <TeamLogo
-                src={teamsById.get(b.team_id)?.logo}
-                alt=""
-                fallbackName={b.team_name}
-                size={16}
-                className={`flex-shrink-0 ${b.is_benched ? 'opacity-50' : ''}`}
-              />
-              <span className={`truncate flex-1 ${b.is_benched ? 'text-turf-600 line-through' : 'text-turf-300'}`}>
-                {b.team_name}
-                {b.is_captain && <span className="text-amber-400"> (C×{b.captain_multiplier})</span>}
-                {b.spread_points !== 0 && <span className="text-purple-400"> spread {signed(b.spread_points)}</span>}
-              </span>
-              <span className={`font-mono flex-shrink-0 ${b.points > 0 ? 'text-field-400' : b.points < 0 ? 'text-red-300' : 'text-turf-500'}`}>
-                {signed(b.points)}
-              </span>
-            </div>
-          ))}
-        </div>
+        <table className="w-full text-sm border-collapse">
+          <caption className="sr-only">Per-team scoring for {label}</caption>
+          <thead>
+            <tr className="border-b border-turf-800">
+              <th scope="col" className="text-left text-xs text-turf-500 uppercase tracking-wide font-medium pb-1.5">Team</th>
+              <th scope="col" className="text-left text-xs text-turf-500 uppercase tracking-wide font-medium pb-1.5">Notes</th>
+              <th scope="col" className="text-right text-xs text-turf-500 uppercase tracking-wide font-medium pb-1.5">Pts</th>
+            </tr>
+          </thead>
+          <tbody>
+            {score.breakdown.map(b => (
+              <tr key={b.team_id} className="border-b border-turf-800/50 last:border-b-0">
+                <td className="py-1.5 pr-2">
+                  <div className={`flex items-center gap-2 ${b.is_benched ? 'opacity-50' : ''}`}>
+                    <TeamLogo src={teamsById.get(b.team_id)?.logo} alt="" fallbackName={b.team_name} size={16} className="flex-shrink-0" />
+                    <span className={`truncate ${b.is_benched ? 'text-turf-600 line-through' : 'text-turf-300'}`}>{b.team_name}</span>
+                  </div>
+                </td>
+                <td className="py-1.5 pr-2">
+                  <div className="flex items-center gap-1 flex-wrap">
+                    {b.is_benched && <span className="badge-gray">Benched</span>}
+                    {b.is_captain && <span className="badge-gold">C×{b.captain_multiplier}</span>}
+                    {b.spread_points !== 0 && <span className="badge-purple">Spread {signed(b.spread_points)}</span>}
+                    {!b.is_benched && !b.is_captain && b.spread_points === 0 && <span className="text-turf-700">—</span>}
+                  </div>
+                </td>
+                <td className={`py-1.5 text-right font-mono tabular-nums ${b.points > 0 ? 'text-field-400' : b.points < 0 ? 'text-red-300' : 'text-turf-500'}`}>
+                  {signed(b.points)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       )}
       {score && score.fa_points !== 0 && (
         <p className="text-xs text-red-300 mt-1">Free agency penalty: {score.fa_points}</p>
@@ -717,36 +729,43 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                         <p className="text-xs text-turf-500 uppercase tracking-wide mb-2">
                           Stat Bonus Breakdown{!confChampComplete ? ' (provisional)' : ''}
                         </p>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+                        <table className="w-full text-sm border-collapse">
+                          <caption className="sr-only">Statistical ranking bonuses by category</caption>
+                          <thead>
+                            <tr className="border-b border-turf-800">
+                              <th scope="col" className="text-left text-xs text-turf-500 uppercase tracking-wide font-medium pb-1.5">Team</th>
+                              <th scope="col" className="text-right text-xs text-turf-500 uppercase tracking-wide font-medium pb-1.5">Value</th>
+                              <th scope="col" className="text-right text-xs text-turf-500 uppercase tracking-wide font-medium pb-1.5">Pts</th>
+                            </tr>
+                          </thead>
                           {STAT_BONUS_CATEGORIES.filter(stat => entry.stat_bonuses.some(b => b.stat === stat)).map(stat => (
-                            <div key={stat}>
-                              <h4 className="text-xs font-medium text-turf-400 mb-1">{STAT_BONUS_LABELS[stat]}</h4>
-                              <div className="space-y-1">
-                                {entry.stat_bonuses.filter(b => b.stat === stat).map((b, i) => {
-                                  const isTop = b.points > 0;
-                                  return (
-                                    <div key={`${b.team_id}-${i}`} className="flex items-center gap-2 text-sm">
-                                      {isTop
-                                        ? <TrendingUp className="w-3 h-3 text-field-400 flex-shrink-0" aria-hidden="true" />
-                                        : <TrendingDown className="w-3 h-3 text-red-300 flex-shrink-0" aria-hidden="true" />}
-                                      <TeamLogo
-                                        src={teamsById.get(b.team_id)?.logo}
-                                        alt=""
-                                        fallbackName={b.team_name}
-                                        size={16}
-                                        className="flex-shrink-0"
-                                      />
-                                      <span className="text-turf-300 truncate flex-1">
-                                        {b.team_name} <span className="text-turf-500">({b.value})</span>
-                                      </span>
-                                      <span className={`font-mono flex-shrink-0 ${isTop ? 'text-field-400' : 'text-red-300'}`}>{signed(b.points)}</span>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
+                            <tbody key={stat}>
+                              <tr>
+                                <th scope="rowgroup" colSpan={3} className="text-left text-xs font-medium text-turf-400 pt-2.5 pb-1">
+                                  {STAT_BONUS_LABELS[stat]}
+                                </th>
+                              </tr>
+                              {entry.stat_bonuses.filter(b => b.stat === stat).map((b, i) => {
+                                const isTop = b.points > 0;
+                                return (
+                                  <tr key={`${b.team_id}-${i}`} className="border-b border-turf-800/50 last:border-b-0">
+                                    <td className="py-1.5 pr-2">
+                                      <div className="flex items-center gap-2">
+                                        {isTop
+                                          ? <TrendingUp className="w-3 h-3 text-field-400 flex-shrink-0" aria-hidden="true" />
+                                          : <TrendingDown className="w-3 h-3 text-red-300 flex-shrink-0" aria-hidden="true" />}
+                                        <TeamLogo src={teamsById.get(b.team_id)?.logo} alt="" fallbackName={b.team_name} size={16} className="flex-shrink-0" />
+                                        <span className="text-turf-300 truncate">{b.team_name}</span>
+                                      </div>
+                                    </td>
+                                    <td className="py-1.5 pr-2 text-right font-mono tabular-nums text-turf-500">{b.value}</td>
+                                    <td className={`py-1.5 text-right font-mono tabular-nums ${isTop ? 'text-field-400' : 'text-red-300'}`}>{signed(b.points)}</td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
                           ))}
-                        </div>
+                        </table>
                       </div>
                     )}
 
