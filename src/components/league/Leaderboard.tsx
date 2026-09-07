@@ -722,6 +722,13 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                                       {isTop
                                         ? <TrendingUp className="w-3 h-3 text-field-400 flex-shrink-0" aria-hidden="true" />
                                         : <TrendingDown className="w-3 h-3 text-red-300 flex-shrink-0" aria-hidden="true" />}
+                                      <TeamLogo
+                                        src={teamsById.get(b.team_id)?.logo}
+                                        alt=""
+                                        fallbackName={b.team_name}
+                                        size={16}
+                                        className="flex-shrink-0"
+                                      />
                                       <span className="text-turf-300 truncate flex-1">
                                         {b.team_name} <span className="text-turf-500">({b.value})</span>
                                       </span>
