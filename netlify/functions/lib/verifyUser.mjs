@@ -25,29 +25,34 @@ function base64UrlDecode(str) {
 // Secret (Settings → API in the Supabase dashboard) — this only handles
 // that case, not a project switched to asymmetric (RS256/ES256) signing
 // keys, which would need a different verification path entirely.
+// Returns { ok: true, id } on success, or { ok: false, reason } — reason is
+// a diagnostic label only (never the token or secret) so a deploy's function
+// logs can say *why* a mismatch happened without leaking anything sensitive.
 function verifyJwtHS256(token, secret) {
   const parts = token.split('.');
-  if (parts.length !== 3) return null;
+  if (parts.length !== 3) return { ok: false, reason: 'malformed (not 3 parts)' };
   const [headerB64, payloadB64, sigB64] = parts;
 
   let header;
-  try { header = JSON.parse(base64UrlDecode(headerB64).toString('utf8')); } catch { return null; }
-  if (header.alg !== 'HS256') return null;
+  try { header = JSON.parse(base64UrlDecode(headerB64).toString('utf8')); } catch { return { ok: false, reason: 'bad header JSON' }; }
+  if (header.alg !== 'HS256') return { ok: false, reason: `alg is ${header.alg}, not HS256` };
 
   let actualSig;
-  try { actualSig = base64UrlDecode(sigB64); } catch { return null; }
+  try { actualSig = base64UrlDecode(sigB64); } catch { return { ok: false, reason: 'bad signature encoding' }; }
   const expectedSig = createHmac('sha256', secret).update(`${headerB64}.${payloadB64}`).digest();
-  if (actualSig.length !== expectedSig.length || !timingSafeEqual(actualSig, expectedSig)) return null;
+  if (actualSig.length !== expectedSig.length || !timingSafeEqual(actualSig, expectedSig)) {
+    return { ok: false, reason: 'signature mismatch (wrong secret)' };
+  }
 
   let payload;
-  try { payload = JSON.parse(base64UrlDecode(payloadB64).toString('utf8')); } catch { return null; }
+  try { payload = JSON.parse(base64UrlDecode(payloadB64).toString('utf8')); } catch { return { ok: false, reason: 'bad payload JSON' }; }
 
   const nowSeconds = Date.now() / 1000;
-  if (typeof payload.exp !== 'number' || payload.exp < nowSeconds) return null;
-  if (payload.aud !== 'authenticated') return null;
-  if (!payload.sub) return null;
+  if (typeof payload.exp !== 'number' || payload.exp < nowSeconds) return { ok: false, reason: 'expired' };
+  if (payload.aud !== 'authenticated') return { ok: false, reason: `aud is "${payload.aud}", not "authenticated"` };
+  if (!payload.sub) return { ok: false, reason: 'no sub claim' };
 
-  return { id: payload.sub };
+  return { ok: true, id: payload.sub };
 }
 
 async function verifyViaNetwork(token, supabaseUrl, apiKey) {
@@ -88,11 +93,11 @@ export async function verifyUser(req, supabaseUrl, apiKey) {
   const jwtSecret = process.env.SUPABASE_JWT_SECRET;
   if (jwtSecret) {
     const local = verifyJwtHS256(token, jwtSecret);
-    if (local) {
+    if (local.ok) {
       console.log('[verifyUser] verified locally');
-      return local;
+      return { id: local.id };
     }
-    console.log('[verifyUser] local verification did not match — falling back to network check');
+    console.log(`[verifyUser] local verification failed (${local.reason}); secret length=${jwtSecret.length} — falling back to network check`);
   } else {
     console.log('[verifyUser] SUPABASE_JWT_SECRET not set — falling back to network check');
   }
