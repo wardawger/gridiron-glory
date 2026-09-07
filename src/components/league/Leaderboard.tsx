@@ -241,49 +241,36 @@ function WeeklyBreakdownTable({
       {!score || score.breakdown.length === 0 ? (
         <p className="text-sm text-turf-600">No games this week</p>
       ) : (
-        <table className="w-full text-sm border-collapse">
-          <caption className="sr-only">Per-team scoring for week {selectedWeek}</caption>
-          <thead>
-            <tr className="border-b border-turf-800">
-              <th scope="col" className="text-left text-xs text-turf-500 uppercase tracking-wide font-medium pb-1">Team</th>
-              <th scope="col" className="text-left text-xs text-turf-500 uppercase tracking-wide font-medium pb-1">Notes</th>
-              <th scope="col" className="text-right text-xs text-turf-500 uppercase tracking-wide font-medium pb-1">Pts</th>
-            </tr>
-          </thead>
-          <tbody>
-            {score.breakdown.map(b => (
-              <tr key={b.team_id} className="border-b border-turf-800/50 last:border-b-0">
-                <td className="py-0.5 pr-2">
-                  <button
-                    type="button"
-                    disabled={!b.game}
-                    onClick={() => b.game && onOpenGameModal({
-                      game: b.game, teamId: b.team_id, teamName: b.team_name,
-                      teamLogo: teamsById.get(b.team_id)?.logo ?? '', week: selectedWeek, isCaptain: b.is_captain,
-                    })}
-                    className={`flex items-center gap-2 w-full text-left rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-400 ${
-                      b.game ? 'hover:text-field-300' : 'cursor-default'
-                    }`}
-                  >
-                    <TeamLogo src={teamsById.get(b.team_id)?.logo} alt="" fallbackName={b.team_name} size={16} className={`flex-shrink-0 ${b.is_benched ? 'opacity-50' : ''}`} />
-                    <span className={`truncate ${b.is_benched ? 'text-turf-600 line-through' : 'text-turf-300'}`}>{b.team_name}</span>
-                  </button>
-                </td>
-                <td className="py-0.5 pr-2">
-                  <div className="flex items-center gap-1 flex-wrap">
-                    {b.is_benched && <span className="badge-gray">Benched</span>}
-                    {b.is_captain && <span className="badge-gold">C×{b.captain_multiplier}</span>}
-                    {b.spread_points !== 0 && <span className="badge-purple">Spread {signed(b.spread_points)}</span>}
-                    {!b.is_benched && !b.is_captain && b.spread_points === 0 && <span className="text-turf-700">—</span>}
-                  </div>
-                </td>
-                <td className={`py-0.5 text-right font-mono tabular-nums ${b.points > 0 ? 'text-field-400' : b.points < 0 ? 'text-red-300' : 'text-turf-500'}`}>
-                  {signed(b.points)}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div
+          role="table"
+          aria-label={`Per-team scoring for week ${selectedWeek}`}
+          className="max-w-md border-t border-turf-800/50"
+        >
+          {score.breakdown.map(b => (
+            <div key={b.team_id} role="row" className="flex items-center gap-2 py-1.5 border-b border-turf-800/50 last:border-b-0">
+              <button
+                type="button"
+                disabled={!b.game}
+                onClick={() => b.game && onOpenGameModal({
+                  game: b.game, teamId: b.team_id, teamName: b.team_name,
+                  teamLogo: teamsById.get(b.team_id)?.logo ?? '', week: selectedWeek, isCaptain: b.is_captain,
+                })}
+                className={`flex items-center gap-2 min-w-0 flex-1 text-left rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-400 ${
+                  b.game ? 'hover:text-field-300' : 'cursor-default'
+                }`}
+              >
+                <TeamLogo src={teamsById.get(b.team_id)?.logo} alt="" fallbackName={b.team_name} size={16} className={`flex-shrink-0 ${b.is_benched ? 'opacity-50' : ''}`} />
+                <span className={`truncate ${b.is_benched ? 'text-turf-600 line-through' : 'text-turf-300'}`}>{b.team_name}</span>
+              </button>
+              {b.is_benched && <span className="badge-gray flex-shrink-0">Benched</span>}
+              {b.is_captain && <span className="badge-gold flex-shrink-0">C×{b.captain_multiplier}</span>}
+              {b.spread_points !== 0 && <span className="badge-purple flex-shrink-0">Spread {signed(b.spread_points)}</span>}
+              <span className={`ml-auto flex-shrink-0 font-mono tabular-nums ${b.points > 0 ? 'text-field-400' : b.points < 0 ? 'text-red-300' : 'text-turf-500'}`}>
+                {signed(b.points)}
+              </span>
+            </div>
+          ))}
+        </div>
       )}
       {score && score.fa_points !== 0 && (
         <p className="text-xs text-red-300 mt-1">Free agency penalty: {score.fa_points}</p>
