@@ -781,57 +781,45 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                       </div>
                     </div>
 
-                    <WeeklyBreakdownTable
-                      entry={entry}
-                      currentWeek={currentWeek}
-                      teamsById={teamsById}
-                      onOpenGameModal={setGameScoreModal}
-                    />
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-4">
+                      <WeeklyBreakdownTable
+                        entry={entry}
+                        currentWeek={currentWeek}
+                        teamsById={teamsById}
+                        onOpenGameModal={setGameScoreModal}
+                      />
 
-                    {includeStatBonuses && entry.stat_bonuses.length > 0 && (
-                      <div>
-                        <p className="text-xs text-turf-500 uppercase tracking-wide mb-2">
-                          Stat Bonus Breakdown{!confChampComplete ? ' (provisional)' : ''}
-                        </p>
-                        <table className="w-full text-sm border-collapse">
-                          <caption className="sr-only">Statistical ranking bonuses by category</caption>
-                          <thead>
-                            <tr className="border-b border-turf-800">
-                              <th scope="col" className="text-left text-xs text-turf-500 uppercase tracking-wide font-medium pb-1">Team</th>
-                              <th scope="col" className="text-right text-xs text-turf-500 uppercase tracking-wide font-medium pb-1">Value</th>
-                              <th scope="col" className="text-right text-xs text-turf-500 uppercase tracking-wide font-medium pb-1">Pts</th>
-                            </tr>
-                          </thead>
-                          {STAT_BONUS_CATEGORIES.filter(stat => entry.stat_bonuses.some(b => b.stat === stat)).map(stat => (
-                            <tbody key={stat}>
-                              <tr>
-                                <th scope="rowgroup" colSpan={3} className="text-left text-xs font-medium text-turf-400 pt-2 pb-0.5">
-                                  {STAT_BONUS_LABELS[stat]}
-                                </th>
-                              </tr>
-                              {entry.stat_bonuses.filter(b => b.stat === stat).map((b, i) => {
-                                const isTop = b.points > 0;
-                                return (
-                                  <tr key={`${b.team_id}-${i}`} className="border-b border-turf-800/50 last:border-b-0">
-                                    <td className="py-0.5 pr-2">
-                                      <div className="flex items-center gap-2">
+                      {includeStatBonuses && entry.stat_bonuses.length > 0 && (
+                        <div>
+                          <p className="text-xs text-turf-500 uppercase tracking-wide mb-2">
+                            Stat Bonus Breakdown{!confChampComplete ? ' (provisional)' : ''}
+                          </p>
+                          <div className="max-w-md space-y-3">
+                            {STAT_BONUS_CATEGORIES.filter(stat => entry.stat_bonuses.some(b => b.stat === stat)).map(stat => (
+                              <div key={stat}>
+                                <h4 className="text-xs font-medium text-turf-400 mb-1">{STAT_BONUS_LABELS[stat]}</h4>
+                                <div className="border-t border-turf-800/50">
+                                  {entry.stat_bonuses.filter(b => b.stat === stat).map((b, i) => {
+                                    const isTop = b.points > 0;
+                                    return (
+                                      <div key={`${b.team_id}-${i}`} className="flex items-center gap-2 py-1 border-b border-turf-800/50 last:border-b-0">
                                         {isTop
                                           ? <TrendingUp className="w-3 h-3 text-field-400 flex-shrink-0" aria-hidden="true" />
                                           : <TrendingDown className="w-3 h-3 text-red-300 flex-shrink-0" aria-hidden="true" />}
                                         <TeamLogo src={teamsById.get(b.team_id)?.logo} alt="" fallbackName={b.team_name} size={16} className="flex-shrink-0" />
-                                        <span className="text-turf-300 truncate">{b.team_name}</span>
+                                        <span className="text-turf-300 truncate min-w-0 flex-1">{b.team_name}</span>
+                                        <span className="text-turf-500 font-mono text-xs flex-shrink-0">{formatStatValue(stat, b.value)}</span>
+                                        <span className={`font-mono tabular-nums flex-shrink-0 ${isTop ? 'text-field-400' : 'text-red-300'}`}>{signed(b.points)}</span>
                                       </div>
-                                    </td>
-                                    <td className="py-0.5 pr-2 text-right font-mono tabular-nums text-turf-500">{formatStatValue(stat, b.value)}</td>
-                                    <td className={`py-0.5 text-right font-mono tabular-nums ${isTop ? 'text-field-400' : 'text-red-300'}`}>{signed(b.points)}</td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          ))}
-                        </table>
-                      </div>
-                    )}
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
 
                     <Link
                       to={`/roster/${entry.user_id}`}
