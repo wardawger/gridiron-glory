@@ -6,7 +6,7 @@ import {
   LineChart, Line, ScatterChart, Scatter, ReferenceLine, ReferenceArea, CartesianGrid,
 } from 'recharts';
 import { Crown, TrendingUp, TrendingDown, Star, ChevronDown } from 'lucide-react';
-import type { LeaderboardEntry, DraftPick, APRanking, CfbTeam, WeeklyScore } from '../../types';
+import type { LeaderboardEntry, DraftPick, APRanking, CfbTeam, ScoringSettings, SpreadPick, GameResult, StatBonusCategory, WeeklyScore } from '../../types';
 import { STAT_BONUS_LABELS, STAT_BONUS_CATEGORIES } from '../../types';
 import { computeAnalytics, scalePosition, tierFor } from '../../services/analytics';
 import type { RosterAnalytics, MetricTier } from '../../services/analytics';
@@ -14,6 +14,7 @@ import { Avatar } from '../ui/Avatar';
 import { TeamLogo } from '../ui/TeamLogo';
 import { InfoTooltip } from '../ui/Tooltip';
 import { Toggle } from '../ui/Toggle';
+import { GameScoreModal } from './GameScoreModal';
 import {
   seriesColor, seriesDash, CHART_TOOLTIP_STYLE, CHART_TOOLTIP_LABEL, CHART_TOOLTIP_ITEM, legendFormatter,
   CHART_AXIS_TICK, CHART_GRID, CHART_MUTED, CHART_SURFACE, CHART_BAND,
@@ -27,6 +28,8 @@ interface Props {
   draftPicks: DraftPick[];
   rankings: APRanking[];
   teams: CfbTeam[];
+  scoring: ScoringSettings;
+  spreadPicks: SpreadPick[];
 }
 
 // Compact team label for the analytics cells. Plain last-word truncation
@@ -182,42 +185,91 @@ interface MetricDef {
 
 const signed = (n: number) => `${n > 0 ? '+' : ''}${n}`;
 
-// Per-team scoring breakdown for one week, used by the expandable standings
-// row. spread_points is a component already folded into `points` (see
-// calcWeeklyScore) — shown as an annotation, not added again.
-function WeekBreakdownSection({ label, score, teamsById }: { label: string; score: WeeklyScore | undefined; teamsById: Map<string, CfbTeam> }) {
+// QBR (passer rating) carries long float tails from CFBD's raw aggregate —
+// rounded to the nearest hundredth for display. Every other stat category
+// is already a whole-number count (TDs, sacks, interceptions), so left as-is.
+const formatStatValue = (stat: StatBonusCategory, value: number) =>
+  stat === 'qbr' ? value.toFixed(2) : String(value);
+
+type OpenGameModalArgs = { game: GameResult; teamId: string; teamName: string; teamLogo: string; week: number; isCaptain: boolean };
+
+// Per-team scoring breakdown, one week at a time, used by the expandable
+// standings row. spread_points is a component already folded into `points`
+// (see calcWeeklyScore) — shown as an annotation, not added again. Each
+// instance owns its own selected-week tab state, so expanding two managers'
+// rows at once never lets one's week selection leak into the other's.
+function WeeklyBreakdownTable({
+  entry, currentWeek, teamsById, onOpenGameModal,
+}: {
+  entry: LeaderboardEntry;
+  currentWeek: number;
+  teamsById: Map<string, CfbTeam>;
+  onOpenGameModal: (args: OpenGameModalArgs) => void;
+}) {
+  const [selectedWeek, setSelectedWeek] = useState(currentWeek);
+  const weeks = useMemo(() => Array.from({ length: currentWeek + 1 }, (_, w) => w), [currentWeek]);
+  const score = entry.weekly_scores.find((w: WeeklyScore) => w.week === selectedWeek);
+
   return (
     <div>
-      <div className="flex items-center justify-between mb-1.5">
-        <p className="text-xs text-turf-500 uppercase tracking-wide">{label}</p>
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-xs text-turf-500 uppercase tracking-wide">Weekly Points</p>
         {score && (
           <span className={`font-mono text-sm font-bold ${score.points > 0 ? 'text-field-400' : score.points < 0 ? 'text-red-300' : 'text-turf-400'}`}>
             {signed(score.points)}
           </span>
         )}
       </div>
+
+      <div role="tablist" aria-label="Select week" className="flex gap-1 overflow-x-auto mb-2">
+        {weeks.map(w => (
+          <button
+            key={w}
+            type="button"
+            role="tab"
+            aria-selected={selectedWeek === w}
+            onClick={() => setSelectedWeek(w)}
+            className={`flex-shrink-0 px-2.5 py-1 rounded-md text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-400 ${
+              selectedWeek === w ? 'bg-field-500 text-turf-950' : 'bg-turf-800 text-turf-400 hover:text-white'
+            }`}
+          >
+            Wk {w}
+          </button>
+        ))}
+      </div>
+
       {!score || score.breakdown.length === 0 ? (
         <p className="text-sm text-turf-600">No games this week</p>
       ) : (
         <table className="w-full text-sm border-collapse">
-          <caption className="sr-only">Per-team scoring for {label}</caption>
+          <caption className="sr-only">Per-team scoring for week {selectedWeek}</caption>
           <thead>
             <tr className="border-b border-turf-800">
-              <th scope="col" className="text-left text-xs text-turf-500 uppercase tracking-wide font-medium pb-1.5">Team</th>
-              <th scope="col" className="text-left text-xs text-turf-500 uppercase tracking-wide font-medium pb-1.5">Notes</th>
-              <th scope="col" className="text-right text-xs text-turf-500 uppercase tracking-wide font-medium pb-1.5">Pts</th>
+              <th scope="col" className="text-left text-xs text-turf-500 uppercase tracking-wide font-medium pb-1">Team</th>
+              <th scope="col" className="text-left text-xs text-turf-500 uppercase tracking-wide font-medium pb-1">Notes</th>
+              <th scope="col" className="text-right text-xs text-turf-500 uppercase tracking-wide font-medium pb-1">Pts</th>
             </tr>
           </thead>
           <tbody>
             {score.breakdown.map(b => (
               <tr key={b.team_id} className="border-b border-turf-800/50 last:border-b-0">
-                <td className="py-1.5 pr-2">
-                  <div className={`flex items-center gap-2 ${b.is_benched ? 'opacity-50' : ''}`}>
-                    <TeamLogo src={teamsById.get(b.team_id)?.logo} alt="" fallbackName={b.team_name} size={16} className="flex-shrink-0" />
+                <td className="py-0.5 pr-2">
+                  <button
+                    type="button"
+                    disabled={!b.game}
+                    onClick={() => b.game && onOpenGameModal({
+                      game: b.game, teamId: b.team_id, teamName: b.team_name,
+                      teamLogo: teamsById.get(b.team_id)?.logo ?? '', week: selectedWeek, isCaptain: b.is_captain,
+                    })}
+                    className={`flex items-center gap-2 w-full text-left rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-400 ${
+                      b.game ? 'hover:text-field-300' : 'cursor-default'
+                    }`}
+                  >
+                    <TeamLogo src={teamsById.get(b.team_id)?.logo} alt="" fallbackName={b.team_name} size={16} className={`flex-shrink-0 ${b.is_benched ? 'opacity-50' : ''}`} />
                     <span className={`truncate ${b.is_benched ? 'text-turf-600 line-through' : 'text-turf-300'}`}>{b.team_name}</span>
-                  </div>
+                  </button>
                 </td>
-                <td className="py-1.5 pr-2">
+                <td className="py-0.5 pr-2">
                   <div className="flex items-center gap-1 flex-wrap">
                     {b.is_benched && <span className="badge-gray">Benched</span>}
                     {b.is_captain && <span className="badge-gold">C×{b.captain_multiplier}</span>}
@@ -225,7 +277,7 @@ function WeekBreakdownSection({ label, score, teamsById }: { label: string; scor
                     {!b.is_benched && !b.is_captain && b.spread_points === 0 && <span className="text-turf-700">—</span>}
                   </div>
                 </td>
-                <td className={`py-1.5 text-right font-mono tabular-nums ${b.points > 0 ? 'text-field-400' : b.points < 0 ? 'text-red-300' : 'text-turf-500'}`}>
+                <td className={`py-0.5 text-right font-mono tabular-nums ${b.points > 0 ? 'text-field-400' : b.points < 0 ? 'text-red-300' : 'text-turf-500'}`}>
                   {signed(b.points)}
                 </td>
               </tr>
@@ -406,10 +458,21 @@ function MetricValue({ metric, a, tier, position }: {
 type AnalyticsTab = 'table' | 'graphs' | 'weekly';
 const ANALYTICS_TABS: AnalyticsTab[] = ['table', 'weekly', 'graphs'];
 
-export function Leaderboard({ entries, currentWeek, userId, confChampComplete, draftPicks, rankings, teams }: Props) {
+export function Leaderboard({ entries, currentWeek, userId, confChampComplete, draftPicks, rankings, teams, scoring, spreadPicks }: Props) {
   const [analyticsTab, setAnalyticsTab] = useState<AnalyticsTab>('table');
   // null = every manager overlaid, which is how the radar loads.
   const [radarFocus, setRadarFocus] = useState<string | null>(null);
+
+  // Shared by every per-week team row's "click for matchup detail" — one
+  // modal instance for the whole standings list, rather than one per
+  // expanded row, since only one can ever be open at a time anyway.
+  const [gameScoreModal, setGameScoreModal] = useState<{
+    game: GameResult; teamId: string; teamName: string; teamLogo: string; week: number; isCaptain: boolean;
+  } | null>(null);
+  const rankByTeamId = useMemo(
+    () => new Map(rankings.filter(r => r.team_id).map(r => [r.team_id!, r.rank])),
+    [rankings]
+  );
 
   // Roving arrow-key focus for the analytics tablist (WAI-ARIA tabs pattern).
   const onTabKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>, idx: number) => {
@@ -543,6 +606,21 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
 
   return (
     <div className="space-y-6 animate-fade-in motion-reduce:animate-none">
+      {gameScoreModal && (
+        <GameScoreModal
+          game={gameScoreModal.game}
+          teamName={gameScoreModal.teamName}
+          teamLogo={gameScoreModal.teamLogo}
+          teamRank={rankByTeamId.get(gameScoreModal.teamId) ?? null}
+          week={gameScoreModal.week}
+          isCaptain={gameScoreModal.isCaptain}
+          scoring={scoring}
+          spreadPick={spreadPicks.find(
+            p => p.team_id === gameScoreModal.teamId && p.week === gameScoreModal.week
+          ) ?? null}
+          onClose={() => setGameScoreModal(null)}
+        />
+      )}
 
       {/* ── Total Points Bar Chart ─────────────────────── */}
       <div className="card p-5">
@@ -716,13 +794,12 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                       </div>
                     </div>
 
-                    <div>
-                      <p className="text-xs text-turf-500 uppercase tracking-wide mb-2">Weekly Points</p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
-                        <WeekBreakdownSection label={`This Week · Wk ${currentWeek}`} score={weekScore} teamsById={teamsById} />
-                        {currentWeek > 0 && <WeekBreakdownSection label={`Last Week · Wk ${currentWeek - 1}`} score={lastWeek} teamsById={teamsById} />}
-                      </div>
-                    </div>
+                    <WeeklyBreakdownTable
+                      entry={entry}
+                      currentWeek={currentWeek}
+                      teamsById={teamsById}
+                      onOpenGameModal={setGameScoreModal}
+                    />
 
                     {includeStatBonuses && entry.stat_bonuses.length > 0 && (
                       <div>
@@ -733,15 +810,15 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                           <caption className="sr-only">Statistical ranking bonuses by category</caption>
                           <thead>
                             <tr className="border-b border-turf-800">
-                              <th scope="col" className="text-left text-xs text-turf-500 uppercase tracking-wide font-medium pb-1.5">Team</th>
-                              <th scope="col" className="text-right text-xs text-turf-500 uppercase tracking-wide font-medium pb-1.5">Value</th>
-                              <th scope="col" className="text-right text-xs text-turf-500 uppercase tracking-wide font-medium pb-1.5">Pts</th>
+                              <th scope="col" className="text-left text-xs text-turf-500 uppercase tracking-wide font-medium pb-1">Team</th>
+                              <th scope="col" className="text-right text-xs text-turf-500 uppercase tracking-wide font-medium pb-1">Value</th>
+                              <th scope="col" className="text-right text-xs text-turf-500 uppercase tracking-wide font-medium pb-1">Pts</th>
                             </tr>
                           </thead>
                           {STAT_BONUS_CATEGORIES.filter(stat => entry.stat_bonuses.some(b => b.stat === stat)).map(stat => (
                             <tbody key={stat}>
                               <tr>
-                                <th scope="rowgroup" colSpan={3} className="text-left text-xs font-medium text-turf-400 pt-2.5 pb-1">
+                                <th scope="rowgroup" colSpan={3} className="text-left text-xs font-medium text-turf-400 pt-2 pb-0.5">
                                   {STAT_BONUS_LABELS[stat]}
                                 </th>
                               </tr>
@@ -749,7 +826,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                                 const isTop = b.points > 0;
                                 return (
                                   <tr key={`${b.team_id}-${i}`} className="border-b border-turf-800/50 last:border-b-0">
-                                    <td className="py-1.5 pr-2">
+                                    <td className="py-0.5 pr-2">
                                       <div className="flex items-center gap-2">
                                         {isTop
                                           ? <TrendingUp className="w-3 h-3 text-field-400 flex-shrink-0" aria-hidden="true" />
@@ -758,8 +835,8 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                                         <span className="text-turf-300 truncate">{b.team_name}</span>
                                       </div>
                                     </td>
-                                    <td className="py-1.5 pr-2 text-right font-mono tabular-nums text-turf-500">{b.value}</td>
-                                    <td className={`py-1.5 text-right font-mono tabular-nums ${isTop ? 'text-field-400' : 'text-red-300'}`}>{signed(b.points)}</td>
+                                    <td className="py-0.5 pr-2 text-right font-mono tabular-nums text-turf-500">{formatStatValue(stat, b.value)}</td>
+                                    <td className={`py-0.5 text-right font-mono tabular-nums ${isTop ? 'text-field-400' : 'text-red-300'}`}>{signed(b.points)}</td>
                                   </tr>
                                 );
                               })}

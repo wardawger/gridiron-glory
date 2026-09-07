@@ -82,6 +82,8 @@ export function HomePage({
           draftPicks={draftPicks}
           rankings={rankings}
           teams={teams}
+          scoring={league.scoring}
+          spreadPicks={spreadPicks}
         />
       )}
     </div>
