@@ -160,7 +160,11 @@ function AnimatedRoutes({ lg, league, auth, cfb }: AnimatedRoutesProps) {
           } />
           <Route path="/draft-recap" element={<DraftRecapPage league={lg} members={league.members} draftPicks={league.draftPicks} teams={cfb.teams} />} />
           <Route path="/league-settings" element={<LeagueSettingsPage league={lg} members={league.members} />} />
-          <Route path="/news" element={<NewsPage members={league.members} rosters={league.rosters} />} />
+          <Route path="/news" element={
+            cfbInitialLoading ? <NewsPageSkeleton /> : (
+              <NewsPage members={league.members} rosters={league.rosters} />
+            )
+          } />
           <Route path="/league-history" element={
             cfbInitialLoading ? <TrophyCasePageSkeleton /> : (
               <TrophyCasePage
