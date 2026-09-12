@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Newspaper, ExternalLink } from 'lucide-react';
+import { useEffect, useId, useMemo, useState } from 'react';
+import { Newspaper, ExternalLink, Users, Search, ChevronDown } from 'lucide-react';
 import type { LeagueMember, RosterEntry } from '../../types';
 import { fetchTeamNews, type NewsArticle } from '../../services/news';
 import { TeamLogo } from '../ui/TeamLogo';
@@ -19,22 +19,25 @@ function timeAgo(iso: string): string {
   return `${Math.floor(days / 30)}mo ago`;
 }
 
-// members isn't read directly — kept in the prop list so this page's data
-// needs are self-documenting alongside `rosters`, matching the other
-// league-wide pages (StatBonusPage, TrophyCasePage) that take the same pair.
-export function NewsPage({ rosters }: Props) {
+export function NewsPage({ members, rosters }: Props) {
+  const uid = useId();
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState(true);
+  const [managerFilter, setManagerFilter] = useState('all');
+  const [search, setSearch] = useState('');
 
   // Every team currently rostered by anyone in the league, keyed by name
   // (what the news search matches on) — one roster entry kept per team
-  // purely for its logo.
-  const draftedTeams = useMemo(() => {
-    const map = new Map<string, RosterEntry>();
-    rosters.forEach(roster => roster.forEach(entry => {
-      if (!map.has(entry.team_name)) map.set(entry.team_name, entry);
+  // purely for its logo, plus which manager currently owns it so the
+  // manager filter below has something to check against.
+  const { draftedTeams, ownerByTeamName } = useMemo(() => {
+    const teams = new Map<string, RosterEntry>();
+    const owner = new Map<string, string>();
+    rosters.forEach((roster, userId) => roster.forEach(entry => {
+      if (!teams.has(entry.team_name)) teams.set(entry.team_name, entry);
+      owner.set(entry.team_name, userId);
     }));
-    return map;
+    return { draftedTeams: teams, ownerByTeamName: owner };
   }, [rosters]);
 
   // Joined into a stable string key so the fetch effect only re-runs when
@@ -52,6 +55,16 @@ export function NewsPage({ rosters }: Props) {
     return () => { cancelled = true; };
   }, [teamNamesKey]);
 
+  const filteredArticles = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return articles.filter(a =>
+      (managerFilter === 'all' || ownerByTeamName.get(a.team_name) === managerFilter) &&
+      (q === '' || a.team_name.toLowerCase().includes(q))
+    );
+  }, [articles, managerFilter, search, ownerByTeamName]);
+
+  const hasActiveFilters = managerFilter !== 'all' || search.trim() !== '';
+
   return (
     <div className="space-y-5 animate-fade-in motion-reduce:animate-none">
       <div className="card p-5">
@@ -68,6 +81,42 @@ export function NewsPage({ rosters }: Props) {
           Sourced from Google News search results, not an official college football feed — coverage and accuracy aren't guaranteed.
         </p>
       </div>
+
+      {draftedTeams.size > 0 && (
+        <div className="card p-3 flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+          <div className="flex items-center gap-2">
+            <Users className="w-4 h-4 text-turf-500 flex-shrink-0" aria-hidden="true" />
+            <label htmlFor={`${uid}-mgr-filter`} className="text-xs text-turf-400 flex-shrink-0">Manager</label>
+            <div className="relative flex-1 sm:flex-initial sm:w-44">
+              <select
+                id={`${uid}-mgr-filter`}
+                name="manager_filter"
+                className="input appearance-none pr-9 text-sm [&>option]:bg-turf-800 [&>option]:text-white"
+                value={managerFilter}
+                onChange={e => setManagerFilter(e.target.value)}
+              >
+                <option value="all">All managers</option>
+                {members.map(m => <option key={m.user_id} value={m.user_id}>{m.display_name}</option>)}
+              </select>
+              <ChevronDown className="w-4 h-4 text-turf-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true" />
+            </div>
+          </div>
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-turf-500" aria-hidden="true" />
+            <input
+              id={`${uid}-team-search`}
+              name="team_search"
+              type="text"
+              autoComplete="off"
+              className="input pl-9 text-sm"
+              placeholder="Search by team…"
+              aria-label="Search by team"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+          </div>
+        </div>
+      )}
 
       {draftedTeams.size === 0 ? (
         <div className="card p-12 text-center text-turf-500">
@@ -94,9 +143,23 @@ export function NewsPage({ rosters }: Props) {
             Nothing turned up for suspensions or coaching changes on your league's drafted teams.
           </p>
         </div>
+      ) : filteredArticles.length === 0 ? (
+        <div className="card p-12 text-center text-turf-500">
+          <Newspaper className="w-8 h-8 mx-auto mb-3 text-turf-700" aria-hidden="true" />
+          <p>No news matches these filters.</p>
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={() => { setManagerFilter('all'); setSearch(''); }}
+              className="text-xs text-field-400 hover:text-field-300 transition-colors mt-1"
+            >
+              Clear filters
+            </button>
+          )}
+        </div>
       ) : (
         <div className="card divide-y divide-turf-800">
-          {articles.map(a => {
+          {filteredArticles.map(a => {
             const team = draftedTeams.get(a.team_name);
             return (
               <a

@@ -86,6 +86,16 @@ function parseRssItems(xml, teamName) {
   return items;
 }
 
+// Google News' search is relevance-based, not a strict phrase match — a
+// query for "Boise State" can return an article that never mentions Boise
+// State in its own headline (e.g. a roundup piece the query matched on body
+// text or a "related" association) and get mis-attributed to that team's
+// feed. Requiring the team's own name to actually appear in the returned
+// headline is a cheap, effective filter for that class of mismatch.
+function isRelevantToTeam(title, teamName) {
+  return title.toLowerCase().includes(teamName.toLowerCase());
+}
+
 async function fetchTeamNews(teamName) {
   const cached = newsCache.get(teamName);
   if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) return cached.items;
@@ -95,7 +105,7 @@ async function fetchTeamNews(teamName) {
     const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
     if (!res.ok) throw new Error(`status ${res.status}`);
     const xml = await res.text();
-    const items = parseRssItems(xml, teamName);
+    const items = parseRssItems(xml, teamName).filter(item => isRelevantToTeam(item.title, teamName));
     newsCache.set(teamName, { items, fetchedAt: Date.now() });
     return items;
   } catch (e) {
