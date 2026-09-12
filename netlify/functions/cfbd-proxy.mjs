@@ -27,18 +27,24 @@
 import { verifyUser } from './lib/verifyUser.mjs';
 
 const CFBD_BASE   = 'https://api.collegefootballdata.com';
-// 30 minutes — matches useCfbData.ts's own client-side refresh interval, so
-// caching any shorter buys nothing (nothing re-asks sooner than that
-// anyway). This is a single shared cache across every user of the app (the
-// cache key has no per-user/per-league component), so the ~13 distinct CFBD
-// endpoints this app calls per refresh cycle work out to roughly
-// 13 endpoints × 48 refreshes/day × 30 days ≈ 18,720 requests/month against
-// a 30,000/month Tier 2 CFBD budget — comfortable headroom left for the
-// separate on-demand spread-line lookups. This also fixes stat bonuses
-// visibly lagging behind game results as a side effect: every endpoint now
-// shares the same freshness ceiling, so they can never drift more than this
-// window apart.
-const CACHE_TTL_H = 0.5; // hours before cache entry is considered stale
+// 2 hours. useCfbData.ts's client-side refresh interval is still 30 minutes,
+// so most of those refreshes now land as a cache HIT (a single cheap indexed
+// Supabase read, no CFBD call, no cache write) instead of a miss — the
+// project's free-tier Postgres compute has been getting overwhelmed and
+// restarting under concurrent load (see the incident notes around
+// 2026-09-07/08), and the writes into cfbd_cache were directly implicated:
+// every cache miss across every one of this app's signed-in users pays a
+// write, and those were the queries actually timing out. A 30-minute TTL
+// meant a fresh write on nearly every refresh cycle for every endpoint;
+// stretching it to 2 hours cuts that write volume (and the CFBD call volume
+// behind it) by roughly 4x without meaningfully staling the data users see
+// — CFBD's own upstream sources (AP polls, season stats) don't change on a
+// sub-2-hour cadence outside of live game windows anyway, and /scoreboard
+// (below) already has its own much shorter TTL for exactly the data that
+// does. This is a load-reduction measure, not a guarantee — it lowers how
+// often the shared free-tier compute gets pushed into the restart threshold,
+// it doesn't remove the ceiling itself.
+const CACHE_TTL_H = 2; // hours before cache entry is considered stale
 
 // /scoreboard is CFBD's live in-game endpoint (period/clock/possession) —
 // sitting behind the same 30-minute window as everything else would make

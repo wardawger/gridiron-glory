@@ -111,7 +111,19 @@ export function useLeagueCore(user: User | null) {
     // applies exactly as before (e.g. invites still comes back empty for a
     // non-commissioner); this only collapses the round-trips, not the
     // access rules.
-    const { data, error } = await supabase.rpc('get_league_data', { p_league_id: leagueId });
+    const attempt = () => supabase.rpc('get_league_data', { p_league_id: leagueId });
+
+    let { data, error } = await attempt();
+    if (error || !data) {
+      // The project's free-tier database has occasionally restarted under
+      // load (see the 2026-09-07/08 incident notes) — that kind of blip
+      // typically clears within a few seconds. One retry after a short
+      // delay rides it out instead of immediately handing every affected
+      // user a broken page for something that resolves moments later on
+      // its own; a second consecutive failure is treated as real.
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      ({ data, error } = await attempt());
+    }
     if (error || !data) {
       console.error('loadLeagueData: get_league_data failed', error);
       setError('Failed to load league data. Try refreshing the page.');
