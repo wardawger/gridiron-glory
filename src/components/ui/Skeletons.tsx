@@ -279,6 +279,25 @@ export function FreeAgencyPageSkeleton() {
   );
 }
 
+export function NewsPageSkeleton() {
+  return (
+    <div className={PAGE_PADDING}>
+      <HeaderCardSkeleton />
+      <div className="card divide-y divide-turf-800">
+        {Array.from({ length: 6 }, (_, i) => (
+          <div key={i} className="p-4 flex items-center gap-3">
+            <Circle size={32} />
+            <div className="flex-1 space-y-2">
+              <Bar className="h-4 w-3/4" />
+              <Bar className="h-3 w-1/3" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function StatBonusPageSkeleton() {
   return (
     <div className={PAGE_PADDING}>

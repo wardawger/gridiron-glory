@@ -14,7 +14,7 @@ import { ErrorBoundary }    from './components/ErrorBoundary';
 import {
   HomePageSkeleton, RosterPageSkeleton, AccountPageSkeleton, DraftRoomSkeleton, AdminPanelSkeleton,
   RankingsPageSkeleton, DraftRecapPageSkeleton, LeagueSettingsPageSkeleton, TrophyCasePageSkeleton,
-  FreeAgencyPageSkeleton, StatBonusPageSkeleton, ScoreboardPageSkeleton,
+  FreeAgencyPageSkeleton, StatBonusPageSkeleton, ScoreboardPageSkeleton, NewsPageSkeleton,
 } from './components/ui/Skeletons';
 
 // Lazy-loaded: only reachable once a user is authenticated with a league
@@ -33,6 +33,7 @@ const TrophyCasePage     = lazy(() => import('./components/league/TrophyCasePage
 const FreeAgencyPage     = lazy(() => import('./components/league/FreeAgencyPage').then(m => ({ default: m.FreeAgencyPage })));
 const StatBonusPage      = lazy(() => import('./components/league/StatBonusPage').then(m => ({ default: m.StatBonusPage })));
 const ScoreboardPage     = lazy(() => import('./components/league/ScoreboardPage').then(m => ({ default: m.ScoreboardPage })));
+const NewsPage           = lazy(() => import('./components/league/NewsPage').then(m => ({ default: m.NewsPage })));
 
 // Matched against the current path so the Suspense fallback mirrors the
 // destination page's own layout (header/list/grid shapes) instead of a
@@ -51,6 +52,7 @@ function RouteFallback({ pathname }: { pathname: string }) {
   if (pathname === '/free-agency') return <FreeAgencyPageSkeleton />;
   if (pathname === '/stat-bonuses') return <StatBonusPageSkeleton />;
   if (pathname === '/scoreboard') return <ScoreboardPageSkeleton />;
+  if (pathname === '/news') return <NewsPageSkeleton />;
   if (pathname === '/') return <HomePageSkeleton />;
   return (
     <div className="flex items-center justify-center py-20">
@@ -158,6 +160,7 @@ function AnimatedRoutes({ lg, league, auth, cfb }: AnimatedRoutesProps) {
           } />
           <Route path="/draft-recap" element={<DraftRecapPage league={lg} members={league.members} draftPicks={league.draftPicks} teams={cfb.teams} />} />
           <Route path="/league-settings" element={<LeagueSettingsPage league={lg} members={league.members} />} />
+          <Route path="/news" element={<NewsPage members={league.members} rosters={league.rosters} />} />
           <Route path="/league-history" element={
             cfbInitialLoading ? <TrophyCasePageSkeleton /> : (
               <TrophyCasePage

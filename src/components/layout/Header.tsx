@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Trophy, Users, Shield, BarChart3, LogOut, RefreshCw, Zap, ChevronDown, Plus, History, ArrowLeftRight, Award, Info, ClipboardList, Archive, Menu, X, LayoutGrid } from 'lucide-react';
+import { Trophy, Users, Shield, BarChart3, LogOut, RefreshCw, Zap, ChevronDown, Plus, History, ArrowLeftRight, Award, Info, ClipboardList, Archive, Menu, X, LayoutGrid, Newspaper } from 'lucide-react';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import type { League, LeagueMember, WaiverClaim, GameData } from '../../types';
 import { Avatar } from '../ui/Avatar';
@@ -121,6 +121,7 @@ export function Header({
 
   const leagueInfoItems: { to: string; label: string; icon: any; description: string; badge?: number; live?: boolean }[] = [
     { to: '/scoreboard', label: 'Scoreboard', icon: LayoutGrid, description: "This week's matchups", live: anyGameLive },
+    { to: '/news', label: 'Team News', icon: Newspaper, description: 'Suspensions and coaching changes' },
     { to: '/draft-recap', label: 'Draft Recap', icon: History, description: 'Every pick, in order' },
     ...(league?.scoring.stat_bonus_enabled
       ? [{ to: '/stat-bonuses', label: 'Stat Bonuses', icon: Award, description: "Who's earning bonus points" }]
