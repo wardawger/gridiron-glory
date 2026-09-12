@@ -1,11 +1,14 @@
 import { supabase } from '../lib/supabase';
 
+export type NewsCategory = 'Suspension' | 'Coach Firing' | 'Player News' | 'General';
+
 export interface NewsArticle {
   team_name: string;
   title: string;
   link: string;
   source: string | null;
   published_at: string;
+  category: NewsCategory;
 }
 
 // Proxied through news-proxy.mjs (CollegeFootballData has no news endpoint

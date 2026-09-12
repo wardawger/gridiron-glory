@@ -81,9 +81,30 @@ function parseRssItems(xml, teamName) {
       link: link.trim(),
       source: sourceName,
       published_at: publishedAt.toISOString(),
+      category: categorizeArticle(cleanTitle),
     });
   }
   return items;
+}
+
+// Best-effort classification from the headline text alone — there's no
+// structured category data behind any of this (see the file header), so
+// this can misfire on a title that names a person without saying "coach" or
+// "player" (e.g. "Michigan fires Sherrone Moore" reads as a player firing
+// without outside knowledge that Moore was the head coach). Order matters:
+// checked most-specific first, since a title can trip more than one word
+// list (a coach firing headline often also contains "suspended" in the
+// context of a related player situation elsewhere in the same story).
+function categorizeArticle(title) {
+  const t = title.toLowerCase();
+  const mentionsCoach = /\bcoach(es|ing)?\b|\bhead coach\b|\bcoordinator\b|\bhc\b|\boc\b|\bdc\b/.test(t);
+  const firingWords = /\bfired\b|\bfires\b|\bfire\b|\bfiring\b|\bdismissed\b|\bdismisses\b|\bdismissal\b|\bparts ways\b|\bousted\b|\bterminated\b|\blet go\b/.test(t);
+  const suspensionWords = /\bsuspend(ed|s|ing)?\b|\bsuspension\b/.test(t);
+
+  if (firingWords && mentionsCoach) return 'Coach Firing';
+  if (suspensionWords) return 'Suspension';
+  if (firingWords) return 'Player News';
+  return 'General';
 }
 
 // Google News' search is relevance-based, not a strict phrase match — a
@@ -96,6 +117,16 @@ function isRelevantToTeam(title, teamName) {
   return title.toLowerCase().includes(teamName.toLowerCase());
 }
 
+// Restricts results to a small set of established, editorially-reviewed
+// outlets rather than every blog/fansite/aggregator Google indexes — trades
+// recall for reliability. Matched case-insensitively since Google News'
+// <source> casing isn't perfectly consistent (a live sample returned
+// "FOX Sports", not "Fox Sports").
+const ALLOWED_SOURCES = new Set(['espn', 'cbs sports', 'fox sports', 'rotowire']);
+function isAllowedSource(source) {
+  return !!source && ALLOWED_SOURCES.has(source.trim().toLowerCase());
+}
+
 async function fetchTeamNews(teamName) {
   const cached = newsCache.get(teamName);
   if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) return cached.items;
@@ -105,7 +136,8 @@ async function fetchTeamNews(teamName) {
     const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
     if (!res.ok) throw new Error(`status ${res.status}`);
     const xml = await res.text();
-    const items = parseRssItems(xml, teamName).filter(item => isRelevantToTeam(item.title, teamName));
+    const items = parseRssItems(xml, teamName)
+      .filter(item => isRelevantToTeam(item.title, teamName) && isAllowedSource(item.source));
     newsCache.set(teamName, { items, fetchedAt: Date.now() });
     return items;
   } catch (e) {

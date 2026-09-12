@@ -1,13 +1,23 @@
 import { useEffect, useId, useMemo, useState } from 'react';
 import { Newspaper, ExternalLink, Users, Search, ChevronDown } from 'lucide-react';
 import type { LeagueMember, RosterEntry } from '../../types';
-import { fetchTeamNews, type NewsArticle } from '../../services/news';
+import { fetchTeamNews, type NewsArticle, type NewsCategory } from '../../services/news';
 import { TeamLogo } from '../ui/TeamLogo';
 
 interface Props {
   members: LeagueMember[];
   rosters: Map<string, RosterEntry[]>;
 }
+
+// Colors follow this app's existing badge-color semantics (red = severe,
+// gold = caution, blue = neutral-informative, gray = default catch-all) —
+// not a new palette invented for this page.
+const CATEGORY_BADGE: Record<NewsCategory, string> = {
+  'Suspension':    'badge-gold',
+  'Coach Firing':  'badge-red',
+  'Player News':   'badge-blue',
+  'General':       'badge-gray',
+};
 
 function timeAgo(iso: string): string {
   const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
@@ -171,6 +181,7 @@ export function NewsPage({ members, rosters }: Props) {
               >
                 <TeamLogo src={team?.team_logo} alt="" fallbackName={a.team_name} size={32} className="flex-shrink-0 mt-0.5" />
                 <div className="flex-1 min-w-0">
+                  <span className={`${CATEGORY_BADGE[a.category]} mb-1`}>{a.category}</span>
                   <p className="text-sm text-white group-hover:text-field-300 transition-colors">{a.title}</p>
                   <p className="text-xs text-turf-500 mt-1 flex items-center gap-1.5 flex-wrap">
                     <span className="text-turf-400">{a.team_name}</span>
