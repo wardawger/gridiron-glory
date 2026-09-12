@@ -48,9 +48,21 @@ function verifyJwtHS256(headerB64, payloadB64, sigB64, secret) {
 let jwksCache = null; // { keys: Map<kid, KeyObject>, fetchedAt: number }
 const JWKS_TTL_MS = 60 * 60 * 1000; // 1 hour — signing keys rotate rarely
 
+// A bounded timeout on every fetch in this file is load-bearing, not
+// defensive polish: this endpoint was observed returning slow 502/504s
+// during testing, and an unbounded fetch that stalls instead of erroring
+// hangs verifyUser() forever — which hangs the whole cfbd-proxy invocation,
+// which hangs the client's Promise.all across every parallel CFBD call a
+// page load fires. One stuck JWKS fetch would freeze the entire app on its
+// loading skeleton with no error and no recovery.
+const JWKS_FETCH_TIMEOUT_MS = 3000;
+const NETWORK_FALLBACK_TIMEOUT_MS = 5000;
+
 async function getJwks(supabaseUrl) {
   if (jwksCache && Date.now() - jwksCache.fetchedAt < JWKS_TTL_MS) return jwksCache.keys;
-  const res = await fetch(`${supabaseUrl}/auth/v1/.well-known/jwks.json`);
+  const res = await fetch(`${supabaseUrl}/auth/v1/.well-known/jwks.json`, {
+    signal: AbortSignal.timeout(JWKS_FETCH_TIMEOUT_MS),
+  });
   if (!res.ok) throw new Error(`status ${res.status}`);
   const { keys: jwks } = await res.json();
   const keys = new Map();
@@ -124,6 +136,7 @@ async function verifyViaNetwork(token, supabaseUrl, apiKey) {
     // Supabase validates the JWT (signature and expiry) for us here.
     const res = await fetch(`${supabaseUrl}/auth/v1/user`, {
       headers: { Authorization: `Bearer ${token}`, apikey: apiKey },
+      signal: AbortSignal.timeout(NETWORK_FALLBACK_TIMEOUT_MS),
     });
     if (!res.ok) return null;
     const user = await res.json();
