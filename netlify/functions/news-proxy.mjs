@@ -122,12 +122,19 @@ function isRelevantToTeam(title, teamName) {
   return title.toLowerCase().includes(teamName.toLowerCase());
 }
 
-// Restricts results to a small set of established, editorially-reviewed
-// outlets rather than every blog/fansite/aggregator Google indexes — trades
-// recall for reliability. Matched case-insensitively since Google News'
-// <source> casing isn't perfectly consistent (a live sample returned
+// Restricts results to a set of established, editorially-reviewed outlets
+// rather than every blog/fansite/aggregator Google indexes — trades recall
+// for reliability. Widened from the original 4 (ESPN/CBS Sports/FOX
+// Sports/RotoWire) after live testing showed several teams had zero results
+// passing every filter at once — the strict set covers a national beat
+// unevenly, and a program's actual suspension/firing news that week is often
+// carried by one of these instead. Matched case-insensitively since Google
+// News' <source> casing isn't perfectly consistent (a live sample returned
 // "FOX Sports", not "Fox Sports").
-const ALLOWED_SOURCES = new Set(['espn', 'cbs sports', 'fox sports', 'rotowire']);
+const ALLOWED_SOURCES = new Set([
+  'espn', 'cbs sports', 'fox sports', 'rotowire',
+  'sports illustrated', 'usa today', 'on3', '247sports',
+]);
 function isAllowedSource(source) {
   return !!source && ALLOWED_SOURCES.has(source.trim().toLowerCase());
 }
