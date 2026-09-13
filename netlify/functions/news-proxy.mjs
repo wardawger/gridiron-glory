@@ -25,8 +25,13 @@ import { verifyUser } from './lib/verifyUser.mjs';
 const NEWS_KEYWORDS =
   '(suspended OR suspension OR fired OR fires OR dismissed OR dismissal OR "parts ways" OR ousted OR terminated OR "let go")';
 
+// "college football" (not just "football") plus excluding NFL coverage —
+// several school names are also NFL cities/franchises that get referred to
+// by the bare city name in headlines (a "Miami" query pulled in Dolphins
+// news alongside Hurricanes news). Verified live against the real feed:
+// this leaves the Hurricanes coverage intact and removes the NFL results.
 function buildQuery(teamName) {
-  return `"${teamName}" football ${NEWS_KEYWORDS}`;
+  return `"${teamName}" college football -NFL ${NEWS_KEYWORDS}`;
 }
 
 // Module-scope cache — reused across invocations on a warm Netlify Function
