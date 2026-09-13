@@ -16,7 +16,7 @@ import { InfoTooltip } from '../ui/Tooltip';
 import { Toggle } from '../ui/Toggle';
 import { GameScoreModal } from './GameScoreModal';
 import {
-  seriesColor, seriesDash, CHART_TOOLTIP_STYLE, CHART_TOOLTIP_LABEL, CHART_TOOLTIP_ITEM, legendFormatter,
+  seriesColor, CHART_TOOLTIP_STYLE, CHART_TOOLTIP_LABEL, CHART_TOOLTIP_ITEM, legendFormatter,
   CHART_AXIS_TICK, CHART_GRID, CHART_MUTED, CHART_SURFACE, CHART_BAND,
 } from '../../lib/chartTheme';
 
@@ -1142,7 +1142,6 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                             dataKey={e.user_id}
                             stroke={seriesColor(i)}
                             strokeWidth={2}
-                            strokeDasharray={seriesDash(i)}
                             dot={{ r: 2 }}
                             activeDot={{ r: 4 }}
                           />

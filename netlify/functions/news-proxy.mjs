@@ -122,6 +122,20 @@ function isRelevantToTeam(title, teamName) {
   return title.toLowerCase().includes(teamName.toLowerCase());
 }
 
+// Same class of problem as the NFL/college mixup above, one level down: a
+// school's name is shared across its own athletic department, so a query
+// for "Houston" (football) can return a real, on-topic-looking result about
+// Houston's *baseball* coach instead. Excluding an explicit other-sport
+// mention is deliberately narrow — it only blocks a headline that names a
+// different sport outright, so it never drops a genuine football headline
+// just for not literally saying "football" (most correct ones don't).
+// Verified live: this removes exactly the baseball-coach mismatches without
+// touching any real football result in the same sample.
+const OTHER_SPORTS_RE = /\b(baseball|basketball|softball|volleyball|hockey|soccer|lacrosse|wrestling|golf|tennis|swimming|gymnastics|rowing|track and field)\b/i;
+function isAboutOtherSport(title) {
+  return OTHER_SPORTS_RE.test(title);
+}
+
 // Restricts results to a set of established, editorially-reviewed outlets
 // rather than every blog/fansite/aggregator Google indexes — trades recall
 // for reliability. Widened from the original 4 (ESPN/CBS Sports/FOX
@@ -149,7 +163,7 @@ async function fetchTeamNews(teamName) {
     if (!res.ok) throw new Error(`status ${res.status}`);
     const xml = await res.text();
     const items = parseRssItems(xml, teamName)
-      .filter(item => isRelevantToTeam(item.title, teamName) && isAllowedSource(item.source));
+      .filter(item => isRelevantToTeam(item.title, teamName) && !isAboutOtherSport(item.title) && isAllowedSource(item.source));
     newsCache.set(teamName, { items, fetchedAt: Date.now() });
     return items;
   } catch (e) {

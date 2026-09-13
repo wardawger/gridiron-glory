@@ -25,18 +25,6 @@ export const CHART_AXIS_TICK = { fill: '#6c757d', fontSize: 12 };  // turf-600 �
 // palette keeps cycling instead of handing every extra manager the same
 // fallback (or, where the caller forgot a fallback, no color at all).
 export const seriesColor = (i: number) => PLAYER_COLORS[i % PLAYER_COLORS.length];
-
-// Dash pattern per manager index, for multi-series line charts. Two
-// managers can legitimately have identical cumulative totals for a
-// stretch of weeks (e.g. the same win/loss record early in a season) —
-// when that happens, whichever <Line> renders last paints directly over
-// the other's identical path, making the earlier one invisible even
-// though its data and legend entry are both correct. A distinct dash
-// pattern per series means an overlapping line still shows through the
-// gaps instead of disappearing entirely. undefined (index 0) keeps the
-// most common case — no overlap — reading as a plain solid line.
-const SERIES_DASH = [undefined, '6 3', '2 3', '8 3 2 3', '3 6', '1 3'];
-export const seriesDash = (i: number) => SERIES_DASH[i % SERIES_DASH.length];
 export const CHART_GRID = '#495057';              // turf-700 — grids, cursors, reference lines
 export const CHART_MUTED = '#adb5bd';             // turf-500 — legend/secondary label text
 export const CHART_SURFACE = '#0d1117';           // turf-950 — page behind the chart
