@@ -59,7 +59,16 @@ export default async (req) => {
   // domain to any address a stranger named, with attacker-controlled text
   // in the subject line — a spam/phishing relay that would have burned the
   // Resend quota and the domain's reputation along with it.
-  const user = await verifyUser(req, SUPABASE_URL, SERVICE_KEY);
+  // verifyUser() is documented to never throw, but wrapped anyway — see
+  // cfbd-proxy.mjs's identical guard for why an uncaught exception here
+  // would otherwise crash the whole invocation instead of failing cleanly.
+  let user;
+  try {
+    user = await verifyUser(req, SUPABASE_URL, SERVICE_KEY);
+  } catch (e) {
+    console.error('[send-invite-email] verifyUser threw:', e);
+    user = null;
+  }
   if (!user) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers });
   }

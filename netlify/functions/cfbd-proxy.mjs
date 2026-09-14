@@ -61,11 +61,25 @@ function ttlForPath(cfbdPath) {
 
 // ── Supabase helpers (plain REST, no SDK needed) ─────────────────────────────
 
+// None of the three fetches in this file (cache read, cache write, the CFBD
+// call itself) had a timeout — production logs showed invocations running
+// 15-18+ seconds, and a fetch that stalls instead of erroring can run long
+// enough that Netlify's own platform timeout force-kills the function
+// rather than letting it fail gracefully. From the outside that force-kill
+// looks exactly like a 502, and it happened even though every fetch here
+// already has its own try/catch — a stalled connection just never reaches
+// the catch. A bounded AbortSignal.timeout on each one guarantees this
+// function always returns control on its own, well inside whatever the
+// platform's real ceiling is, instead of leaving that up to chance.
+const CACHE_GET_TIMEOUT_MS = 3000;
+const CACHE_SET_TIMEOUT_MS = 5000;
+const CFBD_FETCH_TIMEOUT_MS = 12000;
+
 async function cacheGet(supabaseUrl, serviceKey, cacheKey, ttlHours) {
   try {
     const res = await fetch(
       `${supabaseUrl}/rest/v1/cfbd_cache?cache_key=eq.${encodeURIComponent(cacheKey)}&select=data,fetched_at`,
-      { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } }
+      { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` }, signal: AbortSignal.timeout(CACHE_GET_TIMEOUT_MS) }
     );
     if (!res.ok) return null;
     const rows = await res.json();
@@ -91,6 +105,7 @@ async function cacheSet(supabaseUrl, serviceKey, cacheKey, data) {
         data,
         fetched_at: new Date().toISOString(),
       }),
+      signal: AbortSignal.timeout(CACHE_SET_TIMEOUT_MS),
     });
   } catch (e) {
     console.warn('[cfbd-proxy] cache write failed:', e);
@@ -130,7 +145,19 @@ export default async (req) => {
   // anyone could burn the whole CFBD quota. Any signed-in user is
   // sufficient here: the data is public college-football stats, so the
   // gate is about quota abuse, not about who may see what.
-  const user = await verifyUser(req, supabaseUrl, serviceKey);
+  //
+  // verifyUser() is documented to never throw, but it's wrapped anyway:
+  // this is the one call in the whole handler that wasn't inside a
+  // try/catch, and an uncaught exception here — now or from some future
+  // change to that shared function — would crash the entire invocation
+  // (a 502 to the caller) instead of a controlled response.
+  let user;
+  try {
+    user = await verifyUser(req, supabaseUrl, serviceKey);
+  } catch (e) {
+    console.error('[cfbd-proxy] verifyUser threw:', e);
+    user = null;
+  }
   if (!user) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401, headers: corsHeaders,
@@ -182,6 +209,7 @@ export default async (req) => {
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
+      signal: AbortSignal.timeout(CFBD_FETCH_TIMEOUT_MS),
     });
 
     const body = await cfbdRes.text();
