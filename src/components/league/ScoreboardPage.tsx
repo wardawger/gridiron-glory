@@ -375,7 +375,7 @@ export function ScoreboardPage({
         const spreadPick = spreadPicks.find(
           p => p.user_id === member.user_id && p.week === week && p.team_id === b.team_id
         ) ?? null;
-        const live = findLiveStatus(liveScoreboard, b.team_name, b.game!.opponent);
+        const live = findLiveStatus(liveScoreboard, b.team_id, b.game!.opponent_id);
         const liveState = resolveRowLiveState(b, live);
         rows.push({ member, breakdown: b, spreadPick, live, ...liveState });
       });

@@ -718,9 +718,13 @@ export async function fetchSpreads(
 // implies. Both of those were confirmed wrong in the first version of this
 // function (which assumed possession was a team name and matched map keys
 // by exact school name), so this resolves possession to an actual mascot
-// name at parse time here, and callers match team names with a prefix
-// check (see findLiveStatus / teamNameMatches below) instead of exact
-// equality, since a school-only name is always a prefix of the mascot name.
+// name at parse time here. Game/opponent lookup (findLiveStatus below)
+// matches on CFBD team id instead of any form of name comparison — a prior
+// version matched school names as a prefix of the mascot name, which let
+// "Texas State" satisfy a lookup for "Texas" and hand its score to the
+// wrong game. Possession still resolves to a mascot name (there's no id for
+// "which side has the ball"), so teamNameMatches below still needs the
+// prefix check for that one case.
 function statusPriority(status: string): number {
   return status === 'in_progress' ? 2 : status === 'completed' ? 1 : 0;
 }
@@ -733,7 +737,7 @@ function statusPriority(status: string): number {
 // one entry per team and risking a finished game's score leaking onto an
 // unrelated, not-yet-played matchup against a different opponent.
 export interface LiveScoreboardEntry extends LiveGameStatus {
-  opponentName: string;
+  opponentId: string;
 }
 
 function addEntry(map: Map<string, LiveScoreboardEntry[]>, key: string, entry: LiveScoreboardEntry): void {
@@ -765,6 +769,8 @@ export async function fetchScoreboard(): Promise<Map<string, LiveScoreboardEntry
     for (const g of data) {
       const homeName = typeof g.homeTeam?.name === 'string' ? g.homeTeam.name : null;
       const awayName = typeof g.awayTeam?.name === 'string' ? g.awayTeam.name : null;
+      const homeId   = g.homeTeam?.id != null ? String(g.homeTeam.id) : null;
+      const awayId   = g.awayTeam?.id != null ? String(g.awayTeam.id) : null;
 
       const possessionSide = typeof g.possession === 'string' ? g.possession.toLowerCase() : null;
       const possessionTeam = possessionSide === 'home' ? homeName : possessionSide === 'away' ? awayName : null;
@@ -783,9 +789,22 @@ export async function fetchScoreboard(): Promise<Map<string, LiveScoreboardEntry
       // today's — a team can be listed more than once at once (its
       // just-finished game and its next game), so every entry is kept
       // rather than collapsed to one per team; findLiveStatus below
-      // disambiguates by opponent name.
-      if (homeName) addEntry(map, homeName.toLowerCase(), { ...status, opponentName: awayName ?? '' });
-      if (awayName) addEntry(map, awayName.toLowerCase(), { ...status, opponentName: homeName ?? '' });
+      // disambiguates by the opponent's CFBD team id.
+      //
+      // This used to key on lowercased team *name* and disambiguate by
+      // opponent name via a startsWith() prefix check — meant to bridge
+      // this app's school-only names ("Texas") against the live endpoint's
+      // full mascot names ("Texas Longhorns"). That check had a real bug:
+      // "Texas State Bobcats".startsWith("Texas") is also true, so a live
+      // (or just-completed) Texas State game could satisfy a lookup for
+      // Texas's actual opponent and hand its score to the wrong matchup
+      // entirely. CFBD team ids are stable and exact — no prefix ambiguity
+      // between two different schools — so both the team key and the
+      // opponent match now use ids instead of any name comparison.
+      if (homeId && awayId) {
+        addEntry(map, homeId, { ...status, opponentId: awayId });
+        addEntry(map, awayId, { ...status, opponentId: homeId });
+      }
     }
   } catch (e) {
     console.warn('[CFBD] fetchScoreboard failed:', e);
@@ -793,25 +812,24 @@ export async function fetchScoreboard(): Promise<Map<string, LiveScoreboardEntry
   return map;
 }
 
-// fetchScoreboard's map is keyed by full mascot name ("Florida State
-// Seminoles"), but this app's own team names are school-only ("Florida
-// State") — a school name is always a prefix of its mascot name, so match
-// on that instead of exact equality. `opponentName` (also school-only) is
-// required to pick the right game when a team has more than one entry in
-// the map at once — without it, a team's already-finished prior game could
-// otherwise win over its real upcoming game via statusPriority.
+// fetchScoreboard's map is keyed by CFBD team id (a plain string of the
+// numeric id) — exact ids, no name comparison of any kind, so two
+// differently-named-but-similarly-spelled schools ("Texas" vs "Texas
+// State") can never collide the way a prefix match on names could.
+// `opponentId` is required to pick the right game when a team has more
+// than one entry in the map at once (e.g. its just-finished opener and its
+// upcoming next game both present at once) — without it, a team's
+// already-finished prior game could otherwise win over its real upcoming
+// game via statusPriority.
 export function findLiveStatus(
-  live: Map<string, LiveScoreboardEntry[]>, teamName: string, opponentName: string
+  live: Map<string, LiveScoreboardEntry[]>, teamId: string, opponentId: string
 ): LiveGameStatus | null {
-  const needle = teamName.toLowerCase();
-  const oppNeedle = opponentName.toLowerCase();
+  const entries = live.get(teamId);
+  if (!entries) return null;
   let best: LiveScoreboardEntry | null = null;
-  for (const [key, entries] of live) {
-    if (!key.startsWith(needle)) continue;
-    for (const entry of entries) {
-      if (!entry.opponentName.toLowerCase().startsWith(oppNeedle)) continue;
-      if (!best || statusPriority(entry.status) > statusPriority(best.status)) best = entry;
-    }
+  for (const entry of entries) {
+    if (entry.opponentId !== opponentId) continue;
+    if (!best || statusPriority(entry.status) > statusPriority(best.status)) best = entry;
   }
   return best;
 }
