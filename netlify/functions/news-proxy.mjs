@@ -184,6 +184,39 @@ async function fetchTeamNews(teamName) {
   }
 }
 
+// Some drafted team names are a literal prefix of another drafted team's
+// full name — Florida vs. Florida State, Ohio vs. Ohio State, Miami vs.
+// Miami (OH). A genuine "Florida State fires AD" headline contains the
+// substring "Florida" too, so it passed isRelevantToTeam and got wrongly
+// credited (and logoed) to Florida as well as Florida State. Verified live:
+// this drops exactly those Florida-State-only headlines from Florida's
+// results while leaving Florida State's own results untouched.
+//
+// Computed against whichever teams are actually drafted in the calling
+// league, not a hardcoded list of "X State" pairs — and applied here, as a
+// final pass over the combined results, rather than inside fetchTeamNews'
+// cached filter, because which siblings exist depends on that league's own
+// roster while the per-team cache is shared across every league that asks;
+// baking this into the cached filter would let one league's roster shape
+// leak into another's results.
+function isSiblingNameOnly(title, teamName, allTeamNames) {
+  const lowerTitle = title.toLowerCase();
+  const lowerTeam = teamName.toLowerCase();
+  const extensions = allTeamNames
+    .filter(other => other !== teamName && other.toLowerCase().startsWith(lowerTeam))
+    .map(other => other.slice(teamName.length).toLowerCase());
+  if (extensions.length === 0) return false;
+
+  let idx = 0;
+  while (true) {
+    idx = lowerTitle.indexOf(lowerTeam, idx);
+    if (idx === -1) return true; // every occurrence found was sibling-only
+    const after = lowerTitle.slice(idx + lowerTeam.length);
+    if (!extensions.some(ext => after.startsWith(ext))) return false; // a standalone mention exists
+    idx += lowerTeam.length;
+  }
+}
+
 // Bounded concurrency rather than one giant Promise.all — a full league can
 // have 40-60 distinct drafted teams, and firing that many simultaneous
 // requests at an unofficial, unauthenticated endpoint is a good way to get
@@ -195,7 +228,7 @@ async function fetchAllTeamsNews(teamNames) {
     const batch = teamNames.slice(i, i + CONCURRENCY);
     results.push(...(await Promise.all(batch.map(fetchTeamNews))).flat());
   }
-  return results;
+  return results.filter(item => !isSiblingNameOnly(item.title, item.team_name, teamNames));
 }
 
 export default async (req) => {
