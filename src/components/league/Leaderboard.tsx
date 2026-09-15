@@ -212,13 +212,11 @@ function WeeklyBreakdownTable({
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-2">
-        <p className="text-xs text-turf-500 uppercase tracking-wide">Weekly Points</p>
-        {score && (
-          <span className={`font-mono text-sm font-bold ${score.points > 0 ? 'text-field-400' : score.points < 0 ? 'text-red-300' : 'text-turf-400'}`}>
-            {signed(score.points)}
-          </span>
-        )}
+      <div className="card-inner px-3 py-2 mb-2">
+        <p className="text-xs text-turf-600">Week {selectedWeek} Points</p>
+        <p className={`font-mono font-bold ${score && score.points > 0 ? 'text-field-400' : score && score.points < 0 ? 'text-red-300' : 'text-turf-400'}`}>
+          {score ? signed(score.points) : '—'}
+        </p>
       </div>
 
       <div role="tablist" aria-label="Select week" className="flex gap-1 overflow-x-auto mb-2">
@@ -763,7 +761,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                   <div className="px-5 pb-5 pt-1 space-y-4 border-t border-turf-800/60">
                     <div className="pt-3">
                       <p className="text-xs text-turf-500 uppercase tracking-wide mb-1.5">Totals</p>
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className={`grid gap-2 ${includeStatBonuses ? 'grid-cols-2' : 'grid-cols-1'}`}>
                         <div className="card-inner px-3 py-2">
                           <p className="text-xs text-turf-600">Season</p>
                           <p className="font-mono font-bold text-white">{signed(displayTotal(entry))}</p>
@@ -776,12 +774,6 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                             </p>
                           </div>
                         )}
-                        <div className="card-inner px-3 py-2">
-                          <p className="text-xs text-turf-600">Weekly Points</p>
-                          <p className={`font-mono font-bold ${weekScore && weekScore.points > 0 ? 'text-field-400' : weekScore && weekScore.points < 0 ? 'text-red-300' : 'text-turf-400'}`}>
-                            {weekScore ? signed(weekScore.points) : '—'}
-                          </p>
-                        </div>
                       </div>
                     </div>
 
