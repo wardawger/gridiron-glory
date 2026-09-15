@@ -225,7 +225,7 @@ function WeeklyBreakdownTable({
 
   return (
     <div>
-      <div className="card-inner px-3 py-2 mb-2">
+      <div className="card-inner inline-block px-3 py-2 mb-2">
         <p className="text-xs text-turf-600">Week {selectedWeek} Points</p>
         <p className={`font-mono font-bold ${score && score.points > 0 ? 'text-field-400' : score && score.points < 0 ? 'text-red-300' : 'text-turf-400'}`}>
           {score ? signed(score.points) : '—'}
@@ -666,17 +666,6 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
     });
   }, [entries, currentWeek]);
 
-  // Same sparse-early-season problem, one chart over: trendData always has
-  // one point per week (0 through currentWeek) even in week 1, so a 1-2
-  // point line stretched across the full card width reads as a nearly
-  // blank chart. Needs far less width per point than the bar chart above —
-  // it's one tick mark, not a whole band of per-manager bars.
-  const trendPlotMaxWidth = useMemo(() => {
-    const points = trendData.length;
-    if (points === 0 || points >= 6) return undefined;
-    return 64 + points * 90; // 64 ≈ the y-axis gutter
-  }, [trendData.length]);
-
   // Draft value scatter — one series per manager so each gets its own color/legend entry
   const scatterByManager = useMemo(() => {
     return entries.map((e, i) => {
@@ -886,13 +875,13 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                   <div className="px-5 pb-5 pt-1 space-y-4 border-t border-turf-800/60">
                     <div className="pt-3">
                       <p className="text-xs text-turf-500 uppercase tracking-wide mb-1.5">Totals</p>
-                      <div className={`grid gap-2 ${includeStatBonuses ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                        <div className="card-inner px-3 py-2">
+                      <div className="flex flex-wrap gap-2">
+                        <div className="card-inner inline-block px-3 py-2">
                           <p className="text-xs text-turf-600">Season</p>
                           <p className="font-mono font-bold text-white">{signed(displayTotal(entry))}</p>
                         </div>
                         {includeStatBonuses && (
-                          <div className="card-inner px-3 py-2">
+                          <div className="card-inner inline-block px-3 py-2">
                             <p className="text-xs text-turf-600">Stat Bonuses</p>
                             <p className={`font-mono font-bold ${statPts > 0 ? 'text-blue-400' : statPts < 0 ? 'text-red-300' : 'text-turf-400'}`}>
                               {signed(statPts)}
@@ -1240,12 +1229,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                 {trendData.length === 0 ? (
                   <p className="text-turf-500 text-sm text-center py-8">No weekly data yet — check back once games are played</p>
                 ) : (
-                  <div
-                    className="h-72 mx-auto"
-                    style={{ maxWidth: trendPlotMaxWidth }}
-                    role="img"
-                    aria-label="Line chart of each manager's cumulative points across the season"
-                  >
+                  <div className="h-72" role="img" aria-label="Line chart of each manager's cumulative points across the season">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={trendData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
                         <XAxis dataKey="week" tick={CHART_AXIS_TICK} axisLine={false} tickLine={false} />
