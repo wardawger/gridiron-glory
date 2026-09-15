@@ -162,7 +162,7 @@ function AnimatedRoutes({ lg, league, auth, cfb }: AnimatedRoutesProps) {
           <Route path="/league-settings" element={<LeagueSettingsPage league={lg} members={league.members} />} />
           <Route path="/news" element={
             cfbInitialLoading ? <NewsPageSkeleton /> : (
-              <NewsPage members={league.members} rosters={league.rosters} />
+              <NewsPage members={league.members} rosters={league.rosters} allTeamNames={cfb.teams.map(t => t.name)} />
             )
           } />
           <Route path="/league-history" element={

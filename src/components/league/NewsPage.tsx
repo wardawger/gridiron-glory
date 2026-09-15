@@ -7,6 +7,7 @@ import { TeamLogo } from '../ui/TeamLogo';
 interface Props {
   members: LeagueMember[];
   rosters: Map<string, RosterEntry[]>;
+  allTeamNames: string[];
 }
 
 const CATEGORIES: NewsCategory[] = ['Suspension', 'Coach Firing', 'Player News', 'General'];
@@ -31,7 +32,7 @@ function timeAgo(iso: string): string {
   return `${Math.floor(days / 30)}mo ago`;
 }
 
-export function NewsPage({ members, rosters }: Props) {
+export function NewsPage({ members, rosters, allTeamNames }: Props) {
   const uid = useId();
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,7 +63,7 @@ export function NewsPage({ members, rosters }: Props) {
     if (!teamNamesKey) { setLoading(false); return; }
     let cancelled = false;
     setLoading(true);
-    fetchTeamNews(teamNamesKey.split('|')).then(result => {
+    fetchTeamNews(teamNamesKey.split('|'), allTeamNames).then(result => {
       if (!cancelled) { setArticles(result); setLoading(false); }
     });
     return () => { cancelled = true; };

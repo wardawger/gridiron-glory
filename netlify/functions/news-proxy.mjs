@@ -184,21 +184,24 @@ async function fetchTeamNews(teamName) {
   }
 }
 
-// Some drafted team names are a literal prefix of another drafted team's
-// full name — Florida vs. Florida State, Ohio vs. Ohio State, Miami vs.
-// Miami (OH). A genuine "Florida State fires AD" headline contains the
-// substring "Florida" too, so it passed isRelevantToTeam and got wrongly
-// credited (and logoed) to Florida as well as Florida State. Verified live:
-// this drops exactly those Florida-State-only headlines from Florida's
-// results while leaving Florida State's own results untouched.
+// Some FBS team names are a literal prefix of another FBS team's full name
+// — Florida vs. Florida State, Ohio vs. Ohio State, Miami vs. Miami (OH). A
+// genuine "Florida State fires AD" headline contains the substring
+// "Florida" too, so it passed isRelevantToTeam and got wrongly credited
+// (and logoed) to Florida as well as Florida State. Verified live: this
+// drops exactly those Florida-State-only headlines from Florida's results
+// while leaving Florida State's own results untouched.
 //
-// Computed against whichever teams are actually drafted in the calling
-// league, not a hardcoded list of "X State" pairs — and applied here, as a
-// final pass over the combined results, rather than inside fetchTeamNews'
-// cached filter, because which siblings exist depends on that league's own
-// roster while the per-team cache is shared across every league that asks;
-// baking this into the cached filter would let one league's roster shape
-// leak into another's results.
+// This originally checked only against the *other teams drafted in the
+// calling league* — deliberately, to keep one league's roster shape from
+// leaking into another's results via the shared per-team cache. But that
+// meant a league that drafted Florida without also drafting Florida State
+// had no known "sibling" to compare against, so the exclusion silently
+// never fired — the exact bug this function exists to prevent, just for
+// leagues shaped that way. Checked against the caller-supplied full FBS
+// team list instead (every league sends the same list regardless of its
+// own roster, so this still can't leak roster shape between leagues), with
+// a fallback to the drafted-teams list for callers that don't supply one.
 function isSiblingNameOnly(title, teamName, allTeamNames) {
   const lowerTitle = title.toLowerCase();
   const lowerTeam = teamName.toLowerCase();
@@ -222,13 +225,13 @@ function isSiblingNameOnly(title, teamName, allTeamNames) {
 // requests at an unofficial, unauthenticated endpoint is a good way to get
 // rate-limited or blocked outright.
 const CONCURRENCY = 6;
-async function fetchAllTeamsNews(teamNames) {
+async function fetchAllTeamsNews(teamNames, siblingCandidates) {
   const results = [];
   for (let i = 0; i < teamNames.length; i += CONCURRENCY) {
     const batch = teamNames.slice(i, i + CONCURRENCY);
     results.push(...(await Promise.all(batch.map(fetchTeamNews))).flat());
   }
-  return results.filter(item => !isSiblingNameOnly(item.title, item.team_name, teamNames));
+  return results.filter(item => !isSiblingNameOnly(item.title, item.team_name, siblingCandidates));
 }
 
 export default async (req) => {
@@ -258,12 +261,15 @@ export default async (req) => {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
   }
 
-  let teamNames;
+  let teamNames, allTeamNames;
   try {
     const body = await req.json();
     teamNames = Array.isArray(body?.teams)
       ? body.teams.filter(t => typeof t === 'string' && t.trim().length > 0)
       : [];
+    allTeamNames = Array.isArray(body?.allTeams)
+      ? body.allTeams.filter(t => typeof t === 'string' && t.trim().length > 0)
+      : null;
   } catch {
     return new Response(JSON.stringify({ error: 'Invalid JSON body' }), { status: 400, headers: corsHeaders });
   }
@@ -275,9 +281,13 @@ export default async (req) => {
   // Caps the outbound fan-out regardless of how large the caller's list is.
   const MAX_TEAMS = 60;
   const uniqueTeams = [...new Set(teamNames)].slice(0, MAX_TEAMS);
+  // Falls back to the drafted-teams list itself for callers that don't send
+  // the full FBS list — narrower coverage (see isSiblingNameOnly) but still
+  // correct, rather than failing the request outright.
+  const siblingCandidates = allTeamNames && allTeamNames.length > 0 ? [...new Set(allTeamNames)] : uniqueTeams;
 
   try {
-    const articles = await fetchAllTeamsNews(uniqueTeams);
+    const articles = await fetchAllTeamsNews(uniqueTeams, siblingCandidates);
 
     // The same story sometimes surfaces once per team it mentions (a
     // multi-suspension report, a conference-wide coaching-carousel
