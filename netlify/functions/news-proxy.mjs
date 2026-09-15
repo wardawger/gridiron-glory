@@ -136,6 +136,16 @@ function isAboutOtherSport(title) {
   return OTHER_SPORTS_RE.test(title);
 }
 
+// This app only cares about the college teams a league has drafted — a
+// query for "Houston" or "Georgia" can still surface a real high school
+// football story (recruiting, a canceled game, a coach hire) that happens
+// to name-match. Verified live: catches genuine HS stories cleanly on
+// several teams without false positives in the same samples.
+const HIGH_SCHOOL_RE = /\bhigh school\b|\bH\.S\.\b/i;
+function isAboutHighSchool(title) {
+  return HIGH_SCHOOL_RE.test(title);
+}
+
 // Restricts results to a set of established, editorially-reviewed outlets
 // rather than every blog/fansite/aggregator Google indexes — trades recall
 // for reliability. Widened from the original 4 (ESPN/CBS Sports/FOX
@@ -163,7 +173,7 @@ async function fetchTeamNews(teamName) {
     if (!res.ok) throw new Error(`status ${res.status}`);
     const xml = await res.text();
     const items = parseRssItems(xml, teamName)
-      .filter(item => isRelevantToTeam(item.title, teamName) && !isAboutOtherSport(item.title) && isAllowedSource(item.source));
+      .filter(item => isRelevantToTeam(item.title, teamName) && !isAboutOtherSport(item.title) && !isAboutHighSchool(item.title) && isAllowedSource(item.source));
     newsCache.set(teamName, { items, fetchedAt: Date.now() });
     return items;
   } catch (e) {
