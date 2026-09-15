@@ -777,9 +777,9 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                           </div>
                         )}
                         <div className="card-inner px-3 py-2">
-                          <p className="text-xs text-turf-600">Manual Bonuses</p>
-                          <p className={`font-mono font-bold ${entry.bonus_points > 0 ? 'text-amber-400' : entry.bonus_points < 0 ? 'text-red-300' : 'text-turf-400'}`}>
-                            {signed(entry.bonus_points)}
+                          <p className="text-xs text-turf-600">Weekly Points</p>
+                          <p className={`font-mono font-bold ${weekScore && weekScore.points > 0 ? 'text-field-400' : weekScore && weekScore.points < 0 ? 'text-red-300' : 'text-turf-400'}`}>
+                            {weekScore ? signed(weekScore.points) : '—'}
                           </p>
                         </div>
                       </div>
