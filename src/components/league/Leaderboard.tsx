@@ -132,7 +132,7 @@ const ScatterTooltip = ({ active, payload }: any) => {
   return (
     <div className="bg-turf-900 border border-turf-700 rounded-lg px-3 py-2 text-sm shadow-xl shadow-black/40">
       <p className="font-medium text-white mb-1">{p.team_name}</p>
-      <p className="text-turf-400 text-xs">{chartLabel(p.display_name)}</p>
+      <p className="text-turf-400 text-xs">{p.label ?? chartLabel(p.display_name)}</p>
       <p className="text-turf-300 font-mono text-xs mt-1">Pick #{p.pick_number} · AP #{p.rank}</p>
     </div>
   );
@@ -511,6 +511,29 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
     [rankings]
   );
 
+  // chartLabel() alone can collide — two managers named "John Smith" and
+  // "John Sanders" both reduce to "John S." and would then be
+  // indistinguishable on every chart axis/legend/tooltip. Only widens the
+  // label for whichever pair actually collides in this league, rather than
+  // lengthening everyone's label just because two people somewhere might
+  // share one.
+  const labelByUserId = useMemo(() => {
+    const short = new Map(entries.map(e => [e.user_id, chartLabel(e.display_name)]));
+    const countByShort = new Map<string, number>();
+    short.forEach(label => countByShort.set(label, (countByShort.get(label) ?? 0) + 1));
+    const result = new Map<string, string>();
+    entries.forEach(e => {
+      const label = short.get(e.user_id)!;
+      if ((countByShort.get(label) ?? 0) > 1) {
+        const parts = e.display_name.trim().split(/\s+/);
+        result.set(e.user_id, parts.length > 1 ? `${parts[0]} ${parts[1]}` : parts[0]);
+      } else {
+        result.set(e.user_id, label);
+      }
+    });
+    return result;
+  }, [entries]);
+
   // Roving arrow-key focus for the analytics tablist (WAI-ARIA tabs pattern).
   const onTabKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>, idx: number) => {
     const delta = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
@@ -562,7 +585,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
   );
 
   const chartData = rankedEntries.map(e => ({
-    name: chartLabel(e.display_name),
+    name: labelByUserId.get(e.user_id) ?? chartLabel(e.display_name),
     points: displayTotal(e),
   }));
   const chartDomain: [number, number] = [
@@ -643,14 +666,32 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
     });
   }, [entries, currentWeek]);
 
+  // Same sparse-early-season problem, one chart over: trendData always has
+  // one point per week (0 through currentWeek) even in week 1, so a 1-2
+  // point line stretched across the full card width reads as a nearly
+  // blank chart. Needs far less width per point than the bar chart above —
+  // it's one tick mark, not a whole band of per-manager bars.
+  const trendPlotMaxWidth = useMemo(() => {
+    const points = trendData.length;
+    if (points === 0 || points >= 6) return undefined;
+    return 64 + points * 90; // 64 ≈ the y-axis gutter
+  }, [trendData.length]);
+
   // Draft value scatter — one series per manager so each gets its own color/legend entry
   const scatterByManager = useMemo(() => {
-    return entries.map((e, i) => ({
-      name: chartLabel(e.display_name),
-      color: seriesColor(i),
-      data: scatterPoints.filter(p => p.user_id === e.user_id),
-    })).filter(m => m.data.length > 0);
-  }, [entries, scatterPoints]);
+    return entries.map((e, i) => {
+      const label = labelByUserId.get(e.user_id) ?? chartLabel(e.display_name);
+      return {
+        name: label,
+        color: seriesColor(i),
+        // ScatterTooltip is a module-scope component with no closure over
+        // labelByUserId (recharts renders it detached from this tree) —
+        // the disambiguated label rides along on each point instead of
+        // being recomputed from display_name alone down there.
+        data: scatterPoints.filter(p => p.user_id === e.user_id).map(p => ({ ...p, label })),
+      };
+    }).filter(m => m.data.length > 0);
+  }, [entries, scatterPoints, labelByUserId]);
 
   return (
     <div className="space-y-6 animate-fade-in motion-reduce:animate-none">
@@ -974,7 +1015,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                                 style={{ backgroundColor: seriesColor(i) }}
                               />
                               <span className="font-sans font-bold text-sm text-white truncate">
-                                {chartLabel(a.display_name)}
+                                {labelByUserId.get(a.user_id) ?? chartLabel(a.display_name)}
                               </span>
                             </Link>
                             {isMe && <span className="sr-only"> (you)</span>}
@@ -1075,7 +1116,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                       {entries.map((e, i) => (
                         <Bar
                           key={e.user_id}
-                          name={chartLabel(e.display_name)}
+                          name={labelByUserId.get(e.user_id) ?? chartLabel(e.display_name)}
                           dataKey={e.user_id}
                           fill={seriesColor(i)}
                           fillOpacity={0.85}
@@ -1107,7 +1148,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                     role="img"
                     aria-label={
                       radarFocus
-                        ? `Radar chart of ${chartLabel(entries.find(e => e.user_id === radarFocus)?.display_name ?? '')}'s roster across average rank, top-25 rank, best pick, worst pick, and draft value`
+                        ? `Radar chart of ${labelByUserId.get(radarFocus) ?? ''}'s roster across average rank, top-25 rank, best pick, worst pick, and draft value`
                         : "Radar chart comparing each manager's roster on average rank, top-25 rank, best pick, worst pick, and draft value"
                     }
                   >
@@ -1128,7 +1169,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                           radarFocus !== null && radarFocus !== e.user_id ? null : (
                             <Radar
                               key={e.user_id}
-                              name={chartLabel(e.display_name)}
+                              name={labelByUserId.get(e.user_id) ?? chartLabel(e.display_name)}
                               dataKey={e.user_id}
                               stroke={seriesColor(i)}
                               fill={seriesColor(i)}
@@ -1183,7 +1224,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                             className="w-2 h-2 rounded-full flex-shrink-0"
                             style={{ backgroundColor: seriesColor(i) }}
                           />
-                          {chartLabel(e.display_name)}
+                          {labelByUserId.get(e.user_id) ?? chartLabel(e.display_name)}
                         </button>
                       );
                     })}
@@ -1199,7 +1240,12 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                 {trendData.length === 0 ? (
                   <p className="text-turf-500 text-sm text-center py-8">No weekly data yet — check back once games are played</p>
                 ) : (
-                  <div className="h-72" role="img" aria-label="Line chart of each manager's cumulative points across the season">
+                  <div
+                    className="h-72 mx-auto"
+                    style={{ maxWidth: trendPlotMaxWidth }}
+                    role="img"
+                    aria-label="Line chart of each manager's cumulative points across the season"
+                  >
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={trendData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
                         <XAxis dataKey="week" tick={CHART_AXIS_TICK} axisLine={false} tickLine={false} />
@@ -1214,7 +1260,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                           <Line
                             key={e.user_id}
                             type="monotone"
-                            name={chartLabel(e.display_name)}
+                            name={labelByUserId.get(e.user_id) ?? chartLabel(e.display_name)}
                             dataKey={e.user_id}
                             stroke={seriesColor(i)}
                             strokeWidth={2}
