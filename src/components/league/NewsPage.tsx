@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useState } from 'react';
-import { Newspaper, ExternalLink, Users, Search, ChevronDown } from 'lucide-react';
+import { Newspaper, ExternalLink, Users, Search, ChevronDown, Filter } from 'lucide-react';
 import type { LeagueMember, RosterEntry } from '../../types';
 import { fetchTeamNews, type NewsArticle, type NewsCategory } from '../../services/news';
 import { TeamLogo } from '../ui/TeamLogo';
@@ -8,6 +8,8 @@ interface Props {
   members: LeagueMember[];
   rosters: Map<string, RosterEntry[]>;
 }
+
+const CATEGORIES: NewsCategory[] = ['Suspension', 'Coach Firing', 'Player News', 'General'];
 
 // Colors follow this app's existing badge-color semantics (red = severe,
 // gold = caution, blue = neutral-informative, gray = default catch-all) —
@@ -34,6 +36,7 @@ export function NewsPage({ members, rosters }: Props) {
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState(true);
   const [managerFilter, setManagerFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState<NewsCategory | 'all'>('all');
   const [search, setSearch] = useState('');
 
   // Every team currently rostered by anyone in the league, keyed by name
@@ -69,11 +72,12 @@ export function NewsPage({ members, rosters }: Props) {
     const q = search.trim().toLowerCase();
     return articles.filter(a =>
       (managerFilter === 'all' || ownerByTeamName.get(a.team_name) === managerFilter) &&
+      (categoryFilter === 'all' || a.category === categoryFilter) &&
       (q === '' || a.team_name.toLowerCase().includes(q))
     );
-  }, [articles, managerFilter, search, ownerByTeamName]);
+  }, [articles, managerFilter, categoryFilter, search, ownerByTeamName]);
 
-  const hasActiveFilters = managerFilter !== 'all' || search.trim() !== '';
+  const hasActiveFilters = managerFilter !== 'all' || categoryFilter !== 'all' || search.trim() !== '';
 
   return (
     <div className="space-y-5 animate-fade-in motion-reduce:animate-none">
@@ -107,6 +111,23 @@ export function NewsPage({ members, rosters }: Props) {
               >
                 <option value="all">All managers</option>
                 {members.map(m => <option key={m.user_id} value={m.user_id}>{m.display_name}</option>)}
+              </select>
+              <ChevronDown className="w-4 h-4 text-turf-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true" />
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-turf-500 flex-shrink-0" aria-hidden="true" />
+            <label htmlFor={`${uid}-cat-filter`} className="text-xs text-turf-400 flex-shrink-0">Category</label>
+            <div className="relative flex-1 sm:flex-initial sm:w-44">
+              <select
+                id={`${uid}-cat-filter`}
+                name="category_filter"
+                className="input appearance-none pr-9 text-sm [&>option]:bg-turf-800 [&>option]:text-white"
+                value={categoryFilter}
+                onChange={e => setCategoryFilter(e.target.value as NewsCategory | 'all')}
+              >
+                <option value="all">All categories</option>
+                {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
               <ChevronDown className="w-4 h-4 text-turf-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true" />
             </div>
@@ -160,7 +181,7 @@ export function NewsPage({ members, rosters }: Props) {
           {hasActiveFilters && (
             <button
               type="button"
-              onClick={() => { setManagerFilter('all'); setSearch(''); }}
+              onClick={() => { setManagerFilter('all'); setCategoryFilter('all'); setSearch(''); }}
               className="text-xs text-field-400 hover:text-field-300 transition-colors mt-1"
             >
               Clear filters
