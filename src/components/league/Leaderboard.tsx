@@ -201,41 +201,60 @@ const formatStatValue = (stat: StatBonusCategory, value: number) =>
 
 type OpenGameModalArgs = { game: GameResult; teamId: string; teamName: string; teamLogo: string; week: number; isCaptain: boolean };
 
-// Three concentric progress rings sharing one scale (totalPossible), each
-// its own full arc rather than a pie wedge — the "overlapping arcs" doughnut
-// pattern from github.com/chartjs/Chart.js/discussions/11183 (multiple full
-// rings at different radii instead of segments sharing one ring), rebuilt in
-// plain SVG since this app charts with Recharts, which has no radial-gauge
-// primitive. Gradient colors follow the same two-stop, high-opacity style as
-// codepen.io/rozklad/pen/qVObdP: red/pink for this manager's own score (the
-// featured metric), the pen's blue/purple for the league average as a
-// neutral comparison, and this app's own field-green for the ceiling ring
-// (the pen only defines two colors; green was picked to read as "full/max"
-// and to stay in the app's own palette rather than inventing an unrelated
-// third hue).
-const WEEK_RING_SPECS = [
-  { key: 'possible' as const, radius: 50, from: '#4ade80', to: '#22c55e', label: 'Total possible' },
-  { key: 'average'  as const, radius: 38, from: '#5555ff', to: '#9787ff', label: 'League average' },
-  { key: 'weekly'   as const, radius: 26, from: '#ff55b8', to: '#ff8787', label: 'Weekly points' },
+// One ring, three arcs sharing that same radius and layered on top of each
+// other rather than three separate concentric rings — the actual pattern in
+// github.com/chartjs/Chart.js/discussions/11183 ("overlapping arcs" means
+// arcs stacked on the same ring, not nested rings at different radii).
+// Drawn longest-fraction-first so each shorter arc sits visibly on top of
+// the longer ones behind it, same as the reference screenshot's bold
+// foreground arc over a lighter background one. totalPossible's own
+// fraction of itself is always 1, so its arc always paints the full ring —
+// that's intentional: it's the backdrop the average and weekly arcs are
+// read against, not a competing arc that could visually lose to them.
+// Rebuilt in plain SVG since this app charts with Recharts, which has no
+// radial-gauge primitive. Gradient colors follow the same two-stop,
+// high-opacity style as codepen.io/rozklad/pen/qVObdP: red/pink for this
+// manager's own score (the featured metric, drawn last/on top), the pen's
+// blue/purple for the league average, and this app's own field-green for
+// the ceiling arc (the pen only defines two colors; green reads as
+// "full/max" and stays in the app's own palette instead of inventing an
+// unrelated third hue).
+const WEEK_RING_LAYERS = [
+  { key: 'possible' as const, from: '#4ade80', to: '#22c55e', label: 'Total possible' },
+  { key: 'average'  as const, from: '#5555ff', to: '#9787ff', label: 'League average' },
+  { key: 'weekly'   as const, from: '#ff55b8', to: '#ff8787', label: 'Weekly points' },
 ];
 
 function WeekPointsRings({ weekly, leagueAverage, totalPossible }: {
   weekly: number; leagueAverage: number; totalPossible: number;
 }) {
-  // Guards divide-by-zero on a scoreless/bye week — every ring just reads 0.
+  // Guards divide-by-zero on a scoreless/bye week — every arc just reads 0.
   const scale = Math.max(totalPossible, 1);
   const fractionOf = (v: number) => Math.max(0, Math.min(1, v / scale));
-  const values: Record<(typeof WEEK_RING_SPECS)[number]['key'], number> = {
+  const values: Record<(typeof WEEK_RING_LAYERS)[number]['key'], number> = {
     possible: totalPossible, average: leagueAverage, weekly,
   };
-  const STROKE = 8;
+  const RADIUS = 48;
+  const STROKE = 16;
   const CENTER = 60;
+  const circumference = 2 * Math.PI * RADIUS;
+
+  // All three arcs start at the same angle (12 o'clock), so whichever is
+  // drawn last sits on top and fully covers any shorter arc behind it —
+  // fixed draw order broke this the moment weekly points outscored the
+  // league average, since "weekly" was always drawn over "average" and
+  // silently erased it whenever its own fraction was the larger one.
+  // Sorting by fraction descending at render time keeps every arc visible:
+  // longest painted first as the backdrop, each shorter one layered on top.
+  const drawOrder = WEEK_RING_LAYERS
+    .map(r => ({ ...r, fraction: fractionOf(values[r.key]) }))
+    .sort((a, b) => b.fraction - a.fraction);
 
   return (
     <div className="flex items-center gap-4">
       <svg width={120} height={120} viewBox="0 0 120 120" className="flex-shrink-0" aria-hidden="true">
         <defs>
-          {WEEK_RING_SPECS.map(r => (
+          {WEEK_RING_LAYERS.map(r => (
             <linearGradient key={r.key} id={`week-ring-${r.key}`} x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor={r.from} />
               <stop offset="100%" stopColor={r.to} />
@@ -245,34 +264,29 @@ function WeekPointsRings({ weekly, leagueAverage, totalPossible }: {
         {/* Rotated so 0% starts at 12 o'clock and sweeps clockwise, matching
             how a progress ring reads everywhere else in this app. */}
         <g transform={`rotate(-90 ${CENTER} ${CENTER})`}>
-          {WEEK_RING_SPECS.map(r => {
-            const circumference = 2 * Math.PI * r.radius;
-            const fraction = fractionOf(values[r.key]);
-            return (
-              <g key={r.key}>
-                <circle cx={CENTER} cy={CENTER} r={r.radius} fill="none" stroke="currentColor" className="text-turf-800" strokeWidth={STROKE} />
-                <circle
-                  cx={CENTER} cy={CENTER} r={r.radius}
-                  fill="none" stroke={`url(#week-ring-${r.key})`}
-                  strokeWidth={STROKE} strokeLinecap="round"
-                  strokeDasharray={circumference}
-                  strokeDashoffset={circumference * (1 - fraction)}
-                />
-              </g>
-            );
-          })}
+          <circle cx={CENTER} cy={CENTER} r={RADIUS} fill="none" stroke="currentColor" className="text-turf-800" strokeWidth={STROKE} />
+          {drawOrder.map(r => (
+            <circle
+              key={r.key}
+              cx={CENTER} cy={CENTER} r={RADIUS}
+              fill="none" stroke={`url(#week-ring-${r.key})`}
+              strokeWidth={STROKE} strokeLinecap="round"
+              strokeDasharray={circumference}
+              strokeDashoffset={circumference * (1 - r.fraction)}
+            />
+          ))}
         </g>
         <text
           x={CENTER} y={CENTER}
           textAnchor="middle" dominantBaseline="central"
           className={`font-mono font-bold ${weekly > 0 ? 'fill-field-400' : weekly < 0 ? 'fill-red-300' : 'fill-turf-400'}`}
-          style={{ fontSize: 20 }}
+          style={{ fontSize: 22 }}
         >
           {signed(weekly)}
         </text>
       </svg>
       <div className="space-y-1 text-xs">
-        {WEEK_RING_SPECS.map(r => (
+        {WEEK_RING_LAYERS.map(r => (
           <div key={r.key} className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: `linear-gradient(${r.from}, ${r.to})` }} aria-hidden="true" />
             <span className="text-turf-500">{r.label}</span>
