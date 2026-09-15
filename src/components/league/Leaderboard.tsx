@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  Cell, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Legend,
+  Cell, RadarChart, Radar, PolarAngleAxis, PolarRadiusAxis, Legend,
   LineChart, Line, ScatterChart, Scatter, ReferenceLine, ReferenceArea, CartesianGrid,
 } from 'recharts';
 import { Crown, TrendingUp, TrendingDown, Star, ChevronDown } from 'lucide-react';
@@ -51,6 +51,14 @@ function chartLabel(displayName: string): string {
   const parts = displayName.trim().split(/\s+/);
   if (parts.length <= 1) return parts[0] ?? '';
   return `${parts[0]} ${parts[1][0]}`;
+}
+
+function hexToRgba(hex: string, alpha: number): string {
+  const h = hex.replace('#', '');
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -193,15 +201,99 @@ const formatStatValue = (stat: StatBonusCategory, value: number) =>
 
 type OpenGameModalArgs = { game: GameResult; teamId: string; teamName: string; teamLogo: string; week: number; isCaptain: boolean };
 
+// Three concentric progress rings sharing one scale (totalPossible), each
+// its own full arc rather than a pie wedge — the "overlapping arcs" doughnut
+// pattern from github.com/chartjs/Chart.js/discussions/11183 (multiple full
+// rings at different radii instead of segments sharing one ring), rebuilt in
+// plain SVG since this app charts with Recharts, which has no radial-gauge
+// primitive. Gradient colors follow the same two-stop, high-opacity style as
+// codepen.io/rozklad/pen/qVObdP: red/pink for this manager's own score (the
+// featured metric), the pen's blue/purple for the league average as a
+// neutral comparison, and this app's own field-green for the ceiling ring
+// (the pen only defines two colors; green was picked to read as "full/max"
+// and to stay in the app's own palette rather than inventing an unrelated
+// third hue).
+const WEEK_RING_SPECS = [
+  { key: 'possible' as const, radius: 50, from: '#4ade80', to: '#22c55e', label: 'Total possible' },
+  { key: 'average'  as const, radius: 38, from: '#5555ff', to: '#9787ff', label: 'League average' },
+  { key: 'weekly'   as const, radius: 26, from: '#ff55b8', to: '#ff8787', label: 'Weekly points' },
+];
+
+function WeekPointsRings({ weekly, leagueAverage, totalPossible }: {
+  weekly: number; leagueAverage: number; totalPossible: number;
+}) {
+  // Guards divide-by-zero on a scoreless/bye week — every ring just reads 0.
+  const scale = Math.max(totalPossible, 1);
+  const fractionOf = (v: number) => Math.max(0, Math.min(1, v / scale));
+  const values: Record<(typeof WEEK_RING_SPECS)[number]['key'], number> = {
+    possible: totalPossible, average: leagueAverage, weekly,
+  };
+  const STROKE = 8;
+  const CENTER = 60;
+
+  return (
+    <div className="flex items-center gap-4">
+      <svg width={120} height={120} viewBox="0 0 120 120" className="flex-shrink-0" aria-hidden="true">
+        <defs>
+          {WEEK_RING_SPECS.map(r => (
+            <linearGradient key={r.key} id={`week-ring-${r.key}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={r.from} />
+              <stop offset="100%" stopColor={r.to} />
+            </linearGradient>
+          ))}
+        </defs>
+        {/* Rotated so 0% starts at 12 o'clock and sweeps clockwise, matching
+            how a progress ring reads everywhere else in this app. */}
+        <g transform={`rotate(-90 ${CENTER} ${CENTER})`}>
+          {WEEK_RING_SPECS.map(r => {
+            const circumference = 2 * Math.PI * r.radius;
+            const fraction = fractionOf(values[r.key]);
+            return (
+              <g key={r.key}>
+                <circle cx={CENTER} cy={CENTER} r={r.radius} fill="none" stroke="currentColor" className="text-turf-800" strokeWidth={STROKE} />
+                <circle
+                  cx={CENTER} cy={CENTER} r={r.radius}
+                  fill="none" stroke={`url(#week-ring-${r.key})`}
+                  strokeWidth={STROKE} strokeLinecap="round"
+                  strokeDasharray={circumference}
+                  strokeDashoffset={circumference * (1 - fraction)}
+                />
+              </g>
+            );
+          })}
+        </g>
+        <text
+          x={CENTER} y={CENTER}
+          textAnchor="middle" dominantBaseline="central"
+          className={`font-mono font-bold ${weekly > 0 ? 'fill-field-400' : weekly < 0 ? 'fill-red-300' : 'fill-turf-400'}`}
+          style={{ fontSize: 20 }}
+        >
+          {signed(weekly)}
+        </text>
+      </svg>
+      <div className="space-y-1 text-xs">
+        {WEEK_RING_SPECS.map(r => (
+          <div key={r.key} className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: `linear-gradient(${r.from}, ${r.to})` }} aria-hidden="true" />
+            <span className="text-turf-500">{r.label}</span>
+            <span className="text-turf-300 font-mono ml-auto pl-2">{signed(Math.round(values[r.key]))}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // Per-team scoring breakdown, one week at a time, used by the expandable
 // standings row. spread_points is a component already folded into `points`
 // (see calcWeeklyScore) — shown as an annotation, not added again. Each
 // instance owns its own selected-week tab state, so expanding two managers'
 // rows at once never lets one's week selection leak into the other's.
 function WeeklyBreakdownTable({
-  entry, currentWeek, teamsById, onOpenGameModal,
+  entry, allEntries, currentWeek, teamsById, onOpenGameModal,
 }: {
   entry: LeaderboardEntry;
+  allEntries: LeaderboardEntry[];
   currentWeek: number;
   teamsById: Map<string, CfbTeam>;
   onOpenGameModal: (args: OpenGameModalArgs) => void;
@@ -209,6 +301,20 @@ function WeeklyBreakdownTable({
   const [selectedWeek, setSelectedWeek] = useState(currentWeek);
   const weeks = useMemo(() => Array.from({ length: currentWeek + 1 }, (_, w) => w), [currentWeek]);
   const score = entry.weekly_scores.find((w: WeeklyScore) => w.week === selectedWeek);
+
+  // Nothing in this app's scoring defines a hard cap a week's points top
+  // out at — there's no fixed "max possible" anywhere in the schema — so
+  // it's approximated here as the best any manager actually posted that
+  // week: the real ceiling that week's game outcomes produced, not a
+  // theoretical one.
+  const { leagueAverage, totalPossible } = useMemo(() => {
+    const weekPoints = allEntries.map(e => e.weekly_scores.find(w => w.week === selectedWeek)?.points ?? 0);
+    const sum = weekPoints.reduce((s, p) => s + p, 0);
+    return {
+      leagueAverage: weekPoints.length > 0 ? sum / weekPoints.length : 0,
+      totalPossible: weekPoints.length > 0 ? Math.max(...weekPoints) : 0,
+    };
+  }, [allEntries, selectedWeek]);
 
   // By week 17 this strip would render 18 tab buttons in one scrolling row
   // with nothing marking which one is "now" — past the ~4-choice point
@@ -226,10 +332,8 @@ function WeeklyBreakdownTable({
   return (
     <div>
       <div className="card-inner inline-block px-3 py-2 mb-2">
-        <p className="text-xs text-turf-600">Week {selectedWeek} Points</p>
-        <p className={`font-mono font-bold ${score && score.points > 0 ? 'text-field-400' : score && score.points < 0 ? 'text-red-300' : 'text-turf-400'}`}>
-          {score ? signed(score.points) : '—'}
-        </p>
+        <p className="text-xs text-turf-600 mb-1.5">Week {selectedWeek}</p>
+        <WeekPointsRings weekly={score?.points ?? 0} leagueAverage={leagueAverage} totalPossible={totalPossible} />
       </div>
 
       <div role="tablist" aria-label="Select week" className="flex items-center gap-1 overflow-x-auto mb-2">
@@ -894,6 +998,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-4 gap-y-4">
                       <WeeklyBreakdownTable
                         entry={entry}
+                        allEntries={entries}
                         currentWeek={currentWeek}
                         teamsById={teamsById}
                         onOpenGameModal={setGameScoreModal}
@@ -1143,7 +1248,24 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                   >
                     <ResponsiveContainer width="100%" height="100%">
                       <RadarChart data={radarData} margin={{ top: 8, right: 24, left: 24, bottom: 8 }}>
-                        <PolarGrid stroke={CHART_GRID} />
+                        {/* Styling modeled on codepen.io/rozklad/pen/qVObdP — a
+                            gradient-filled, borderless, gridless radar with a
+                            soft drop shadow under each shape, rather than a
+                            flat-fill shape sitting on visible grid rings.
+                            Colors are unchanged (still seriesColor per
+                            manager); only the fill/shadow treatment and the
+                            removed grid lines come from that reference. */}
+                        <defs>
+                          {entries.map((e, i) => (
+                            <linearGradient key={e.user_id} id={`radar-grad-${e.user_id}`} x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor={hexToRgba(seriesColor(i), 0.9)} />
+                              <stop offset="100%" stopColor={hexToRgba(seriesColor(i), 0.55)} />
+                            </linearGradient>
+                          ))}
+                          <filter id="radar-shadow" x="-50%" y="-50%" width="200%" height="200%">
+                            <feDropShadow dx="0" dy="3" stdDeviation="5" floodColor="#000000" floodOpacity="0.35" />
+                          </filter>
+                        </defs>
                         <PolarAngleAxis dataKey="metric" tick={CHART_AXIS_TICK} />
                         <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
                         <Tooltip
@@ -1160,12 +1282,13 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                               key={e.user_id}
                               name={labelByUserId.get(e.user_id) ?? chartLabel(e.display_name)}
                               dataKey={e.user_id}
-                              stroke={seriesColor(i)}
-                              fill={seriesColor(i)}
+                              stroke="none"
+                              fill={`url(#radar-grad-${e.user_id})`}
                               // A lone shape can carry more fill than six
-                              // stacked on top of each other.
+                              // stacked on top of each other — multiplies
+                              // against the gradient's own stop opacity.
                               fillOpacity={radarFocus === null ? 0.12 : 0.28}
-                              strokeWidth={2}
+                              style={{ filter: 'url(#radar-shadow)' }}
                               isAnimationActive={false}
                             />
                           )
