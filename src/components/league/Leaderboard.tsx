@@ -845,19 +845,8 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
         />
       )}
 
-      {/* Standings (bar chart + accordion list) and Roster Analytics (a
-          3-tab module with three more charts) otherwise sit on one
-          continuous scroll with no way to skip between them — this is the
-          only wayfinding on an otherwise long page. */}
-      <div className="flex items-center gap-2 text-xs">
-        <span className="text-turf-600">Jump to:</span>
-        <a href="#standings-section" className="text-field-400 hover:text-field-300 transition-colors underline underline-offset-2">Standings</a>
-        <span className="text-turf-700">·</span>
-        <a href="#analytics-section" className="text-field-400 hover:text-field-300 transition-colors underline underline-offset-2">Roster Analytics</a>
-      </div>
-
       {/* ── Total Points Bar Chart ─────────────────────── */}
-      <div id="standings-section" className="card p-5 scroll-mt-4">
+      <div className="card p-5">
         <div className="flex items-center justify-between mb-4">
           <h2 className="section-title text-xl">Season Standings</h2>
           <div className="flex items-center gap-3">
@@ -1089,7 +1078,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
 
       {/* ── Roster Analytics ─────────────────────────── */}
       {analytics.length > 0 && (
-        <div id="analytics-section" className="card overflow-hidden scroll-mt-4">
+        <div className="card overflow-hidden">
           <div className="flex items-center justify-between px-5 py-4 border-b border-turf-800">
             <h2 className="section-title text-xl">Roster Analytics</h2>
             <div role="tablist" aria-label="Roster analytics view" className="flex gap-1 bg-turf-800 p-1 rounded-lg">
