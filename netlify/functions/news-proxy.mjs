@@ -100,6 +100,23 @@ function parseRssItems(xml, teamName) {
 // checked most-specific first, since a title can trip more than one word
 // list (a coach firing headline often also contains "suspended" in the
 // context of a related player situation elsewhere in the same story).
+// A game/contest being suspended (weather, a fight, a power outage) uses
+// the same word as a person being suspended but means something entirely
+// different — no one was disciplined. "Oregon-Oklahoma State game
+// suspended due to thunder and lightning" isn't a Suspension in this page's
+// sense, it's schedule news. Checked as a carve-out rather than folded into
+// suspensionWords itself, since it needs to demote the article to General
+// rather than just suppress the match.
+//
+// Deliberately requires "game"/"match"/"contest" to be the grammatical
+// *subject* of suspended (game [is/was/has been] suspended, or "suspends
+// the game") rather than just nearby — a wider proximity match caught real
+// player/coach suspensions too, since "suspended for two games"/"suspended
+// 1 game" is exactly how those are normally phrased and "game" ends up a
+// few words from "suspended" there as well, just as the object of a
+// duration, not the thing being suspended.
+const GAME_SUSPENSION_RE = /\b(game|match|contest)s?\s+(?:is\s+|was\s+|has\s+been\s+|have\s+been\s+)?suspended\b|\bsuspends?\s+(?:the\s+)?(game|match|contest)s?\b|\blightning\b|\bthunder\b|\brain delay\b|\bweather delay\b|\binclement weather\b|\bstorm delay\b|\bpower outage\b/i;
+
 function categorizeArticle(title) {
   const t = title.toLowerCase();
   const mentionsCoach = /\bcoach(es|ing)?\b|\bhead coach\b|\bcoordinator\b|\bhc\b|\boc\b|\bdc\b/.test(t);
@@ -107,7 +124,7 @@ function categorizeArticle(title) {
   const suspensionWords = /\bsuspend(ed|s|ing)?\b|\bsuspension\b/.test(t);
 
   if (firingWords && mentionsCoach) return 'Coach Firing';
-  if (suspensionWords) return 'Suspension';
+  if (suspensionWords && !GAME_SUSPENSION_RE.test(t)) return 'Suspension';
   if (firingWords) return 'Player News';
   return 'General';
 }
@@ -146,6 +163,23 @@ function isAboutHighSchool(title) {
   return HIGH_SCHOOL_RE.test(title);
 }
 
+// Catches the recruiting-commit stories HIGH_SCHOOL_RE misses because they
+// never say "high school" at all — "5-star Alabama commit suspended for
+// amateurism violation", "How OSU commit Jamier Brown's suspension affects
+// 2 Cincinnati teams". The subject is still a high schooler who hasn't
+// joined the team this season, just referred to by recruiting-speak
+// ("commit", star rating) instead of naming the school. \bcommits?\b
+// deliberately doesn't match "committed"/"commitment" (a coach denying
+// interest in other jobs is real news, not a recruiting story) — the word
+// boundary after "commit"/"commits" falls inside those longer words, not
+// after them. Narrow on purpose: "recruiting" alone is left unfiltered
+// since it's also how a real current-roster story reads, e.g. "coach
+// suspended for recruiting violations".
+const RECRUITING_RE = /\bcommits?\b|\bdecommit|\bsignees?\b|\bsigning class\b|\brecruiting class\b|\b\d-star\b/i;
+function isAboutRecruitingCommit(title) {
+  return RECRUITING_RE.test(title);
+}
+
 // Restricts results to a set of established, editorially-reviewed outlets
 // rather than every blog/fansite/aggregator Google indexes — trades recall
 // for reliability. Widened from the original 4 (ESPN/CBS Sports/FOX
@@ -173,7 +207,7 @@ async function fetchTeamNews(teamName) {
     if (!res.ok) throw new Error(`status ${res.status}`);
     const xml = await res.text();
     const items = parseRssItems(xml, teamName)
-      .filter(item => isRelevantToTeam(item.title, teamName) && !isAboutOtherSport(item.title) && !isAboutHighSchool(item.title) && isAllowedSource(item.source));
+      .filter(item => isRelevantToTeam(item.title, teamName) && !isAboutOtherSport(item.title) && !isAboutHighSchool(item.title) && !isAboutRecruitingCommit(item.title) && isAllowedSource(item.source));
     newsCache.set(teamName, { items, fetchedAt: Date.now() });
     return items;
   } catch (e) {
