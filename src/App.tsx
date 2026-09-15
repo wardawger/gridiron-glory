@@ -140,6 +140,7 @@ function AnimatedRoutes({ lg, league, auth, cfb }: AnimatedRoutesProps) {
                 teams={cfb.teams}
                 userId={auth.user!.id}
                 cfbLoading={cfb.loading}
+                cfbError={cfb.error}
               />
             )
           } />

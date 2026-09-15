@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   Cell, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Legend,
@@ -12,7 +12,7 @@ import { computeAnalytics, scalePosition, tierFor } from '../../services/analyti
 import type { RosterAnalytics, MetricTier } from '../../services/analytics';
 import { Avatar } from '../ui/Avatar';
 import { TeamLogo } from '../ui/TeamLogo';
-import { InfoTooltip } from '../ui/Tooltip';
+import { InfoTooltip, Tooltip as UiTooltip } from '../ui/Tooltip';
 import { Toggle } from '../ui/Toggle';
 import { GameScoreModal } from './GameScoreModal';
 import {
@@ -210,6 +210,19 @@ function WeeklyBreakdownTable({
   const weeks = useMemo(() => Array.from({ length: currentWeek + 1 }, (_, w) => w), [currentWeek]);
   const score = entry.weekly_scores.find((w: WeeklyScore) => w.week === selectedWeek);
 
+  // By week 17 this strip would render 18 tab buttons in one scrolling row
+  // with nothing marking which one is "now" — past the ~4-choice point
+  // where a decision point stops being scannable. Collapsed to the most
+  // recent RECENT_WEEKS by default; "All weeks" reveals the rest without
+  // losing them. Always includes selectedWeek even when collapsed, so
+  // picking an older week (or this instance mounting on a bye week) never
+  // hides the tab that's actually active.
+  const RECENT_WEEKS = 5;
+  const [showAllWeeks, setShowAllWeeks] = useState(false);
+  const visibleWeeks = showAllWeeks || weeks.length <= RECENT_WEEKS
+    ? weeks
+    : Array.from(new Set([...weeks.slice(-RECENT_WEEKS), selectedWeek])).sort((a, b) => a - b);
+
   return (
     <div>
       <div className="card-inner px-3 py-2 mb-2">
@@ -219,8 +232,17 @@ function WeeklyBreakdownTable({
         </p>
       </div>
 
-      <div role="tablist" aria-label="Select week" className="flex gap-1 overflow-x-auto mb-2">
-        {weeks.map(w => (
+      <div role="tablist" aria-label="Select week" className="flex items-center gap-1 overflow-x-auto mb-2">
+        {!showAllWeeks && weeks.length > RECENT_WEEKS && (
+          <button
+            type="button"
+            onClick={() => setShowAllWeeks(true)}
+            className="flex-shrink-0 px-2 py-1 rounded-md text-xs font-medium text-turf-500 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-400"
+          >
+            +{weeks.length - visibleWeeks.length} more
+          </button>
+        )}
+        {visibleWeeks.map(w => (
           <button
             key={w}
             type="button"
@@ -448,9 +470,35 @@ type AnalyticsTab = 'table' | 'graphs' | 'weekly';
 const ANALYTICS_TABS: AnalyticsTab[] = ['table', 'weekly', 'graphs'];
 
 export function Leaderboard({ entries, currentWeek, userId, confChampComplete, draftPicks, rankings, teams, scoring, spreadPicks }: Props) {
-  const [analyticsTab, setAnalyticsTab] = useState<AnalyticsTab>('table');
+  // Which analytics tab and radar focus are showing lived only in local
+  // state — a manager couldn't link a league-mate to "graphs tab, focused
+  // on me," and a refresh silently reset whatever view was open. Mirrored
+  // into the URL (replace, not push, so tab-switching doesn't spam back
+  // history) with local state as the source of truth React renders from;
+  // the query params are read once on mount and written on every change.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = searchParams.get('tab');
+  const [analyticsTab, setAnalyticsTabState] = useState<AnalyticsTab>(
+    ANALYTICS_TABS.includes(initialTab as AnalyticsTab) ? (initialTab as AnalyticsTab) : 'table'
+  );
+  const setAnalyticsTab = (tab: AnalyticsTab) => {
+    setAnalyticsTabState(tab);
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      next.set('tab', tab);
+      return next;
+    }, { replace: true });
+  };
   // null = every manager overlaid, which is how the radar loads.
-  const [radarFocus, setRadarFocus] = useState<string | null>(null);
+  const [radarFocus, setRadarFocusState] = useState<string | null>(searchParams.get('focus'));
+  const setRadarFocus = (focus: string | null) => {
+    setRadarFocusState(focus);
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      if (focus) next.set('focus', focus); else next.delete('focus');
+      return next;
+    }, { replace: true });
+  };
 
   // Shared by every per-week team row's "click for matchup detail" — one
   // modal instance for the whole standings list, rather than one per
@@ -483,7 +531,18 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
   // performance (wins/losses/spread/captain) unless a manager opts into
   // seeing the statistical-ranking bonuses layered on top. Re-sorts by
   // whichever total is on screen, so rank always matches what's displayed.
-  const [includeStatBonuses, setIncludeStatBonuses] = useState(false);
+  const [includeStatBonuses, setIncludeStatBonusesState] = useState(searchParams.get('bonuses') === '1');
+  const setIncludeStatBonuses = (updater: boolean | ((v: boolean) => boolean)) => {
+    setIncludeStatBonusesState(prev => {
+      const next = typeof updater === 'function' ? (updater as (v: boolean) => boolean)(prev) : updater;
+      setSearchParams(sp => {
+        const n = new URLSearchParams(sp);
+        if (next) n.set('bonuses', '1'); else n.delete('bonuses');
+        return n;
+      }, { replace: true });
+      return next;
+    });
+  };
   const displayTotal = (e: LeaderboardEntry) =>
     includeStatBonuses ? e.total_points : e.total_points - ((e as any).stat_points ?? 0);
 
@@ -611,8 +670,19 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
         />
       )}
 
+      {/* Standings (bar chart + accordion list) and Roster Analytics (a
+          3-tab module with three more charts) otherwise sit on one
+          continuous scroll with no way to skip between them — this is the
+          only wayfinding on an otherwise long page. */}
+      <div className="flex items-center gap-2 text-xs">
+        <span className="text-turf-600">Jump to:</span>
+        <a href="#standings-section" className="text-field-400 hover:text-field-300 transition-colors underline underline-offset-2">Standings</a>
+        <span className="text-turf-700">·</span>
+        <a href="#analytics-section" className="text-field-400 hover:text-field-300 transition-colors underline underline-offset-2">Roster Analytics</a>
+      </div>
+
       {/* ── Total Points Bar Chart ─────────────────────── */}
-      <div className="card p-5">
+      <div id="standings-section" className="card p-5 scroll-mt-4">
         <div className="flex items-center justify-between mb-4">
           <h2 className="section-title text-xl">Season Standings</h2>
           <div className="flex items-center gap-3">
@@ -677,7 +747,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                 <div className="w-8 flex-shrink-0 text-center">
                   {idx === 0
                     ? <><Crown className="w-5 h-5 text-gold-400 mx-auto" aria-hidden="true" /><span className="sr-only">1st place</span></>
-                    : <span className={`font-mono font-bold text-lg ${idx === 1 ? 'text-slate-400' : idx === 2 ? 'text-amber-700' : 'text-turf-600'}`}>{idx + 1}</span>
+                    : <span className={`font-mono font-bold text-lg ${idx === 1 ? 'text-slate-400' : idx === 2 ? 'text-amber-500' : 'text-turf-600'}`}>{idx + 1}</span>
                   }
                 </div>
                 <Avatar
@@ -724,9 +794,23 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                         {statPts > 0 ? '+' : ''}{statPts} stats
                         {!includeStatBonuses && <span className="sr-only"> (excluded from total below)</span>}
                         {!confChampComplete && (
-                          <span title="Provisional — final once conference championships are complete">
-                            {' ◎'}<span className="sr-only"> (provisional)</span>
-                          </span>
+                          // The whole standings row is itself a <button> (see
+                          // toggleExpanded above), so the trigger here can't
+                          // be a real <button> — nested buttons are invalid
+                          // HTML and behave unpredictably. A focusable,
+                          // role="button" span gets the same keyboard/tap
+                          // reachability without nesting interactive tags;
+                          // Tooltip's own onClick already stops propagation,
+                          // so tapping this doesn't also toggle the row.
+                          <UiTooltip content="Provisional — final once conference championships are complete" clickToOpen>
+                            <span
+                              role="button"
+                              tabIndex={0}
+                              className="rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-400"
+                            >
+                              {' ◎'}<span className="sr-only"> (provisional)</span>
+                            </span>
+                          </UiTooltip>
                         )}
                       </span>
                     )}
@@ -833,7 +917,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
 
       {/* ── Roster Analytics ─────────────────────────── */}
       {analytics.length > 0 && (
-        <div className="card overflow-hidden">
+        <div id="analytics-section" className="card overflow-hidden scroll-mt-4">
           <div className="flex items-center justify-between px-5 py-4 border-b border-turf-800">
             <h2 className="section-title text-xl">Roster Analytics</h2>
             <div role="tablist" aria-label="Roster analytics view" className="flex gap-1 bg-turf-800 p-1 rounded-lg">

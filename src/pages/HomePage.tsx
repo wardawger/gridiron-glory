@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Loader2, Coins, Trophy, BarChart3 } from 'lucide-react';
+import { Loader2, Coins, Trophy, BarChart3, AlertTriangle } from 'lucide-react';
 import { Leaderboard } from '../components/league/Leaderboard';
 import { TriviaCard } from '../components/ui/TriviaCard';
 import type { League, LeagueMember, CaptainPick, GameData, ManualBonus, DraftPick, TeamSeasonStats, APRanking, SpreadPick, FreeAgencyMove, CfbTeam, ScoreCorrection, BenchPick } from '../types';
@@ -22,11 +22,12 @@ interface Props {
   teams: CfbTeam[];
   userId: string;
   cfbLoading: boolean;
+  cfbError: string | null;
 }
 
 export function HomePage({
   league, members, draftPicks, captainPicks, manualBonuses, spreadPicks, freeAgencyMoves, scoreCorrections,
-  benchPicks, gameData, seasonStats, rankings, teams, userId, cfbLoading,
+  benchPicks, gameData, seasonStats, rankings, teams, userId, cfbLoading, cfbError,
 }: Props) {
   const confChampComplete = league.current_week >= 15;
 
@@ -45,6 +46,19 @@ export function HomePage({
         <div className="card p-4 flex items-center gap-3 text-sm text-turf-400">
           <Loader2 className="w-4 h-4 animate-spin text-field-400 flex-shrink-0" />
           Loading live game data from College Football Data API…
+        </div>
+      )}
+      {/* Without this, a failed CFBD fetch and a genuine bye week rendered
+          identically — standings, scores, and "No games this week" all
+          looked the same whether the data behind them was real or just
+          never arrived. cfbError already existed on useCfbData but was
+          never read anywhere in the app. */}
+      {!cfbLoading && cfbError && (
+        <div className="card p-4 flex items-center gap-3 text-sm border-red-800/40 bg-red-950/20">
+          <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0" />
+          <span className="text-red-300">
+            Live game data failed to load ({cfbError}). Standings below may be stale or incomplete — try refreshing.
+          </span>
         </div>
       )}
       {!cfbLoading && seasonStats.size > 0 && !confChampComplete && (
