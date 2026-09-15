@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -225,6 +225,38 @@ const WEEK_RING_LAYERS = [
   { key: 'weekly'   as const, from: '#ff55b8', to: '#ff8787', label: 'Weekly points' },
 ];
 
+// Sweeps every arc in from 0 and counts the center number up alongside it,
+// re-running whenever the underlying values change (switching the week tab
+// re-triggers it, same as a fresh reveal). Driven by one shared progress
+// value via requestAnimationFrame rather than a CSS transition, since the
+// center number needs to animate in lockstep with the arcs and CSS can't
+// interpolate text content. Skips straight to the end state for
+// prefers-reduced-motion, matching this app's motion-reduce convention
+// elsewhere — checked once via a ref since it can't change mid-session.
+function useAnimatedProgress(deps: number[], durationMs = 700): number {
+  const [progress, setProgress] = useState(0);
+  const reduceMotion = useRef(
+    typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  );
+
+  useEffect(() => {
+    if (reduceMotion.current) { setProgress(1); return; }
+    let raf: number;
+    const start = performance.now();
+    setProgress(0);
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - start) / durationMs);
+      setProgress(1 - Math.pow(1 - t, 3)); // ease-out-cubic
+      if (t < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps);
+
+  return progress;
+}
+
 function WeekPointsRings({ weekly, leagueAverage, totalPossible }: {
   weekly: number; leagueAverage: number; totalPossible: number;
 }) {
@@ -238,6 +270,7 @@ function WeekPointsRings({ weekly, leagueAverage, totalPossible }: {
   const STROKE = 16;
   const CENTER = 60;
   const circumference = 2 * Math.PI * RADIUS;
+  const progress = useAnimatedProgress([weekly, leagueAverage, totalPossible]);
 
   // All three arcs start at the same angle (12 o'clock), so whichever is
   // drawn last sits on top and fully covers any shorter arc behind it —
@@ -246,6 +279,9 @@ function WeekPointsRings({ weekly, leagueAverage, totalPossible }: {
   // silently erased it whenever its own fraction was the larger one.
   // Sorting by fraction descending at render time keeps every arc visible:
   // longest painted first as the backdrop, each shorter one layered on top.
+  // Sorted by each arc's real target fraction (not the animated one) so the
+  // stacking order stays fixed throughout the reveal instead of reshuffling
+  // as they grow in.
   const drawOrder = WEEK_RING_LAYERS
     .map(r => ({ ...r, fraction: fractionOf(values[r.key]) }))
     .sort((a, b) => b.fraction - a.fraction);
@@ -272,7 +308,7 @@ function WeekPointsRings({ weekly, leagueAverage, totalPossible }: {
               fill="none" stroke={`url(#week-ring-${r.key})`}
               strokeWidth={STROKE} strokeLinecap="round"
               strokeDasharray={circumference}
-              strokeDashoffset={circumference * (1 - r.fraction)}
+              strokeDashoffset={circumference * (1 - r.fraction * progress)}
             />
           ))}
         </g>
@@ -282,7 +318,7 @@ function WeekPointsRings({ weekly, leagueAverage, totalPossible }: {
           className={`font-mono font-bold ${weekly > 0 ? 'fill-field-400' : weekly < 0 ? 'fill-red-300' : 'fill-turf-400'}`}
           style={{ fontSize: 22 }}
         >
-          {signed(weekly)}
+          {signed(Math.round(weekly * progress))}
         </text>
       </svg>
       <div className="space-y-1 text-xs">
@@ -991,23 +1027,19 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
               >
                 <div className="overflow-hidden">
                   <div className="px-5 pb-5 pt-1 space-y-4 border-t border-turf-800/60">
-                    <div className="pt-3">
-                      <p className="text-xs text-turf-500 uppercase tracking-wide mb-1.5">Totals</p>
-                      <div className="flex flex-wrap gap-2">
-                        <div className="card-inner inline-block px-3 py-2">
-                          <p className="text-xs text-turf-600">Season</p>
-                          <p className="font-mono font-bold text-white">{signed(displayTotal(entry))}</p>
-                        </div>
-                        {includeStatBonuses && (
+                    {includeStatBonuses && (
+                      <div className="pt-3">
+                        <p className="text-xs text-turf-500 uppercase tracking-wide mb-1.5">Totals</p>
+                        <div className="flex flex-wrap gap-2">
                           <div className="card-inner inline-block px-3 py-2">
                             <p className="text-xs text-turf-600">Stat Bonuses</p>
                             <p className={`font-mono font-bold ${statPts > 0 ? 'text-blue-400' : statPts < 0 ? 'text-red-300' : 'text-turf-400'}`}>
                               {signed(statPts)}
                             </p>
                           </div>
-                        )}
+                        </div>
                       </div>
-                    </div>
+                    )}
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-4 gap-y-4">
                       <WeeklyBreakdownTable
