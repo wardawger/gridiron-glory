@@ -16,7 +16,7 @@ import { InfoTooltip, Tooltip as UiTooltip } from '../ui/Tooltip';
 import { Toggle } from '../ui/Toggle';
 import { GameScoreModal } from './GameScoreModal';
 import {
-  seriesColor, CHART_TOOLTIP_STYLE, CHART_TOOLTIP_LABEL, CHART_TOOLTIP_ITEM, legendFormatter,
+  seriesColor, PLAYER_COLORS, CHART_TOOLTIP_STYLE, CHART_TOOLTIP_LABEL, CHART_TOOLTIP_ITEM, legendFormatter,
   CHART_AXIS_TICK, CHART_GRID, CHART_MUTED, CHART_SURFACE, CHART_BAND,
 } from '../../lib/chartTheme';
 
@@ -212,17 +212,16 @@ type OpenGameModalArgs = { game: GameResult; teamId: string; teamName: string; t
 // that's intentional: it's the backdrop the average and weekly arcs are
 // read against, not a competing arc that could visually lose to them.
 // Rebuilt in plain SVG since this app charts with Recharts, which has no
-// radial-gauge primitive. Gradient colors follow the same two-stop,
-// high-opacity style as codepen.io/rozklad/pen/qVObdP: red/pink for this
-// manager's own score (the featured metric, drawn last/on top), the pen's
-// blue/purple for the league average, and this app's own field-green for
-// the ceiling arc (the pen only defines two colors; green reads as
-// "full/max" and stays in the app's own palette instead of inventing an
-// unrelated third hue).
+// radial-gauge primitive. Colors match the Season Standings bar chart at
+// the top of this page exactly — PLAYER_COLORS[1] (blue), PLAYER_COLORS[0]
+// (amber/yellow), PLAYER_COLORS[3] (green) — rather than the gradient
+// palette this component originally borrowed from its styling reference
+// (codepen.io/rozklad/pen/qVObdP), so the two charts on this page read as
+// one consistent color system instead of two unrelated ones.
 const WEEK_RING_LAYERS = [
-  { key: 'possible' as const, from: '#4ade80', to: '#22c55e', label: 'Total possible' },
-  { key: 'average'  as const, from: '#5555ff', to: '#9787ff', label: 'League average' },
-  { key: 'weekly'   as const, from: '#ff55b8', to: '#ff8787', label: 'Weekly points' },
+  { key: 'possible' as const, color: PLAYER_COLORS[1], label: 'Total possible' },
+  { key: 'average'  as const, color: PLAYER_COLORS[3], label: 'League average' },
+  { key: 'weekly'   as const, color: PLAYER_COLORS[0], label: 'Weekly points' },
 ];
 
 // Sweeps every arc in from 0 and counts the center number up alongside it,
@@ -289,14 +288,6 @@ function WeekPointsRings({ weekly, leagueAverage, totalPossible }: {
   return (
     <div className="flex items-center gap-4">
       <svg width={120} height={120} viewBox="0 0 120 120" className="flex-shrink-0" aria-hidden="true">
-        <defs>
-          {WEEK_RING_LAYERS.map(r => (
-            <linearGradient key={r.key} id={`week-ring-${r.key}`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={r.from} />
-              <stop offset="100%" stopColor={r.to} />
-            </linearGradient>
-          ))}
-        </defs>
         {/* Rotated so 0% starts at 12 o'clock and sweeps clockwise, matching
             how a progress ring reads everywhere else in this app. */}
         <g transform={`rotate(-90 ${CENTER} ${CENTER})`}>
@@ -305,7 +296,7 @@ function WeekPointsRings({ weekly, leagueAverage, totalPossible }: {
             <circle
               key={r.key}
               cx={CENTER} cy={CENTER} r={RADIUS}
-              fill="none" stroke={`url(#week-ring-${r.key})`}
+              fill="none" stroke={r.color}
               strokeWidth={STROKE} strokeLinecap="round"
               strokeDasharray={circumference}
               strokeDashoffset={circumference * (1 - r.fraction * progress)}
@@ -324,7 +315,7 @@ function WeekPointsRings({ weekly, leagueAverage, totalPossible }: {
       <div className="space-y-1 text-xs">
         {WEEK_RING_LAYERS.map(r => (
           <div key={r.key} className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: `linear-gradient(${r.from}, ${r.to})` }} aria-hidden="true" />
+            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: r.color }} aria-hidden="true" />
             <span className="text-turf-500">{r.label}</span>
             <span className="text-turf-300 font-mono ml-auto pl-2">{signed(Math.round(values[r.key]))}</span>
           </div>
