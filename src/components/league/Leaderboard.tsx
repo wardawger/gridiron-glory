@@ -438,7 +438,7 @@ function WeeklyBreakdownTable({
               {captainRow ? (
                 <p className="font-bold text-white text-sm mt-1 flex items-center gap-1.5 min-w-0">
                   <TeamLogo src={teamsById.get(captainRow.team_id)?.logo} alt="" fallbackName={captainRow.team_name} size={18} className="flex-shrink-0" />
-                  <span className="truncate">{captainRow.team_name} ×{captainRow.captain_multiplier}</span>
+                  <span className="truncate min-w-0 flex-1">{captainRow.team_name} ×{captainRow.captain_multiplier}</span>
                 </p>
               ) : (
                 <p className="font-bold text-white text-sm mt-1">—</p>
@@ -937,7 +937,17 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
             <span className="badge-gray text-xs">Week {currentWeek}</span>
           </div>
         </div>
-        <div className="h-48">
+        {/* overflow-hidden here (and on every other ResponsiveContainer
+            wrapper on this page) is a second, local clip on top of the
+            document-root one in index.css — that one only guards against
+            the page growing a horizontal scrollbar, but the mobile Safari
+            "zoomed out on load" bug it documents is about the *layout
+            viewport* getting sized to a momentarily-oversized chart during
+            the ResizeObserver measurement pass, which a page-level clip
+            doesn't reliably catch in every WebKit version. Clipping at each
+            chart's own box is a tighter guarantee that a stray frame can
+            never make anything upstream of it wider than intended. */}
+        <div className="h-48 overflow-hidden">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData} layout="vertical" margin={{ top: 0, right: 32, left: 0, bottom: 0 }}>
               <XAxis type="number" hide domain={chartDomain} />
@@ -1285,7 +1295,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                 <p className="text-turf-500 text-sm text-center py-8">No weekly data yet — check back once games are played</p>
               ) : (
                 <div
-                  className="h-72 mx-auto"
+                  className="h-72 mx-auto overflow-hidden"
                   style={{ maxWidth: weeklyPlotMaxWidth }}
                   role="img"
                   aria-label={`Bar chart of points scored per week by each manager, across ${weeklyData.length} scored week${weeklyData.length === 1 ? '' : 's'}`}
@@ -1336,7 +1346,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                 ) : (
                   <>
                   <div
-                    className="h-72 animate-radar-in motion-reduce:animate-none"
+                    className="h-72 animate-radar-in motion-reduce:animate-none overflow-hidden"
                     style={{ transformOrigin: 'center' }}
                     role="img"
                     aria-label={
@@ -1451,7 +1461,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                 {trendData.length === 0 ? (
                   <p className="text-turf-500 text-sm text-center py-8">No weekly data yet — check back once games are played</p>
                 ) : (
-                  <div className="h-72" role="img" aria-label="Line chart of each manager's cumulative points across the season">
+                  <div className="h-72 overflow-hidden" role="img" aria-label="Line chart of each manager's cumulative points across the season">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={trendData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
                         <XAxis dataKey="week" tick={CHART_AXIS_TICK} axisLine={false} tickLine={false} />
@@ -1487,7 +1497,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                 {scatterByManager.length === 0 ? (
                   <p className="text-turf-500 text-sm text-center py-8">No ranking data yet</p>
                 ) : (
-                  <div className="h-72" role="img" aria-label="Scatter plot of each drafted team's pick number against its AP rank, colored by manager">
+                  <div className="h-72 overflow-hidden" role="img" aria-label="Scatter plot of each drafted team's pick number against its AP rank, colored by manager">
                     <ResponsiveContainer width="100%" height="100%">
                       <ScatterChart margin={{ top: 16, right: 24, left: 8, bottom: 8 }}>
                         <XAxis
