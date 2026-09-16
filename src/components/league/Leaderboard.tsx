@@ -372,11 +372,6 @@ function WeeklyBreakdownTable({
 
   return (
     <div>
-      <div className="card-inner inline-block px-3 py-2 mb-2">
-        <p className="text-xs text-turf-600 mb-1.5">Week {selectedWeek}</p>
-        <WeekPointsRings weekly={score?.points ?? 0} leagueAverage={leagueAverage} totalPossible={totalPossible} />
-      </div>
-
       <div role="tablist" aria-label="Select week" className="flex items-center gap-1 overflow-x-auto mb-2">
         {!showAllWeeks && weeks.length > RECENT_WEEKS && (
           <button
@@ -401,6 +396,11 @@ function WeeklyBreakdownTable({
             Wk {w}
           </button>
         ))}
+      </div>
+
+      <div className="card-inner inline-block px-3 py-2 mb-2">
+        <p className="text-xs text-turf-600 mb-1.5">Week {selectedWeek}</p>
+        <WeekPointsRings weekly={score?.points ?? 0} leagueAverage={leagueAverage} totalPossible={totalPossible} />
       </div>
 
       {!score || score.breakdown.length === 0 ? (
