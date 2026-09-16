@@ -1219,18 +1219,26 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
           {/* ── TABLE VIEW ── */}
           {analyticsTab === 'table' && (
             <div role="tabpanel" id="analytics-panel-table" aria-labelledby="analytics-tab-table">
-              {/* max-w-[100vw] hard-caps this to the real device width
-                  rather than trusting overflow-x-auto alone to contain it.
-                  This table's sticky first column (below) is the one
-                  element on the whole page that reproduces the mobile
-                  Safari "zoomed out on load" bug even with overflow-hidden
-                  on every ancestor up to the document root — position:
-                  sticky inside a wide, many-column table appears to escape
-                  normal ancestor overflow containment for the browser's
-                  initial-zoom width calculation in a way plain overflow
-                  content doesn't. 100vw sidesteps that entirely by capping
-                  against the true viewport instead of an ancestor's
-                  (possibly wrong, in this one case) reported width. */}
+              {/* This table is the one element on the whole page that
+                  reproduces the "page loads zoomed out" bug on real iOS
+                  devices (confirmed on Chrome for iOS, which — like every
+                  iOS browser — runs on WebKit under the hood) — and only on
+                  narrow/mobile viewports. overflow-hidden on every ancestor
+                  up to the document root and max-w-[100vw] here didn't fix
+                  it; a minimal repro of this exact markup (sticky first
+                  column + overflow-x-auto + max-w-[100vw], same as below)
+                  showed NO real page-level overflow in a standards
+                  Chromium engine, pointing at an iOS-only WebKit rendering
+                  quirk specific to position:sticky inside a horizontally
+                  scrolling table, not a genuine containment bug this app's
+                  CSS could have prevented. The sticky first column below is
+                  therefore disabled below the `sm` breakpoint — losing the
+                  "frozen column while scrolling" convenience on phones,
+                  where this table already needs horizontal scrolling most,
+                  but keeping it as a nice-to-have (not the actual fix
+                  target) on tablet/desktop widths where the bug hasn't been
+                  observed. max-w-[100vw] stays as a harmless belt-and-braces
+                  measure even though it alone didn't resolve this. */}
               <div
                 className="overflow-x-auto max-w-[100vw] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-field-400"
                 tabIndex={0}
@@ -1240,7 +1248,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                   <caption className="sr-only">Metrics down the side, managers across the top.</caption>
                   <thead>
                     <tr className="border-b border-turf-800">
-                      <th scope="col" className="px-4 py-3 text-left text-xs text-turf-500 uppercase tracking-wide font-medium w-44 sticky left-0 bg-turf-900 z-10 border-r border-turf-800">
+                      <th scope="col" className="px-4 py-3 text-left text-xs text-turf-500 uppercase tracking-wide font-medium w-44 sm:sticky sm:left-0 bg-turf-900 sm:z-10 border-r border-turf-800">
                         Metric
                       </th>
                       {analytics.map((a, i) => {
@@ -1274,7 +1282,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                       <tr key={m.id} className={`group hover:bg-turf-800/20 transition-colors ${m.groupStart ? 'border-t-[6px] border-t-turf-800/30' : ''}`}>
                         <th
                           scope="row"
-                          className="px-4 py-2.5 text-left font-normal sticky left-0 bg-turf-900 group-hover:bg-turf-800 transition-colors z-10 border-r border-turf-800"
+                          className="px-4 py-2.5 text-left font-normal sm:sticky sm:left-0 bg-turf-900 group-hover:bg-turf-800 transition-colors sm:z-10 border-r border-turf-800"
                         >
                           <MetricLabel label={m.label} tooltip={m.tooltip} polarity={m.polarity} />
                         </th>
