@@ -1189,8 +1189,20 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
           {/* ── TABLE VIEW ── */}
           {analyticsTab === 'table' && (
             <div role="tabpanel" id="analytics-panel-table" aria-labelledby="analytics-tab-table">
+              {/* max-w-[100vw] hard-caps this to the real device width
+                  rather than trusting overflow-x-auto alone to contain it.
+                  This table's sticky first column (below) is the one
+                  element on the whole page that reproduces the mobile
+                  Safari "zoomed out on load" bug even with overflow-hidden
+                  on every ancestor up to the document root — position:
+                  sticky inside a wide, many-column table appears to escape
+                  normal ancestor overflow containment for the browser's
+                  initial-zoom width calculation in a way plain overflow
+                  content doesn't. 100vw sidesteps that entirely by capping
+                  against the true viewport instead of an ancestor's
+                  (possibly wrong, in this one case) reported width. */}
               <div
-                className="overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-field-400"
+                className="overflow-x-auto max-w-[100vw] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-field-400"
                 tabIndex={0}
                 aria-label="Roster analytics by manager, scrolls horizontally"
               >
