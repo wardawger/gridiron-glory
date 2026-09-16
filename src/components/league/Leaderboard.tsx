@@ -5,7 +5,7 @@ import {
   Cell, RadarChart, Radar, PolarAngleAxis, PolarRadiusAxis, Legend,
   LineChart, Line, ScatterChart, Scatter, ReferenceLine, ReferenceArea, CartesianGrid,
 } from 'recharts';
-import { Crown, TrendingUp, TrendingDown, Star, ChevronDown } from 'lucide-react';
+import { Crown, TrendingUp, TrendingDown, Star, ChevronDown, ChevronRight } from 'lucide-react';
 import type { LeaderboardEntry, DraftPick, APRanking, CfbTeam, ScoringSettings, SpreadPick, GameResult, StatBonusCategory, WeeklyScore } from '../../types';
 import { STAT_BONUS_LABELS, STAT_BONUS_CATEGORIES } from '../../types';
 import { computeAnalytics, scalePosition, tierFor } from '../../services/analytics';
@@ -370,9 +370,17 @@ function WeeklyBreakdownTable({
     ? weeks
     : Array.from(new Set([...weeks.slice(-RECENT_WEEKS), selectedWeek])).sort((a, b) => a - b);
 
+  // Benched teams are excluded from both — a manager's "did my active
+  // roster win" read shouldn't be diluted by teams that couldn't score
+  // regardless of their real-world result.
+  const activeBreakdown = score?.breakdown.filter(b => !b.is_benched) ?? [];
+  const played = activeBreakdown.filter(b => b.game).length;
+  const won = activeBreakdown.filter(b => b.game && b.points > 0).length;
+  const captainRow = score?.breakdown.find(b => b.is_captain) ?? null;
+
   return (
     <div>
-      <div role="tablist" aria-label="Select week" className="flex items-center gap-1 overflow-x-auto mb-2">
+      <div role="tablist" aria-label="Select week" className="flex items-center gap-1 overflow-x-auto mb-3">
         {!showAllWeeks && weeks.length > RECENT_WEEKS && (
           <button
             type="button"
@@ -398,55 +406,114 @@ function WeeklyBreakdownTable({
         ))}
       </div>
 
-      <div className="card-inner inline-block px-3 py-2 mb-2">
-        <p className="text-xs text-turf-600 mb-1.5">Week {selectedWeek}</p>
-        <WeekPointsRings weekly={score?.points ?? 0} leagueAverage={leagueAverage} totalPossible={totalPossible} />
-      </div>
-
-      {!score || score.breakdown.length === 0 ? (
-        <p className="text-sm text-turf-600">No games this week</p>
-      ) : (
-        <div
-          role="table"
-          aria-label={`Per-team scoring for week ${selectedWeek}`}
-          className="max-w-md border-t border-turf-800/50"
-        >
-          {score.breakdown.map(b => (
-            <div key={b.team_id} role="row" className="flex items-center gap-2 py-1.5 px-1 -mx-1 rounded border-b border-turf-800/50 last:border-b-0 hover:bg-turf-800/40 transition-colors">
-              <button
-                type="button"
-                disabled={!b.game}
-                onClick={() => b.game && onOpenGameModal({
-                  game: b.game, teamId: b.team_id, teamName: b.team_name,
-                  teamLogo: teamsById.get(b.team_id)?.logo ?? '', week: selectedWeek, isCaptain: b.is_captain,
-                })}
-                className={`flex items-center gap-2 min-w-0 flex-1 text-left rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-400 ${
-                  b.game ? 'hover:text-field-300' : 'cursor-default'
-                }`}
-              >
-                <TeamLogo src={teamsById.get(b.team_id)?.logo} alt="" fallbackName={b.team_name} size={24} className={`flex-shrink-0 ${b.is_benched ? 'opacity-50' : ''}`} />
-                <span className={`truncate ${b.is_benched ? 'text-turf-600 line-through' : 'text-turf-300'}`}>{b.team_name}</span>
-              </button>
-              {b.is_benched && <span className="badge-gray flex-shrink-0">Benched</span>}
-              {b.is_captain && (
-                <span className="badge-gold flex-shrink-0 inline-flex items-center gap-0.5">
-                  <Star className="w-3 h-3 fill-current" aria-hidden="true" />×{b.captain_multiplier}
-                </span>
-              )}
-              {b.spread_points !== 0 && <span className="badge-purple flex-shrink-0">Spread {signed(b.spread_points)}</span>}
-              <span className={`ml-auto flex-shrink-0 font-mono tabular-nums ${b.points > 0 ? 'text-field-400' : b.points < 0 ? 'text-red-300' : 'text-turf-500'}`}>
-                {signed(b.points)}
-              </span>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        {/* Left: this week's ring chart plus two real, derivable stat tiles —
+            no invented per-pick metrics, since this app scores drafted
+            teams, not individual picks against a spread. */}
+        <div className="card p-4">
+          <div className="flex items-start justify-between gap-2 mb-4">
+            <div>
+              <p className="text-xs text-turf-500 uppercase tracking-wide">Week {selectedWeek} Breakdown</p>
+              <p className="text-sm text-turf-400 mt-0.5">Team scoring this week</p>
             </div>
-          ))}
+            {score && (
+              <span className={`flex-shrink-0 ${score.points > leagueAverage ? 'badge-green' : score.points < leagueAverage ? 'badge-red' : 'badge-gray'}`}>
+                {score.points > leagueAverage ? 'Above Average' : score.points < leagueAverage ? 'Below Average' : 'On Average'}
+              </span>
+            )}
+          </div>
+
+          <WeekPointsRings weekly={score?.points ?? 0} leagueAverage={leagueAverage} totalPossible={totalPossible} />
+
+          <div className="grid grid-cols-2 gap-2 mt-4">
+            <div className="card-inner p-3">
+              <p className="text-xs text-turf-500 uppercase tracking-wide">Teams Won</p>
+              <p className="font-mono font-bold text-white text-lg mt-1">{played > 0 ? `${won}/${played}` : '—'}</p>
+            </div>
+            <div className="card-inner p-3 min-w-0">
+              <p className="text-xs text-turf-500 uppercase tracking-wide">Captain Pick</p>
+              <p className="font-bold text-white text-sm mt-1 truncate">
+                {captainRow ? `${captainRow.team_name} ×${captainRow.captain_multiplier}` : '—'}
+              </p>
+            </div>
+          </div>
+
+          <Link
+            to={`/roster/${entry.user_id}`}
+            className="btn-secondary btn-sm w-full mt-4 flex items-center justify-between"
+          >
+            View Full Roster
+            <ChevronRight className="w-4 h-4" aria-hidden="true" />
+          </Link>
         </div>
-      )}
-      {score && score.fa_points !== 0 && (
-        <p className="text-xs text-red-300 mt-1">Free agency penalty: {score.fa_points}</p>
-      )}
-      {score && score.correction_points !== 0 && (
-        <p className="text-xs text-turf-400 mt-1">Commissioner correction: {signed(score.correction_points)}</p>
-      )}
+
+        {/* Right: per-team rows, unchanged data/interactions (click for
+            matchup detail, captain/spread/benched badges) — restyled from a
+            plain list into boxed rows with a colored net-impact chip. */}
+        <div className="card p-4">
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <div>
+              <p className="text-xs text-turf-500 uppercase tracking-wide">Week {selectedWeek} Matchups</p>
+              <p className="text-sm text-turf-400 mt-0.5">
+                {score && score.breakdown.length > 0
+                  ? `${score.breakdown.length} team${score.breakdown.length === 1 ? '' : 's'} scored`
+                  : 'No games this week'}
+              </p>
+            </div>
+            {score && score.breakdown.length > 0 && (
+              <span className="text-xs text-turf-600 uppercase tracking-wide flex-shrink-0">Net Impact</span>
+            )}
+          </div>
+
+          {!score || score.breakdown.length === 0 ? (
+            <p className="text-sm text-turf-600 text-center py-8">No games this week</p>
+          ) : (
+            <div
+              role="table"
+              aria-label={`Per-team scoring for week ${selectedWeek}`}
+              className="grid grid-cols-1 sm:grid-cols-2 gap-2"
+            >
+              {score.breakdown.map(b => (
+                <button
+                  key={b.team_id}
+                  type="button"
+                  role="row"
+                  disabled={!b.game}
+                  onClick={() => b.game && onOpenGameModal({
+                    game: b.game, teamId: b.team_id, teamName: b.team_name,
+                    teamLogo: teamsById.get(b.team_id)?.logo ?? '', week: selectedWeek, isCaptain: b.is_captain,
+                  })}
+                  className={`card-inner flex items-center gap-2 p-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-400 ${
+                    b.game ? 'hover:border-turf-600' : 'cursor-default'
+                  }`}
+                >
+                  <TeamLogo src={teamsById.get(b.team_id)?.logo} alt="" fallbackName={b.team_name} size={28} className={`flex-shrink-0 ${b.is_benched ? 'opacity-50' : ''}`} />
+                  <span className={`truncate min-w-0 flex-1 ${b.is_benched ? 'text-turf-600 line-through' : 'text-turf-300'}`}>{b.team_name}</span>
+                  {b.is_benched && <span className="badge-gray flex-shrink-0">Benched</span>}
+                  {b.is_captain && (
+                    <span className="badge-gold flex-shrink-0 inline-flex items-center gap-0.5">
+                      <Star className="w-3 h-3 fill-current" aria-hidden="true" />×{b.captain_multiplier}
+                    </span>
+                  )}
+                  {b.spread_points !== 0 && <span className="badge-purple flex-shrink-0">Spread {signed(b.spread_points)}</span>}
+                  <span className={`flex-shrink-0 font-mono text-xs font-bold px-2 py-0.5 rounded-full ${
+                    b.points > 0 ? 'bg-field-900/60 text-field-400' : b.points < 0 ? 'bg-red-900/60 text-red-300' : 'bg-turf-700 text-turf-400'
+                  }`}>
+                    {signed(b.points)}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {score && score.fa_points !== 0 && (
+            <p className="text-xs text-red-300 mt-2">Free agency penalty: {score.fa_points}</p>
+          )}
+          {score && score.correction_points !== 0 && (
+            <p className="text-xs text-turf-400 mt-2">Commissioner correction: {signed(score.correction_points)}</p>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -1021,46 +1088,44 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                       </div>
                     )}
 
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-4 gap-y-4">
-                      <WeeklyBreakdownTable
-                        entry={entry}
-                        allEntries={entries}
-                        currentWeek={currentWeek}
-                        teamsById={teamsById}
-                        onOpenGameModal={setGameScoreModal}
-                      />
+                    <WeeklyBreakdownTable
+                      entry={entry}
+                      allEntries={entries}
+                      currentWeek={currentWeek}
+                      teamsById={teamsById}
+                      onOpenGameModal={setGameScoreModal}
+                    />
 
-                      {includeStatBonuses && entry.stat_bonuses.length > 0 && (
-                        <div className="lg:border-l lg:border-turf-800/60 lg:pl-4">
-                          <p className="text-xs text-turf-500 uppercase tracking-wide mb-2">
-                            Stat Bonus Breakdown{!confChampComplete ? ' (provisional)' : ''}
-                          </p>
-                          <div className="max-w-md space-y-3">
-                            {STAT_BONUS_CATEGORIES.filter(stat => entry.stat_bonuses.some(b => b.stat === stat)).map(stat => (
-                              <div key={stat}>
-                                <h4 className="text-xs font-medium text-turf-400 mb-1">{STAT_BONUS_LABELS[stat]}</h4>
-                                <div className="border-t border-turf-800/50">
-                                  {entry.stat_bonuses.filter(b => b.stat === stat).map((b, i) => {
-                                    const isTop = b.points > 0;
-                                    return (
-                                      <div key={`${b.team_id}-${i}`} className="flex items-center gap-2 py-1 border-b border-turf-800/50 last:border-b-0">
-                                        {isTop
-                                          ? <TrendingUp className="w-3 h-3 text-field-400 flex-shrink-0" aria-hidden="true" />
-                                          : <TrendingDown className="w-3 h-3 text-red-300 flex-shrink-0" aria-hidden="true" />}
-                                        <TeamLogo src={teamsById.get(b.team_id)?.logo} alt="" fallbackName={b.team_name} size={24} className="flex-shrink-0" />
-                                        <span className="text-turf-300 truncate min-w-0 flex-1">{b.team_name}</span>
-                                        <span className="text-turf-500 font-mono text-xs flex-shrink-0 w-14 text-center">{formatStatValue(stat, b.value)}</span>
-                                        <span className={`font-mono tabular-nums flex-shrink-0 w-10 text-right ${isTop ? 'text-field-400' : 'text-red-300'}`}>{signed(b.points)}</span>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
+                    {includeStatBonuses && entry.stat_bonuses.length > 0 && (
+                      <div>
+                        <p className="text-xs text-turf-500 uppercase tracking-wide mb-2">
+                          Stat Bonus Breakdown{!confChampComplete ? ' (provisional)' : ''}
+                        </p>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-4 gap-y-3">
+                          {STAT_BONUS_CATEGORIES.filter(stat => entry.stat_bonuses.some(b => b.stat === stat)).map(stat => (
+                            <div key={stat}>
+                              <h4 className="text-xs font-medium text-turf-400 mb-1">{STAT_BONUS_LABELS[stat]}</h4>
+                              <div className="border-t border-turf-800/50">
+                                {entry.stat_bonuses.filter(b => b.stat === stat).map((b, i) => {
+                                  const isTop = b.points > 0;
+                                  return (
+                                    <div key={`${b.team_id}-${i}`} className="flex items-center gap-2 py-1 border-b border-turf-800/50 last:border-b-0">
+                                      {isTop
+                                        ? <TrendingUp className="w-3 h-3 text-field-400 flex-shrink-0" aria-hidden="true" />
+                                        : <TrendingDown className="w-3 h-3 text-red-300 flex-shrink-0" aria-hidden="true" />}
+                                      <TeamLogo src={teamsById.get(b.team_id)?.logo} alt="" fallbackName={b.team_name} size={24} className="flex-shrink-0" />
+                                      <span className="text-turf-300 truncate min-w-0 flex-1">{b.team_name}</span>
+                                      <span className="text-turf-500 font-mono text-xs flex-shrink-0 w-14 text-center">{formatStatValue(stat, b.value)}</span>
+                                      <span className={`font-mono tabular-nums flex-shrink-0 w-10 text-right ${isTop ? 'text-field-400' : 'text-red-300'}`}>{signed(b.points)}</span>
+                                    </div>
+                                  );
+                                })}
                               </div>
-                            ))}
-                          </div>
+                            </div>
+                          ))}
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    )}
 
                     <Link
                       to={`/roster/${entry.user_id}`}
