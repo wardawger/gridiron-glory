@@ -1219,35 +1219,66 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
           {/* ── TABLE VIEW ── */}
           {analyticsTab === 'table' && (
             <div role="tabpanel" id="analytics-panel-table" aria-labelledby="analytics-tab-table">
-              {/* This table was the one element on the whole page that
-                  reproduced the "page loads zoomed out" bug on real iOS
-                  devices (confirmed on Chrome for iOS, which — like every
-                  iOS browser — runs on WebKit under the hood), and only on
-                  narrow/mobile viewports. overflow-hidden on every ancestor,
-                  max-w-[100vw], and disabling the sticky first column on
-                  mobile all failed to fix it in turn — ruling out
-                  position:sticky specifically, since the bug persisted even
-                  with it off. What's left is the <table> element itself:
-                  WebKit computes a real HTML table's min-content width from
-                  its cell content (table-layout: auto, the default), and
-                  that computation is a documented source of exactly this
-                  "leaks into the page's viewport-zoom detection" bug,
-                  independent of any overflow/sticky CSS on top of it — a
-                  minimal repro of the old markup showed no page-level
-                  overflow in a standards Chromium engine, meaning it's a
-                  WebKit-only quirk in the table layout algorithm itself,
-                  not something clippable from outside it.
-                  Rebuilt as CSS Grid (role="table"/"row"/"columnheader"/
-                  "cell" + display:contents rows, the standard accessible
-                  "table via grid" pattern) instead, which has no such
-                  quirk — sticky is back on for every viewport, not just
-                  sm+, since removing the actual <table> is the fix, not
-                  the sticky-on-mobile workaround this replaces. */}
+              {/* This is the one view on the whole page that reproduces the
+                  "page loads zoomed out" bug on real iOS devices (confirmed
+                  on Chrome for iOS, which — like every iOS browser — runs
+                  on WebKit under the hood), and only on narrow/mobile
+                  viewports. Four targeted fixes in a row failed against it:
+                  overflow-hidden on every ancestor, max-w-[100vw],
+                  disabling the sticky first column on mobile, and replacing
+                  the <table> element with a CSS Grid of the exact same
+                  shape — ruling out sticky and the <table> layout algorithm
+                  specifically, since the bug persisted with both removed.
+                  Every one of those fixes targeted HOW this view's wide,
+                  horizontally-scrolling multi-column region was built.
+                  What's constant across all four failures is that it's
+                  wide and horizontally-scrollable at all — that's also the
+                  one thing that's true here and not true on the Weekly/
+                  Graphs tabs, which never reproduce this. Rather than keep
+                  guessing at why iOS reacts to it, this removes the actual
+                  trigger on narrow viewports: below `sm`, there's no
+                  horizontally-scrolling grid at all, only stacked
+                  single-column cards — nothing left to react to regardless
+                  of the exact mechanism. The grid stays for `sm:` and up,
+                  where the bug hasn't been reported. */}
+              <div className="sm:hidden divide-y divide-turf-800">
+                {analytics.map((a, i) => {
+                  const isMe = a.user_id === userId;
+                  return (
+                    <div key={a.user_id} className={`py-3 ${isMe ? 'bg-field-900/10' : ''}`}>
+                      <Link
+                        to={`/roster/${a.user_id}`}
+                        className="inline-flex items-center gap-1.5 mb-2 rounded hover:text-field-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-400"
+                      >
+                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: seriesColor(i) }} aria-hidden="true" />
+                        <span className="font-sans font-bold text-sm text-white">{labelByUserId.get(a.user_id) ?? chartLabel(a.display_name)}</span>
+                        {isMe && <span className="sr-only"> (you)</span>}
+                      </Link>
+                      <div className="space-y-2">
+                        {METRICS.map(m => {
+                          const value = m.value(a);
+                          const tier = m.domain ? tierFor(value, m.domain) : 'none';
+                          const position = m.domain ? scalePosition(value, m.domain) : null;
+                          return (
+                            <div key={m.id} className="flex items-center justify-between gap-3">
+                              <MetricLabel label={m.label} tooltip={m.tooltip} polarity={null} />
+                              <div className="flex-shrink-0 text-right">
+                                <MetricValue metric={m} a={a} tier={tier} position={position} />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
               <div
                 role="table"
                 aria-label="Roster analytics by manager"
                 aria-describedby="roster-analytics-desc"
-                className="overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-field-400"
+                className="hidden sm:block overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-field-400"
                 tabIndex={0}
               >
                 <span id="roster-analytics-desc" className="sr-only">Metrics down the side, managers across the top.</span>
