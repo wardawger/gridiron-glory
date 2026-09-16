@@ -720,6 +720,36 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
     }, { replace: true });
   };
 
+  // Mobile Safari can lock the page's layout viewport into a zoomed-out
+  // scale from an early bad width measurement on this page (this page's
+  // sticky-column analytics table and several Recharts ResponsiveContainers
+  // are the suspects, but overflow-hidden/max-w-[100vw] fixes targeting
+  // those specific elements didn't resolve it on a real device) and never
+  // re-check it afterward without some trigger. Switching analytics tabs
+  // was observed to "fix" it, which pointed at a DOM/layout change being
+  // the actual fix mechanism rather than anything about those tabs
+  // specifically — but a synthetic DOM event (e.g. dispatching a `resize`
+  // event) does NOT work here, because it never reaches WebKit's native
+  // viewport/zoom recalculation; that only re-runs when the browser
+  // actually reprocesses the <meta name="viewport"> tag. Toggling that
+  // tag's content and restoring it a frame later forces exactly that
+  // reprocessing, which is the standard fix for this exact class of bug.
+  // Run twice (once quickly, once after a longer delay) since team logos
+  // and chart measurements can still be settling after the first pass.
+  useEffect(() => {
+    const viewport = document.querySelector('meta[name="viewport"]');
+    if (!viewport) return;
+    const original = viewport.getAttribute('content');
+    if (!original) return;
+    const nudge = () => {
+      viewport.setAttribute('content', `${original}, maximum-scale=1`);
+      requestAnimationFrame(() => viewport.setAttribute('content', original));
+    };
+    const t1 = setTimeout(nudge, 200);
+    const t2 = setTimeout(nudge, 1200);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, []);
+
   // Shared by every per-week team row's "click for matchup detail" — one
   // modal instance for the whole standings list, rather than one per
   // expanded row, since only one can ever be open at a time anyway.
