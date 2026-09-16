@@ -1219,49 +1219,58 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
           {/* ── TABLE VIEW ── */}
           {analyticsTab === 'table' && (
             <div role="tabpanel" id="analytics-panel-table" aria-labelledby="analytics-tab-table">
-              {/* This table is the one element on the whole page that
-                  reproduces the "page loads zoomed out" bug on real iOS
+              {/* This table was the one element on the whole page that
+                  reproduced the "page loads zoomed out" bug on real iOS
                   devices (confirmed on Chrome for iOS, which — like every
-                  iOS browser — runs on WebKit under the hood) — and only on
-                  narrow/mobile viewports. overflow-hidden on every ancestor
-                  up to the document root and max-w-[100vw] here didn't fix
-                  it; a minimal repro of this exact markup (sticky first
-                  column + overflow-x-auto + max-w-[100vw], same as below)
-                  showed NO real page-level overflow in a standards
-                  Chromium engine, pointing at an iOS-only WebKit rendering
-                  quirk specific to position:sticky inside a horizontally
-                  scrolling table, not a genuine containment bug this app's
-                  CSS could have prevented. The sticky first column below is
-                  therefore disabled below the `sm` breakpoint — losing the
-                  "frozen column while scrolling" convenience on phones,
-                  where this table already needs horizontal scrolling most,
-                  but keeping it as a nice-to-have (not the actual fix
-                  target) on tablet/desktop widths where the bug hasn't been
-                  observed. max-w-[100vw] stays as a harmless belt-and-braces
-                  measure even though it alone didn't resolve this. */}
+                  iOS browser — runs on WebKit under the hood), and only on
+                  narrow/mobile viewports. overflow-hidden on every ancestor,
+                  max-w-[100vw], and disabling the sticky first column on
+                  mobile all failed to fix it in turn — ruling out
+                  position:sticky specifically, since the bug persisted even
+                  with it off. What's left is the <table> element itself:
+                  WebKit computes a real HTML table's min-content width from
+                  its cell content (table-layout: auto, the default), and
+                  that computation is a documented source of exactly this
+                  "leaks into the page's viewport-zoom detection" bug,
+                  independent of any overflow/sticky CSS on top of it — a
+                  minimal repro of the old markup showed no page-level
+                  overflow in a standards Chromium engine, meaning it's a
+                  WebKit-only quirk in the table layout algorithm itself,
+                  not something clippable from outside it.
+                  Rebuilt as CSS Grid (role="table"/"row"/"columnheader"/
+                  "cell" + display:contents rows, the standard accessible
+                  "table via grid" pattern) instead, which has no such
+                  quirk — sticky is back on for every viewport, not just
+                  sm+, since removing the actual <table> is the fix, not
+                  the sticky-on-mobile workaround this replaces. */}
               <div
-                className="overflow-x-auto max-w-[100vw] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-field-400"
+                role="table"
+                aria-label="Roster analytics by manager"
+                aria-describedby="roster-analytics-desc"
+                className="overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-field-400"
                 tabIndex={0}
-                aria-label="Roster analytics by manager, scrolls horizontally"
               >
-                <table className="w-full text-sm" aria-label="Roster analytics by manager">
-                  <caption className="sr-only">Metrics down the side, managers across the top.</caption>
-                  <thead>
-                    <tr className="border-b border-turf-800">
-                      <th scope="col" className="px-4 py-3 text-left text-xs text-turf-500 uppercase tracking-wide font-medium w-44 sm:sticky sm:left-0 bg-turf-900 sm:z-10 border-r border-turf-800">
+                <span id="roster-analytics-desc" className="sr-only">Metrics down the side, managers across the top.</span>
+                <div
+                  className="grid text-sm"
+                  style={{ gridTemplateColumns: `11rem repeat(${analytics.length}, minmax(7rem, 1fr))` }}
+                >
+                  <div role="rowgroup" className="contents">
+                    <div role="row" className="contents">
+                      <div role="columnheader" className="px-4 py-3 text-left text-xs text-turf-500 uppercase tracking-wide font-medium sticky left-0 bg-turf-900 z-10 border-r border-b border-turf-800">
                         Metric
-                      </th>
+                      </div>
                       {analytics.map((a, i) => {
                         const isMe = a.user_id === userId;
                         return (
-                          <th
+                          <div
                             key={a.user_id}
-                            scope="col"
-                            className={`px-3 py-3 text-center border-r border-turf-800 last:border-r-0 ${isMe ? 'bg-field-900/30' : ''}`}
+                            role="columnheader"
+                            className={`px-3 py-3 text-center border-r border-b border-turf-800 last:border-r-0 ${isMe ? 'bg-field-900/30' : ''}`}
                           >
                             <Link
                               to={`/roster/${a.user_id}`}
-                              className="inline-flex items-center gap-1.5 max-w-[9rem] rounded hover:text-field-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-400"
+                              className="inline-flex items-center gap-1.5 max-w-[9rem] mx-auto rounded hover:text-field-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-400"
                             >
                               <span
                                 className="w-2 h-2 rounded-full flex-shrink-0"
@@ -1272,38 +1281,39 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                               </span>
                             </Link>
                             {isMe && <span className="sr-only"> (you)</span>}
-                          </th>
+                          </div>
                         );
                       })}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-turf-800/50">
+                    </div>
+                  </div>
+                  <div role="rowgroup" className="contents">
                     {METRICS.map(m => (
-                      <tr key={m.id} className={`group hover:bg-turf-800/20 transition-colors ${m.groupStart ? 'border-t-[6px] border-t-turf-800/30' : ''}`}>
-                        <th
-                          scope="row"
-                          className="px-4 py-2.5 text-left font-normal sm:sticky sm:left-0 bg-turf-900 group-hover:bg-turf-800 transition-colors sm:z-10 border-r border-turf-800"
+                      <div key={m.id} role="row" className="contents group">
+                        <div
+                          role="rowheader"
+                          className={`px-4 py-2.5 text-left font-normal sticky left-0 bg-turf-900 group-hover:bg-turf-800 transition-colors z-10 border-r border-b border-turf-800/50 ${m.groupStart ? 'border-t-[6px] border-t-turf-800/30' : ''}`}
                         >
                           <MetricLabel label={m.label} tooltip={m.tooltip} polarity={m.polarity} />
-                        </th>
+                        </div>
                         {analytics.map(a => {
                           const value = m.value(a);
                           const tier = m.domain ? tierFor(value, m.domain) : 'none';
                           const position = m.domain ? scalePosition(value, m.domain) : null;
                           const isMe = a.user_id === userId;
                           return (
-                            <td
+                            <div
                               key={a.user_id}
-                              className={`px-3 py-2.5 text-center font-mono text-xs font-medium border-r border-turf-800/50 last:border-r-0 ${isMe ? 'bg-field-900/20' : ''}`}
+                              role="cell"
+                              className={`px-3 py-2.5 text-center font-mono text-xs font-medium border-r border-b border-turf-800/50 last:border-r-0 group-hover:bg-turf-800/20 transition-colors ${isMe ? 'bg-field-900/20' : ''} ${m.groupStart ? 'border-t-[6px] border-t-turf-800/30' : ''}`}
                             >
                               <MetricValue metric={m} a={a} tier={tier} position={position} />
-                            </td>
+                            </div>
                           );
                         })}
-                      </tr>
+                      </div>
                     ))}
-                  </tbody>
-                </table>
+                  </div>
+                </div>
               </div>
 
               <div className="border-t border-turf-800 px-4 py-3 flex items-center gap-x-4 gap-y-1 text-xs text-turf-500 flex-wrap">
