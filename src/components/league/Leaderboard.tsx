@@ -431,10 +431,18 @@ function WeeklyBreakdownTable({
               <p className="font-mono font-bold text-white text-lg mt-1">{played > 0 ? `${won}/${played}` : '—'}</p>
             </div>
             <div className="card-inner p-3 min-w-0">
-              <p className="text-xs text-turf-500 uppercase tracking-wide">Captain Pick</p>
-              <p className="font-bold text-white text-sm mt-1 truncate">
-                {captainRow ? `${captainRow.team_name} ×${captainRow.captain_multiplier}` : '—'}
+              <p className="text-xs text-turf-500 uppercase tracking-wide inline-flex items-center gap-1">
+                <Star className="w-3 h-3 fill-amber-400 text-amber-400" aria-hidden="true" />
+                Captain Pick
               </p>
+              {captainRow ? (
+                <p className="font-bold text-white text-sm mt-1 flex items-center gap-1.5 min-w-0">
+                  <TeamLogo src={teamsById.get(captainRow.team_id)?.logo} alt="" fallbackName={captainRow.team_name} size={18} className="flex-shrink-0" />
+                  <span className="truncate">{captainRow.team_name} ×{captainRow.captain_multiplier}</span>
+                </p>
+              ) : (
+                <p className="font-bold text-white text-sm mt-1">—</p>
+              )}
             </div>
           </div>
 
