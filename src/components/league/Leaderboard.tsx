@@ -829,6 +829,18 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
     return next;
   });
 
+  // Same idea for the mobile-only stacked Roster Analytics cards (see the
+  // "table" tab below) — all 11 metrics per manager is a lot of vertical
+  // space to show for everyone at once on a phone. Starts with the
+  // viewer's own card open, everyone else collapsed, rather than starting
+  // fully collapsed or fully expanded.
+  const [expandedAnalyticsIds, setExpandedAnalyticsIds] = useState<Set<string>>(() => new Set([userId]));
+  const toggleAnalyticsExpanded = (rowUserId: string) => setExpandedAnalyticsIds(prev => {
+    const next = new Set(prev);
+    if (next.has(rowUserId)) next.delete(rowUserId); else next.add(rowUserId);
+    return next;
+  });
+
   const rankedEntries = useMemo(
     () => [...entries].sort((a, b) => displayTotal(b) - displayTotal(a)),
     [entries, includeStatBonuses]
@@ -1244,31 +1256,49 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
               <div className="sm:hidden divide-y divide-turf-800">
                 {analytics.map((a, i) => {
                   const isMe = a.user_id === userId;
+                  const isOpen = expandedAnalyticsIds.has(a.user_id);
+                  const panelId = `analytics-mobile-panel-${a.user_id}`;
                   return (
-                    <div key={a.user_id} className={`py-3 ${isMe ? 'bg-field-900/10' : ''}`}>
-                      <Link
-                        to={`/roster/${a.user_id}`}
-                        className="inline-flex items-center gap-1.5 mb-2 rounded hover:text-field-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-400"
+                    <div key={a.user_id} className={isMe ? 'bg-field-900/10' : ''}>
+                      <button
+                        type="button"
+                        onClick={() => toggleAnalyticsExpanded(a.user_id)}
+                        aria-expanded={isOpen}
+                        aria-controls={panelId}
+                        className="w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-turf-800/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-field-400"
                       >
                         <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: seriesColor(i) }} aria-hidden="true" />
-                        <span className="font-sans font-bold text-sm text-white">{labelByUserId.get(a.user_id) ?? chartLabel(a.display_name)}</span>
-                        {isMe && <span className="sr-only"> (you)</span>}
-                      </Link>
-                      <div className="space-y-2">
-                        {METRICS.map(m => {
-                          const value = m.value(a);
-                          const tier = m.domain ? tierFor(value, m.domain) : 'none';
-                          const position = m.domain ? scalePosition(value, m.domain) : null;
-                          return (
-                            <div key={m.id} className="flex items-center justify-between gap-3">
-                              <MetricLabel label={m.label} tooltip={m.tooltip} polarity={null} />
-                              <div className="flex-shrink-0 text-right">
-                                <MetricValue metric={m} a={a} tier={tier} position={position} />
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
+                        <span className="font-sans font-bold text-sm text-white flex-1 min-w-0 truncate">
+                          {labelByUserId.get(a.user_id) ?? chartLabel(a.display_name)}
+                          {isMe && <span className="sr-only"> (you)</span>}
+                        </span>
+                        <ChevronDown
+                          className={`w-4 h-4 text-turf-500 flex-shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+                          aria-hidden="true"
+                        />
+                      </button>
+                      {isOpen && (
+                        <div id={panelId} className="px-4 pb-4">
+                          <div className="space-y-2 mb-3">
+                            {METRICS.map(m => {
+                              const value = m.value(a);
+                              const tier = m.domain ? tierFor(value, m.domain) : 'none';
+                              const position = m.domain ? scalePosition(value, m.domain) : null;
+                              return (
+                                <div key={m.id} className="flex items-center justify-between gap-3">
+                                  <MetricLabel label={m.label} tooltip={m.tooltip} polarity={null} />
+                                  <div className="flex-shrink-0 text-right">
+                                    <MetricValue metric={m} a={a} tier={tier} position={position} />
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                          <Link to={`/roster/${a.user_id}`} className="btn-secondary btn-sm inline-flex">
+                            View Roster
+                          </Link>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
