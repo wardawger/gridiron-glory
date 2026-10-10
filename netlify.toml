@@ -6,7 +6,7 @@
   # tokens). Netlify's secrets scanner otherwise flags their own
   # intentional presence in dist/ as an "exposed secret" and fails the
   # build. Omit them by key so the scanner still catches anything else.
-  SECRETS_SCAN_OMIT_KEYS = "VITE_SUPABASE_URL,VITE_SUPABASE_ANON_KEY,VITE_CFBD_KEY,VITE_POSTHOG_KEY,VITE_POSTHOG_HOST"
+  SECRETS_SCAN_OMIT_KEYS = "VITE_SUPABASE_URL,VITE_SUPABASE_ANON_KEY,VITE_CFBD_KEY,VITE_POSTHOG_KEY,VITE_POSTHOG_HOST,VITE_VAPID_PUBLIC_KEY"
 
 [[redirects]]
   from = "/*"
