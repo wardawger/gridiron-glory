@@ -32,5 +32,46 @@
       "type": "image/png",
       "purpose": "maskable"
     }
+  ],
+  "shortcuts": [
+    {
+      "name": "Standings",
+      "short_name": "Standings",
+      "description": "League standings",
+      "url": "/",
+      "icons": [
+        {
+          "src": "/favicon-96x96.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "My Roster",
+      "short_name": "Roster",
+      "description": "Set your captain, bets and lineup",
+      "url": "/roster",
+      "icons": [
+        {
+          "src": "/favicon-96x96.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Scoreboard",
+      "short_name": "Scoreboard",
+      "description": "This week's matchups",
+      "url": "/scoreboard",
+      "icons": [
+        {
+          "src": "/favicon-96x96.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    }
   ]
 }
