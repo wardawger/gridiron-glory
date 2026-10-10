@@ -8,6 +8,7 @@ import { validateAvatarFile, uploadAvatarImage } from '../services/avatarUpload'
 import { Avatar } from '../components/ui/Avatar';
 import { TeamLogo } from '../components/ui/TeamLogo';
 import { PasswordInput } from '../components/ui/PasswordInput';
+import { NotificationSettings } from '../components/account/NotificationSettings';
 
 interface Props {
   auth: ReturnType<typeof useAuth>;
@@ -344,6 +345,8 @@ export function AccountPage({
       </div>
 
       {/* Change password */}
+      <NotificationSettings userId={auth.user!.id} />
+
       <div className="card p-5 space-y-4">
         <h3 className="font-medium text-white text-sm">Change Password</h3>
         <form onSubmit={handleChangePassword} className="space-y-3">
