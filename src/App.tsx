@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import { useAuth }     from './hooks/useAuth';
 import { useLeague }   from './hooks/useLeague';
 import { useCfbData }  from './hooks/useCfbData';
+import { InstallPrompt } from './components/ui/InstallPrompt';
 import { Header }      from './components/layout/Header';
 import { AuthPage }         from './pages/AuthPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
@@ -441,6 +442,7 @@ export default function App() {
             <AnimatedRoutes lg={lg} league={league} auth={auth} cfb={cfb} />
           </ErrorBoundary>
         </main>
+        <InstallPrompt />
       </div>
     </BrowserRouter>
   );

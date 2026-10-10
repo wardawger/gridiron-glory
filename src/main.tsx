@@ -4,6 +4,7 @@ import App from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import posthog from 'posthog-js';
 import './index.css';
+import { registerSW } from 'virtual:pwa-register';
 
 const posthogKey = import.meta.env.VITE_POSTHOG_KEY;
 const posthogHost = import.meta.env.VITE_POSTHOG_HOST;
@@ -31,6 +32,12 @@ if (posthogKey && posthogHost) {
 // browser's own history restoration.
 if ('scrollRestoration' in history) {
   history.scrollRestoration = 'manual';
+}
+
+// Installable-app service worker (app shell only — see src/sw.ts). Only
+// registered in production builds; in dev it would cache stale modules.
+if (import.meta.env.PROD) {
+  registerSW({ immediate: true });
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
