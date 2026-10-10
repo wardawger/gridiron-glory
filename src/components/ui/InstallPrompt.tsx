@@ -21,6 +21,14 @@ function isIos(): boolean {
   return /iPhone|iPad|iPod/.test(ua) || (ua.includes('Macintosh') && navigator.maxTouchPoints > 1);
 }
 
+// Where the Share button lives differs by iOS browser: Safari keeps it in the
+// bottom toolbar, Chrome/Edge/Firefox put it in the address bar.
+function iosShareHint(): string {
+  const ua = navigator.userAgent;
+  if (/CriOS|EdgiOS|FxiOS/.test(ua)) return 'Tap the Share icon in the address bar, then';
+  return 'Tap the Share button, then';
+}
+
 function recentlyDismissed(): boolean {
   const at = Number(localStorage.getItem(DISMISSED_KEY));
   return !!at && Date.now() - at < DISMISS_DAYS * 24 * 60 * 60 * 1000;
@@ -78,7 +86,7 @@ export function InstallPrompt() {
       <div className="flex-1 min-w-0 text-sm">
         <p className="font-medium text-white">Add Gridiron Glory to your home screen</p>
         {showIosHelp ? (
-          <p className="text-xs text-turf-400">Tap the Share button, then <span className="text-white">Add to Home Screen</span>.</p>
+          <p className="text-xs text-turf-400">{iosShareHint()} <span className="text-white">Add to Home Screen</span>.</p>
         ) : (
           <p className="text-xs text-turf-400">Opens full-screen like an app.</p>
         )}
