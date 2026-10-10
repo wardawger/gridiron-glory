@@ -4,6 +4,7 @@ import { useAuth }     from './hooks/useAuth';
 import { useLeague }   from './hooks/useLeague';
 import { useCfbData }  from './hooks/useCfbData';
 import { InstallPrompt } from './components/ui/InstallPrompt';
+import { PullToRefresh } from './components/ui/PullToRefresh';
 import { Header }      from './components/layout/Header';
 import { AuthPage }         from './pages/AuthPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
@@ -437,7 +438,8 @@ export default function App() {
           isRefreshing={cfb.loading}
           onSwitchLeague={league.switchLeague}
         />
-        <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-6">
+        <PullToRefresh onRefresh={cfb.refresh} />
+        <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-6 pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:pb-6">
           <ErrorBoundary inline>
             <AnimatedRoutes lg={lg} league={league} auth={auth} cfb={cfb} />
           </ErrorBoundary>

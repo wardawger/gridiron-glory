@@ -1,7 +1,8 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Trophy, Users, Shield, BarChart3, LogOut, RefreshCw, Zap, ChevronDown, Plus, History, ArrowLeftRight, Award, Info, ClipboardList, Archive, Menu, X, LayoutGrid, Newspaper } from 'lucide-react';
+import { Trophy, Users, Shield, BarChart3, LogOut, RefreshCw, Zap, ChevronDown, Plus, History, ArrowLeftRight, Award, Info, ClipboardList, Archive, LayoutGrid, Newspaper } from 'lucide-react';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import type { League, LeagueMember, WaiverClaim, GameData } from '../../types';
+import { MobileTabBar, type TabNavItem } from "./MobileTabBar";
 import { Avatar } from '../ui/Avatar';
 import { getSeenWaiverClaimIds } from '../../lib/waiverSeen';
 
@@ -79,10 +80,8 @@ export function Header({
   }, [gameData, league, now]);
   const [showLeaguePicker, setShowLeaguePicker] = useState(false);
   const [showLeagueInfo, setShowLeagueInfo] = useState(false);
-  const [showMobileMenu, setShowMobileMenu] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
   const infoRef = useRef<HTMLDivElement>(null);
-  const mobileMenuRef = useRef<HTMLDivElement>(null);
 
   // Close any dropdown when clicking outside its own container
   useEffect(() => {
@@ -93,19 +92,10 @@ export function Header({
       if (infoRef.current && !infoRef.current.contains(e.target as Node)) {
         setShowLeagueInfo(false);
       }
-      if (mobileMenuRef.current && !mobileMenuRef.current.contains(e.target as Node)) {
-        setShowMobileMenu(false);
-      }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
-
-  // A route change means a nav link was just followed — close the menu
-  // rather than leaving it open over the newly-loaded page.
-  useEffect(() => {
-    setShowMobileMenu(false);
-  }, [loc.pathname]);
 
   const nav = [
     { to: '/',          label: 'Standings',  icon: Trophy },
@@ -134,8 +124,22 @@ export function Header({
   ];
   const infoActive = leagueInfoItems.some(i => i.to === loc.pathname);
 
+  // Phone tab bar: the four most-used destinations, everything else in "More".
+  const scoreboardItem = leagueInfoItems[0];
+  const draftOpen = league?.draft_status !== 'complete';
+  const rankingsItem = nav.find(n => n.to === '/rankings')!;
+  const draftItem = nav.find(n => n.to === '/draft');
+  const tabItems: TabNavItem[] = [
+    nav[0], nav[1], scoreboardItem,
+    draftOpen && draftItem ? draftItem : rankingsItem,
+  ];
+  const tabPaths = new Set(tabItems.map(t => t.to));
+  const moreItems: TabNavItem[] = [...nav.slice(0, 3), ...leagueInfoItems, ...nav.slice(3)]
+    .filter(i => !tabPaths.has(i.to));
+
   return (
-    <header className="sticky top-0 z-40 bg-turf-950/90 backdrop-blur border-b border-turf-800">
+    <>
+    <header className="sticky top-0 z-40 bg-turf-950/90 backdrop-blur border-b border-turf-800" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex items-center justify-between h-14">
 
@@ -293,10 +297,10 @@ export function Header({
               <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
               <span className="hidden sm:inline">Refresh</span>
             </button>
-            <div className="h-5 w-px bg-turf-700" />
+            <div className="hidden md:block h-5 w-px bg-turf-700" />
             <Link
               to="/account"
-              className="flex items-center gap-2 px-1.5 py-1 rounded-lg hover:bg-turf-800 transition-colors group"
+              className="hidden md:flex items-center gap-2 px-1.5 py-1 rounded-lg hover:bg-turf-800 transition-colors group"
               title="My Account"
             >
               <Avatar
@@ -307,64 +311,15 @@ export function Header({
               />
               <span className="text-sm text-turf-400 group-hover:text-white transition-colors hidden sm:inline">{displayName}</span>
             </Link>
-            <button onClick={onSignOut} className="btn-ghost btn-sm" title="Sign out" aria-label="Sign out">
+            <button onClick={onSignOut} className="hidden md:inline-flex btn-ghost btn-sm" title="Sign out" aria-label="Sign out">
               <LogOut className="w-4 h-4" />
             </button>
 
-            {/* Hamburger toggle — mobile only, the desktop <nav> above
-                covers this same link set at md: and up. */}
-            <div className="relative md:hidden" ref={mobileMenuRef}>
-              <button
-                onClick={() => setShowMobileMenu(v => !v)}
-                className="btn-ghost btn-sm relative"
-                title="Menu"
-                aria-label="Menu"
-                aria-expanded={showMobileMenu}
-              >
-                {showMobileMenu ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
-                {!showMobileMenu && (
-                  <>
-                    <CountBadge count={unseenWaiverCount} className="absolute -top-1 -right-1" />
-                    {anyGameLive && unseenWaiverCount <= 0 && <LiveDot className="absolute -top-0.5 -right-0.5" />}
-                  </>
-                )}
-              </button>
-
-              {showMobileMenu && (
-                <div className="absolute top-full right-0 mt-1 w-64 card shadow-xl shadow-black/40 overflow-hidden animate-slide-up z-50 p-1.5 max-h-[70vh] overflow-y-auto">
-                  {[...nav.slice(0, 3), ...leagueInfoItems, ...nav.slice(3)].map(({ to, label, icon: Icon, description, badge, live }: any) => {
-                    const active = loc.pathname === to;
-                    return (
-                      <Link
-                        key={to}
-                        to={to}
-                        onClick={() => setShowMobileMenu(false)}
-                        className={`flex items-start gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors ${
-                          active
-                            ? 'bg-field-900/60 text-field-400'
-                            : 'text-turf-300 hover:bg-turf-800 hover:text-white'
-                        }`}
-                      >
-                        <Icon className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                        <div className="min-w-0 flex-1">
-                          <div className="font-medium flex items-center gap-1.5">
-                            {label}
-                            {live && <LiveDot />}
-                            <CountBadge count={badge ?? 0} />
-                          </div>
-                          {description && (
-                            <div className="text-xs text-turf-500 truncate">{description}</div>
-                          )}
-                        </div>
-                      </Link>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
           </div>
         </div>
       </div>
     </header>
+    <MobileTabBar tabs={tabItems} moreItems={moreItems} displayName={displayName} onSignOut={onSignOut} />
+    </>
   );
 }

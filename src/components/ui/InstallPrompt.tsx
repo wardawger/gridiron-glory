@@ -77,8 +77,7 @@ export function InstallPrompt() {
     <div
       role="region"
       aria-label="Install Gridiron Glory"
-      className="fixed inset-x-3 bottom-3 z-40 mx-auto max-w-md card p-3 pr-2 flex items-center gap-3 shadow-xl shadow-black/50"
-      style={{ marginBottom: 'env(safe-area-inset-bottom)' }}
+      className="fixed inset-x-3 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] md:bottom-3 z-40 mx-auto max-w-md card p-3 pr-2 flex items-center gap-3 shadow-xl shadow-black/50"
     >
       <div className="w-10 h-10 rounded-lg bg-field-500 flex items-center justify-center flex-shrink-0">
         {installEvent ? <Download className="w-5 h-5 text-turf-950" aria-hidden="true" /> : <Share className="w-5 h-5 text-turf-950" aria-hidden="true" />}
