@@ -373,3 +373,37 @@ export function ScoreboardPageSkeleton() {
     </div>
   );
 }
+
+// Whole-app placeholder shown while the signed-in user's league loads —
+// mirrors the real header, page, and mobile tab bar so the first paint after
+// sign-in already looks like the app instead of a lone spinner.
+export function AppShellSkeleton() {
+  return (
+    <div className="min-h-dvh flex flex-col" aria-busy="true" aria-label="Loading">
+      <div className="h-14 border-b border-turf-800 bg-turf-950/90" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+        <div className="max-w-7xl mx-auto px-4 h-full flex items-center gap-3">
+          <div className="w-7 h-7 rounded bg-field-500 flex items-center justify-center flex-shrink-0">
+            <span className="font-display text-turf-950 text-sm leading-none">G</span>
+          </div>
+          <Bar className="h-5 w-40" />
+          <div className="flex-1" />
+          <Bar className="h-7 w-7 rounded-lg md:w-20" />
+        </div>
+      </div>
+      <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-6 pb-24 md:pb-6">
+        <HomePageSkeleton />
+      </main>
+      <div
+        className="md:hidden fixed bottom-0 inset-x-0 border-t border-turf-800 bg-turf-950/95 grid grid-cols-5 items-center"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      >
+        {Array.from({ length: 5 }, (_, i) => (
+          <div key={i} className="flex flex-col items-center gap-1.5 min-h-[56px] justify-center">
+            <Bar className="h-5 w-5 rounded-md" />
+            <Bar className="h-2 w-9" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

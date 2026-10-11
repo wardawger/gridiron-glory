@@ -5,6 +5,8 @@ import { useLeague }   from './hooks/useLeague';
 import { useCfbData }  from './hooks/useCfbData';
 import { InstallPrompt } from './components/ui/InstallPrompt';
 import { PullToRefresh } from './components/ui/PullToRefresh';
+import { OfflineBanner } from './components/ui/OfflineBanner';
+import { LoadErrorScreen } from './components/ui/LoadErrorScreen';
 import { Header }      from './components/layout/Header';
 import { AuthPage }         from './pages/AuthPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
@@ -14,7 +16,7 @@ import { PrivacyPage }      from './pages/PrivacyPage';
 import { Loader2 }          from 'lucide-react';
 import { ErrorBoundary }    from './components/ErrorBoundary';
 import {
-  HomePageSkeleton, RosterPageSkeleton, AccountPageSkeleton, DraftRoomSkeleton, AdminPanelSkeleton,
+  AppShellSkeleton, HomePageSkeleton, RosterPageSkeleton, AccountPageSkeleton, DraftRoomSkeleton, AdminPanelSkeleton,
   RankingsPageSkeleton, DraftRecapPageSkeleton, LeagueSettingsPageSkeleton, TrophyCasePageSkeleton,
   FreeAgencyPageSkeleton, StatBonusPageSkeleton, ScoreboardPageSkeleton, NewsPageSkeleton,
 } from './components/ui/Skeletons';
@@ -340,16 +342,13 @@ export default function App() {
   }
 
   if (auth.user && league.loading) {
-    return (
-      <div className="min-h-dvh flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3 text-turf-400">
-          <div className="w-10 h-10 rounded-xl bg-field-500 flex items-center justify-center animate-pulse">
-            <span className="font-display text-turf-950 text-2xl">G</span>
-          </div>
-          <Loader2 className="w-5 h-5 animate-spin" />
-        </div>
-      </div>
-    );
+    return <AppShellSkeleton />;
+  }
+
+  // A failed load (offline, server error) must not fall through to the
+  // no-league branch below, which would offer to create a new league.
+  if (auth.user && league.error && !league.league) {
+    return <LoadErrorScreen message={league.error} onRetry={league.reload} />;
   }
 
   if (!auth.user) {
@@ -438,6 +437,7 @@ export default function App() {
           isRefreshing={cfb.loading}
           onSwitchLeague={league.switchLeague}
         />
+        <OfflineBanner onReconnect={cfb.refresh} />
         <PullToRefresh onRefresh={cfb.refresh} />
         <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-6 pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:pb-6">
           <ErrorBoundary inline>
