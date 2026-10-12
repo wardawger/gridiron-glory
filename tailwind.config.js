@@ -50,6 +50,8 @@ export default {
         'radar-in': 'radarIn 0.4s ease-out',
         'content-fade-in': 'contentFadeIn 180ms cubic-bezier(0.16, 1, 0.3, 1)',
         'content-fade-out': 'contentFadeOut 120ms ease-in',
+        'tab-in-right': 'tabInRight 240ms cubic-bezier(0.16, 1, 0.3, 1)',
+        'tab-in-left': 'tabInLeft 240ms cubic-bezier(0.16, 1, 0.3, 1)',
         'sheet-up': 'sheetUp 260ms cubic-bezier(0.16, 1, 0.3, 1)',
         'sheet-down': 'sheetDown 200ms ease-in',
       },
@@ -79,6 +81,14 @@ export default {
         radarIn: {
           '0%':   { transform: 'scale(0.8)', opacity: '0' },
           '100%': { transform: 'scale(1)',   opacity: '1' },
+        },
+        tabInRight: {
+          '0%':   { opacity: '0', transform: 'translateX(20px)' },
+          '100%': { opacity: '1', transform: 'translateX(0)' },
+        },
+        tabInLeft: {
+          '0%':   { opacity: '0', transform: 'translateX(-20px)' },
+          '100%': { opacity: '1', transform: 'translateX(0)' },
         },
         contentFadeIn: {
           '0%':   { opacity: '0' },

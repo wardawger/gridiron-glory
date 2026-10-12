@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useLayoutEffect, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -701,7 +701,28 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
   const [analyticsTab, setAnalyticsTabState] = useState<AnalyticsTab>(
     ANALYTICS_TABS.includes(initialTab as AnalyticsTab) ? (initialTab as AnalyticsTab) : 'table'
   );
+  // Direction of the last tab change, so the incoming panel slides in from
+  // the side the tab sits on. Null on first render: no entrance animation
+  // for the panel that is simply there when the page loads.
+  const [tabDirection, setTabDirection] = useState<1 | -1 | null>(null);
+  const tabRefs = useRef<Partial<Record<AnalyticsTab, HTMLButtonElement | null>>>({});
+  const [pill, setPill] = useState<{ left: number; width: number } | null>(null);
+  const measurePill = () => {
+    const el = tabRefs.current[analyticsTab];
+    if (!el) return;
+    setPill(prev => (prev && prev.left === el.offsetLeft && prev.width === el.offsetWidth ? prev : { left: el.offsetLeft, width: el.offsetWidth }));
+  };
+  // Runs after every render (cheap, and bails out when unchanged) because the
+  // tablist only mounts once analytics exist and its width shifts with layout.
+  useLayoutEffect(measurePill);
+  useEffect(() => {
+    window.addEventListener('resize', measurePill);
+    return () => window.removeEventListener('resize', measurePill);
+  });
+  const tabPanelAnim = tabDirection === null ? ''
+    : tabDirection > 0 ? 'animate-tab-in-right motion-reduce:animate-none' : 'animate-tab-in-left motion-reduce:animate-none';
   const setAnalyticsTab = (tab: AnalyticsTab) => {
+    if (tab !== analyticsTab) setTabDirection(ANALYTICS_TABS.indexOf(tab) > ANALYTICS_TABS.indexOf(analyticsTab) ? 1 : -1);
     setAnalyticsTabState(tab);
     setSearchParams(prev => {
       const next = new URLSearchParams(prev);
@@ -1206,10 +1227,19 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
         <div className="card overflow-hidden">
           <div className="flex items-center justify-between px-5 py-4 border-b border-turf-800">
             <h2 className="section-title text-xl">Roster Analytics</h2>
-            <div role="tablist" aria-label="Roster analytics view" className="flex gap-1 bg-turf-800 p-1 rounded-lg">
+            <div role="tablist" aria-label="Roster analytics view" className="relative flex gap-1 bg-turf-800 p-1 rounded-lg">
+              {/* Sliding highlight behind the active tab */}
+              {pill && (
+                <span
+                  aria-hidden="true"
+                  className="absolute top-1 bottom-1 rounded-md bg-field-500 transition-[left,width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none"
+                  style={{ left: pill.left, width: pill.width }}
+                />
+              )}
               {ANALYTICS_TABS.map((id, idx) => (
                 <button
                   key={id}
+                  ref={el => { tabRefs.current[id] = el; }}
                   type="button"
                   role="tab"
                   id={`analytics-tab-${id}`}
@@ -1218,8 +1248,8 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
                   tabIndex={analyticsTab === id ? 0 : -1}
                   onClick={() => setAnalyticsTab(id)}
                   onKeyDown={e => onTabKeyDown(e, idx)}
-                  className={`px-3 py-1.5 min-h-[32px] rounded-md text-xs font-medium transition-colors capitalize focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-400 ${
-                    analyticsTab === id ? 'bg-field-500 text-turf-950' : 'text-turf-400 hover:text-white'
+                  className={`relative px-3 py-1.5 min-h-[32px] rounded-md text-xs font-medium transition-colors capitalize focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-400 ${
+                    analyticsTab === id ? 'text-turf-950' : 'text-turf-400 hover:text-white'
                   }`}
                 >
                   {id}
@@ -1230,7 +1260,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
 
           {/* ── TABLE VIEW ── */}
           {analyticsTab === 'table' && (
-            <div role="tabpanel" id="analytics-panel-table" aria-labelledby="analytics-tab-table">
+            <div role="tabpanel" id="analytics-panel-table" aria-labelledby="analytics-tab-table" className={tabPanelAnim}>
               {/* This is the one view on the whole page that reproduces the
                   "page loads zoomed out" bug on real iOS devices (confirmed
                   on Chrome for iOS, which — like every iOS browser — runs
@@ -1410,7 +1440,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
 
           {/* ── WEEKLY VIEW ── */}
           {analyticsTab === 'weekly' && (
-            <div role="tabpanel" id="analytics-panel-weekly" aria-labelledby="analytics-tab-weekly" className="p-5">
+            <div role="tabpanel" id="analytics-panel-weekly" aria-labelledby="analytics-tab-weekly" className={`p-5 ${tabPanelAnim}`}>
               <p className="text-xs text-turf-500 mb-4">Points scored per week by each player</p>
               {weeklyData.length === 0 ? (
                 <p className="text-turf-500 text-sm text-center py-8">No weekly data yet — check back once games are played</p>
@@ -1457,7 +1487,7 @@ export function Leaderboard({ entries, currentWeek, userId, confChampComplete, d
 
           {/* ── GRAPHS VIEW ── */}
           {analyticsTab === 'graphs' && (
-            <div role="tabpanel" id="analytics-panel-graphs" aria-labelledby="analytics-tab-graphs" className="p-5 space-y-4">
+            <div role="tabpanel" id="analytics-panel-graphs" aria-labelledby="analytics-tab-graphs" className={`p-5 space-y-4 ${tabPanelAnim}`}>
               {/* Radar */}
               <div className="card-inner p-4">
                 <h3 className="font-display text-lg tracking-wide text-white">Roster profile</h3>
