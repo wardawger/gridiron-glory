@@ -12,10 +12,14 @@ const EXIT_DURATION_MS = 120;
 // takes over and fades in. Callers keep every panel mounted (hidden via
 // the class returned here) rather than conditionally rendering, so the
 // swap has something to animate between.
-export function useTabCrossfade<T extends string>(initial: T) {
+//
+// Pass `order` (the tabs left-to-right, a stable reference) to make the
+// incoming panel slide in from the side its tab sits on instead of only fading.
+export function useTabCrossfade<T extends string>(initial: T, order?: readonly T[]) {
   const [active, setActive] = useState<T>(initial);
   const [displayed, setDisplayed] = useState<T>(initial);
   const [exiting, setExiting] = useState(false);
+  const [direction, setDirection] = useState<1 | -1 | 0>(0);
   const activeRef = useRef(initial);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -25,6 +29,7 @@ export function useTabCrossfade<T extends string>(initial: T) {
 
   const select = useCallback((next: T) => {
     if (activeRef.current === next) return;
+    if (order) setDirection(order.indexOf(next) > order.indexOf(activeRef.current) ? 1 : -1);
     activeRef.current = next;
     setActive(next);
     setExiting(true);
@@ -33,11 +38,14 @@ export function useTabCrossfade<T extends string>(initial: T) {
       setDisplayed(next);
       setExiting(false);
     }, EXIT_DURATION_MS);
-  }, []);
+  }, [order]);
 
-  const panelClass = useCallback((id: T) =>
-    displayed === id ? (exiting ? 'animate-content-fade-out' : 'animate-content-fade-in') : 'hidden',
-  [displayed, exiting]);
+  const panelClass = useCallback((id: T) => {
+    if (displayed !== id) return 'hidden';
+    if (exiting) return 'animate-content-fade-out';
+    if (direction === 0) return 'animate-content-fade-in';
+    return direction > 0 ? 'animate-tab-in-right' : 'animate-tab-in-left';
+  }, [displayed, exiting, direction]);
 
   return { active, select, panelClass };
 }

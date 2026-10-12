@@ -80,6 +80,8 @@ interface ModalProps {
   onClose: () => void;
 }
 
+const ROSTER_VIEW_ORDER = ['week', 'schedule'] as const;
+
 function ScheduleModal({ team, gameData, captainPicks, userId, currentWeek, teamRank, onClose }: ModalProps) {
   const teamGames = gameData[team.team_id] ?? {};
   const panelRef = useDialog(onClose);
@@ -248,7 +250,7 @@ export function RosterView({
     () => new Map(rankings.filter(r => r.team_id).map(r => [r.team_id!, r.rank])),
     [rankings]
   );
-  const { active: view, select: selectView, panelClass: viewPanelClass } = useTabCrossfade<'week' | 'schedule'>('week');
+  const { active: view, select: selectView, panelClass: viewPanelClass } = useTabCrossfade<'week' | 'schedule'>('week', ROSTER_VIEW_ORDER);
   // Which week the roster page is browsing — defaults to the league's actual
   // current week each time this page is opened, but can be changed freely
   // without affecting league.current_week (used elsewhere for free agency,
@@ -882,10 +884,21 @@ export function RosterView({
             "Week N ▾" text/chevron additionally opens the week picker. The
             outer area is a pointer convenience; the inner button is the
             real control, so keyboard users lose nothing. */}
-        <div className="flex gap-1 bg-turf-900 p-1 rounded-xl border border-turf-800">
+        <div className="relative flex gap-1 bg-turf-900 p-1 rounded-xl border border-turf-800">
+          {/* Sliding highlight: each half is (100% - 12px) / 2 wide (4px
+              padding either side plus the 4px gap), so the schedule position
+              is one pill width plus the gap to the right. */}
+          <span
+            aria-hidden="true"
+            className="absolute top-1 bottom-1 left-1 rounded-lg bg-field-500 transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none"
+            style={{
+              width: 'calc((100% - 12px) / 2)',
+              transform: view === 'schedule' ? 'translateX(calc(100% + 4px))' : 'translateX(0)',
+            }}
+          />
           <div
             className={`relative flex-1 flex items-center justify-center rounded-lg transition-colors cursor-pointer ${
-              view === 'week' ? 'bg-field-500' : 'hover:bg-turf-800/60'
+              view === 'week' ? '' : 'hover:bg-turf-800/60'
             }`}
             ref={weekMenu.rootRef}
             onClick={() => selectView('week')}
@@ -938,8 +951,8 @@ export function RosterView({
             aria-pressed={view === 'schedule'}
             aria-controls="roster-panel-schedule"
             onClick={() => selectView('schedule')}
-            className={`flex items-center gap-1.5 flex-1 justify-center py-2 rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-field-400 ${
-              view === 'schedule' ? 'bg-field-500 text-turf-950' : 'text-turf-400 hover:text-white'
+            className={`relative flex items-center gap-1.5 flex-1 justify-center py-2 rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-field-400 ${
+              view === 'schedule' ? 'text-turf-950' : 'text-turf-400 hover:text-white'
             }`}
           >
             <Calendar className="w-3.5 h-3.5" aria-hidden="true" /> Full Schedule
