@@ -54,6 +54,7 @@ const TABS: { id: Tab; label: string; icon: typeof Shield }[] = [
   { id: 'scoring',     label: 'Scoring',     icon: Settings },
   { id: 'adjustments', label: 'Adjustments', icon: Gift },
 ];
+const TAB_ORDER = TABS.map(t => t.id);
 const isTab = (v: string | null): v is Tab => v === 'members' || v === 'scoring' || v === 'adjustments';
 
 export function AdminPanel({
@@ -68,7 +69,7 @@ export function AdminPanel({
   const [searchParams, setSearchParams] = useSearchParams();
   const urlTab = searchParams.get('tab');
   const initialTab: Tab = isTab(urlTab) ? urlTab : 'members';
-  const { active: tab, select: selectTab, panelClass: tabPanelClass } = useTabCrossfade<Tab>(initialTab);
+  const { active: tab, select: selectTab, panelClass: tabPanelClass } = useTabCrossfade<Tab>(initialTab, TAB_ORDER);
 
   useEffect(() => {
     if (isTab(urlTab) && urlTab !== tab) selectTab(urlTab);
@@ -133,7 +134,17 @@ export function AdminPanel({
       </div>
 
       {/* Tabs */}
-      <div role="tablist" aria-label="Commissioner panel sections" className="flex gap-1 bg-turf-900 p-1 rounded-xl border border-turf-800">
+      <div role="tablist" aria-label="Commissioner panel sections" className="relative flex gap-1 bg-turf-900 p-1 rounded-xl border border-turf-800">
+        {/* Sliding highlight: each tab is (100% - 16px) / 3 wide (4px padding
+            either side plus two 4px gaps); step right by one width + gap. */}
+        <span
+          aria-hidden="true"
+          className="absolute top-1 bottom-1 left-1 rounded-lg bg-field-500 transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none"
+          style={{
+            width: `calc((100% - 16px) / ${TABS.length})`,
+            transform: `translateX(calc(${TABS.findIndex(t => t.id === tab)} * (100% + 4px)))`,
+          }}
+        />
         {TABS.map(({ id, label, icon: Icon }, idx) => (
           <button
             key={id}
@@ -145,9 +156,9 @@ export function AdminPanel({
             tabIndex={tab === id ? 0 : -1}
             onClick={() => goToTab(id)}
             onKeyDown={e => onTabKeyDown(e, idx)}
-            className={`flex items-center gap-1.5 flex-1 justify-center px-2 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-field-400 ${
+            className={`relative flex items-center gap-1.5 flex-1 justify-center px-2 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-field-400 ${
               tab === id
-                ? 'bg-field-500 text-turf-950'
+                ? 'text-turf-950'
                 : 'text-turf-400 hover:text-white'
             }`}
           >
