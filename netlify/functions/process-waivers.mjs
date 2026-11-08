@@ -85,6 +85,22 @@ function computeLocalParts(tz, date) {
   return { weekday: WEEKDAY_INDEX[weekdayStr] ?? -1, hour };
 }
 
+// Most recent moment (hour granularity) at which this league's waivers were
+// due to run: the configured weekday at PROCESS_HOUR_LOCAL in its timezone,
+// looking back up to 8 days. Using "most recent due time" rather than "is it
+// exactly that hour right now" means a run that failed or was skipped is
+// picked up by the next hourly tick instead of waiting a whole week.
+function lastProcessTime(scoring, now) {
+  const hourMs = 60 * 60 * 1000;
+  const start = Math.floor(now.getTime() / hourMs) * hourMs;
+  for (let i = 0; i <= 8 * 24; i++) {
+    const t = new Date(start - i * hourMs);
+    const { weekday, hour } = computeLocalParts(scoring.waiver_timezone, t);
+    if (weekday === scoring.waiver_process_day && hour === PROCESS_HOUR_LOCAL) return t;
+  }
+  return null;
+}
+
 // ── CFBD helpers (direct calls — cfbd.ts's browser-relative proxy URL can't
 //    be reused inside another function) ─────────────────────────────────────
 
@@ -234,18 +250,24 @@ function checkConferenceLimits(myRoster, droppedTeamId, addedTeamConference, set
 
 // ── Per-league processing ────────────────────────────────────────────────
 
-async function processLeague(league, scoring) {
-  const [members, draftPicks, moves, captainPicks, manualBonuses, spreadPicks, pendingClaims] = await Promise.all([
+async function processLeague(league, scoring, dueAt) {
+  // Cheap check first: this now runs every hour for every waiver league, so
+  // bail before the heavy fetches when nothing is waiting. Only claims filed
+  // before this run's process time are due; later ones wait for the next.
+  const allPending = await sbGet(`waiver_claims?league_id=eq.${league.id}&status=eq.pending&select=*`);
+  const pendingClaims = allPending.filter(c => new Date(c.submitted_at) < dueAt);
+  if (pendingClaims.length === 0) return { skipped: 'no pending claims' };
+
+  const [members, draftPicks, moves, captainPicks, manualBonuses, spreadPicks, scoreCorrections, benchPicks] = await Promise.all([
     sbGet(`league_members?league_id=eq.${league.id}&select=*`),
     sbGet(`draft_picks?league_id=eq.${league.id}&select=*`),
     sbGet(`free_agency_moves?league_id=eq.${league.id}&select=*`),
     sbGet(`captain_picks?league_id=eq.${league.id}&select=*`),
     sbGet(`manual_bonuses?league_id=eq.${league.id}&select=*`),
     sbGet(`spread_picks?league_id=eq.${league.id}&select=*`),
-    sbGet(`waiver_claims?league_id=eq.${league.id}&status=eq.pending&select=*`),
+    sbGet(`score_corrections?league_id=eq.${league.id}&select=*`),
+    sbGet(`bench_picks?league_id=eq.${league.id}&select=*`),
   ]);
-
-  if (pendingClaims.length === 0) return { skipped: 'no pending claims' };
 
   const teamIds = new Set([
     ...draftPicks.map(p => p.team_id),
@@ -266,7 +288,8 @@ async function processLeague(league, scoring) {
   const confChampComplete = league.current_week >= 15;
   const leaderboard = buildLeaderboard(
     members, draftPicks, captainPicks, gameData, scoring, manualBonuses,
-    new Map(), confChampComplete, spreadPicks, moves, league.current_week,
+    new Map(), confChampComplete, spreadPicks, moves, scoreCorrections,
+    league.current_week, undefined, benchPicks,
   );
   const { analytics } = computeAnalytics(leaderboard, draftPicks, []);
   const analyticsByUser = new Map(analytics.map(a => [a.user_id, a]));
@@ -393,11 +416,11 @@ export default async (req) => {
     const scoring = normalizeScoring(league.scoring);
     if (!scoring.waiver_enabled) continue;
 
-    const { weekday, hour } = computeLocalParts(scoring.waiver_timezone, now);
-    if (weekday !== scoring.waiver_process_day || hour !== PROCESS_HOUR_LOCAL) continue;
+    const dueAt = lastProcessTime(scoring, now);
+    if (!dueAt) continue;
 
     try {
-      const outcome = await processLeague(league, scoring);
+      const outcome = await processLeague(league, scoring, dueAt);
       results.push({ league_id: league.id, ...outcome });
     } catch (e) {
       console.error(`[process-waivers] league ${league.id} failed:`, e);
