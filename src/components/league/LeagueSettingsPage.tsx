@@ -1,4 +1,4 @@
-import { ClipboardList, Coins, ArrowLeftRight, Award, Gift, TrendingUp, TrendingDown, Clock, Users } from 'lucide-react';
+import { Ban, ClipboardList, Coins, ArrowLeftRight, Award, Gift, TrendingUp, TrendingDown, Clock, Users } from 'lucide-react';
 import type { League, LeagueMember } from '../../types';
 import { normalizeScoring, STAT_BONUS_CATEGORIES, STAT_BONUS_LABELS, BONUS_LABELS, BONUS_GROUPS } from '../../types';
 
@@ -66,6 +66,29 @@ export function LeagueSettingsPage({ league, members }: Props) {
             : 'No limit on G6, Independent, or non-P4 teams.'}
         </p>
       </div>
+
+      {/* Excluded conferences — only when the commissioner removed any */}
+      {scoring.excluded_conferences.length > 0 && (
+        <div className="card p-5 space-y-3">
+          <div className="flex items-center gap-2">
+            <Ban className="w-4 h-4 text-red-400" aria-hidden="true" />
+            <h3 className="font-medium text-white text-sm" id="excluded-conferences-heading">Excluded Conferences</h3>
+            <span className="badge-gray text-xs ml-auto">{scoring.excluded_conferences.length}</span>
+          </div>
+          <ul className="flex flex-wrap gap-2" aria-labelledby="excluded-conferences-heading">
+            {scoring.excluded_conferences.map(conference => (
+              <li key={conference} className="px-3 py-1.5 rounded-lg border border-red-800 bg-red-950/30 text-red-300 text-sm">
+                {conference}
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs text-turf-500">
+            Teams from these conferences can't be drafted
+            {scoring.free_agency_enabled ? ` or added through the ${scoring.waiver_enabled ? 'Portal or waivers' : 'Portal'}` : ''}.
+            They won't appear in the available-teams list, and anyone already rostered keeps their team.
+          </p>
+        </div>
+      )}
 
       {/* Base scoring */}
       <div className="card p-5 space-y-3">
