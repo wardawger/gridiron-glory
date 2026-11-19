@@ -5,6 +5,7 @@ import type { League, LeagueMember, WaiverClaim, GameData } from '../../types';
 import { MobileTabBar, type TabNavItem } from "./MobileTabBar";
 import { Avatar } from '../ui/Avatar';
 import { getSeenWaiverClaimIds } from '../../lib/waiverSeen';
+import { fetchScoreboard, findLiveStatus } from '../../services/cfbd';
 
 interface Props {
   league: League | null;
@@ -36,13 +37,11 @@ function LiveDot({ className = '' }: { className?: string }) {
   return <span className={`w-1.5 h-1.5 rounded-full bg-field-400 animate-pulse flex-shrink-0 ${className}`} aria-hidden="true" />;
 }
 
-// A game is presumed live once its kickoff has passed and it hasn't been
-// marked completed, for up to ~4.5 hours (covers a normal game plus OT/
-// weather delays) — a lightweight heuristic from schedule data the app
-// already has loaded, rather than polling CFBD's separate rate-limited
-// live endpoint app-wide (that endpoint is deliberately scoped to only run
-// while the Scoreboard page itself is open — see useLiveScoreboard) just to
-// light a nav dot.
+// A game is only a live *candidate* once its kickoff has passed and it
+// hasn't been marked completed, for up to ~4.5 hours (covers a normal game
+// plus OT/weather delays). The nav dot then confirms candidates against
+// CFBD's live scoreboard (see below), polling only while a candidate exists
+// so the rate-limited endpoint isn't hit app-wide all day.
 const LIVE_WINDOW_MS = 4.5 * 60 * 60 * 1000;
 
 export function Header({
@@ -67,17 +66,43 @@ export function Header({
     return () => clearInterval(id);
   }, []);
 
-  const anyGameLive = useMemo(() => {
-    if (!league) return false;
+  // Step 1 (cheap, local): which games *might* be live — kicked off within
+  // the window and not yet marked completed. Keyed as a string so the
+  // polling effect below only restarts when the candidate set really changes.
+  const candidateKey = useMemo(() => {
+    if (!league) return '';
     const week = league.current_week;
-    for (const teamGames of Object.values(gameData)) {
+    const out: string[] = [];
+    for (const [teamId, teamGames] of Object.entries(gameData)) {
       const game = teamGames[week];
       if (!game || game.completed || !game.start_date) continue;
       const kickoff = new Date(game.start_date).getTime();
-      if (now >= kickoff && now - kickoff <= LIVE_WINDOW_MS) return true;
+      if (now >= kickoff && now - kickoff <= LIVE_WINDOW_MS) out.push(`${teamId}:${game.opponent_id}`);
     }
-    return false;
+    return out.join(',');
   }, [gameData, league, now]);
+
+  // Step 2: only while there are candidates, confirm against CFBD's live
+  // scoreboard once a minute. A finished, delayed, or cancelled game never
+  // appears there as in_progress, so it can't light the dot.
+  const [liveKeys, setLiveKeys] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (!candidateKey) { setLiveKeys(new Set()); return; }
+    let cancelled = false;
+    const pairs = candidateKey.split(',');
+    const check = async () => {
+      const live = await fetchScoreboard();
+      if (cancelled) return;
+      setLiveKeys(new Set(pairs.filter(p => {
+        const [teamId, oppId] = p.split(':');
+        return findLiveStatus(live, teamId, oppId)?.status === 'in_progress';
+      })));
+    };
+    check();
+    const id = setInterval(check, 60_000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [candidateKey]);
+  const anyGameLive = liveKeys.size > 0;
   const [showLeaguePicker, setShowLeaguePicker] = useState(false);
   const [showLeagueInfo, setShowLeagueInfo] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
