@@ -4,6 +4,7 @@ import type {
   TrophySnapshot, TrophyTeamRef, TrophyWinner, ScoreCorrection,
 } from '../types';
 import { normalizeScoring, G6_CONFERENCES } from '../types';
+import { LAST_SCORED_WEEK } from './postseasonWeeks';
 import { isP4Conference } from './scoring';
 import { calcWeeklyScore, didWinSpreadPick } from './scoring';
 import { rosterAtWeek } from './roster';
@@ -227,7 +228,7 @@ function computeWeeklyExtremes(
   const result = new Map<string, WeeklyExtreme | null>();
   members.forEach(member => {
     let worst: WeeklyExtreme | null = null;
-    for (let w = 1; w <= 17; w++) {
+    for (let w = 1; w <= LAST_SCORED_WEEK; w++) {
       const roster = rosterAtWeek(member.user_id, w, draftPicks, freeAgencyMoves);
       if (roster.length === 0) continue;
       const weekly = calcWeeklyScore(member.user_id, w, roster, captainPicks, gameData, scoring, spreadPicks, freeAgencyMoves, scoreCorrections);

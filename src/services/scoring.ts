@@ -5,6 +5,7 @@ import type {
   SpreadPick, DraftPick, FreeAgencyMove, ScoreCorrection, BenchPick,
 } from '../types';
 import { STAT_BONUS_CATEGORIES, normalizeScoring } from '../types';
+import { LAST_SCORED_WEEK } from './postseasonWeeks';
 import { rosterAtWeek, currentRosters } from './roster';
 
 export { P4_CONFERENCES } from '../types';
@@ -343,7 +344,7 @@ export function buildLeaderboard(
   freeAgencyMoves: FreeAgencyMove[] = [],
   scoreCorrections: ScoreCorrection[] = [],
   currentWeek = 0,
-  totalWeeks = 17,
+  totalWeeks = LAST_SCORED_WEEK,
   benchPicks: BenchPick[] = [],
 ): LeaderboardEntry[] {
   const rosters = currentRosters(members, draftPicks, freeAgencyMoves, currentWeek);

@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { LAST_SCORED_WEEK } from '../services/postseasonWeeks';
 import { Link } from 'react-router-dom';
 import { Loader2, Coins, Trophy, BarChart3, AlertTriangle } from 'lucide-react';
 import { Leaderboard } from '../components/league/Leaderboard';
@@ -35,7 +36,7 @@ export function HomePage({
     () => buildLeaderboard(
       members, draftPicks, captainPicks, gameData,
       league.scoring, manualBonuses, seasonStats, confChampComplete, spreadPicks,
-      freeAgencyMoves, scoreCorrections, league.current_week, 17, benchPicks
+      freeAgencyMoves, scoreCorrections, league.current_week, LAST_SCORED_WEEK, benchPicks
     ),
     [members, draftPicks, captainPicks, gameData, league.scoring, manualBonuses, seasonStats, confChampComplete, spreadPicks, freeAgencyMoves, scoreCorrections, league.current_week, benchPicks]
   );

@@ -15,6 +15,7 @@ import { Avatar } from '../ui/Avatar';
 import { TriviaCard } from '../ui/TriviaCard';
 import { FadeIn } from '../amicro/fade-in';
 import { GameScoreModal } from './GameScoreModal';
+import { ALL_WEEKS, REGULAR_SEASON_LAST_WEEK } from '../../services/postseasonWeeks';
 
 interface Props {
   member: LeagueMember;
@@ -47,7 +48,7 @@ interface Props {
   onEnsureBenchSeeded?: (week: number, rosterTeamIds: string[]) => Promise<void>;
 }
 
-const WEEKS = Array.from({ length: 16 }, (_, i) => i); // weeks 0–15
+const WEEKS = ALL_WEEKS; // weeks 0–22: regular season, then bowl/playoff weeks
 
 // ── Spread helpers ────────────────────────────────────────────────────────
 
@@ -257,6 +258,16 @@ export function RosterView({
   // standings, and stat bonus lock-in).
   const [selectedWeek, setSelectedWeek] = useState(currentWeek);
   const weekMenu = useDropdownMenu();
+  // Regular-season weeks always show; postseason weeks only once they exist
+  // for one of this roster's teams (or the league has reached them), so the
+  // schedule grid and week picker don't carry a run of empty columns.
+  const visibleWeeks = useMemo(
+    () => WEEKS.filter(w =>
+      w <= REGULAR_SEASON_LAST_WEEK
+      || w <= currentWeek
+      || roster.some(t => gameData[t.team_id]?.[w])),
+    [roster, gameData, currentWeek],
+  );
   const managerMenu = useDropdownMenu();
   const [modalTeam, setModalTeam] = useState<RosterEntry | null>(null);
   const [spreadError, setSpreadError] = useState<string | null>(null);
@@ -925,7 +936,7 @@ export function RosterView({
                 aria-label="Week"
                 className="absolute top-full left-1/2 -translate-x-1/2 mt-1 w-40 card shadow-xl shadow-black/40 overflow-hidden animate-slide-up motion-reduce:animate-none z-50 p-1.5 max-h-72 overflow-y-auto"
               >
-                {WEEKS.map(w => (
+                {visibleWeeks.map(w => (
                   <button
                     key={w}
                     type="button"
@@ -1046,7 +1057,7 @@ export function RosterView({
                     <th scope="col" className="px-4 py-3 text-left text-turf-400 font-medium sticky left-0 bg-turf-900 z-10 min-w-44">
                       Team
                     </th>
-                    {WEEKS.map(w => (
+                    {visibleWeeks.map(w => (
                       <th
                         key={w}
                         scope="col"
@@ -1091,7 +1102,7 @@ export function RosterView({
                         </th>
 
                         {/* Week cells */}
-                        {WEEKS.map(w => {
+                        {visibleWeeks.map(w => {
                           const game     = gameData[entry.team_id]?.[w];
                           const isCap    = isCaptainForWeek(entry.team_id, w);
                           const isPast   = w < currentWeek;

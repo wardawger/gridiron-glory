@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { LAST_SCORED_WEEK } from '../services/postseasonWeeks';
 import { useParams } from 'react-router-dom';
 import { RosterView } from '../components/league/RosterView';
 import type { League, LeagueMember, DraftPick, CaptainPick, GameData, SpreadPick, SpreadData, FreeAgencyMove, ScoreCorrection, BenchPick, APRanking } from '../types';
@@ -43,7 +44,7 @@ export function RosterPage({
   );
 
   const weeklyScores = useMemo(() => {
-    return Array.from({ length: 18 }, (_, i) => {
+    return Array.from({ length: LAST_SCORED_WEEK + 1 }, (_, i) => {
       const weekRoster = rosterAtWeek(targetId, i, draftPicks, freeAgencyMoves);
       return calcWeeklyScore(targetId, i, weekRoster, captainPicks, gameData, league.scoring, spreadPicks, freeAgencyMoves, scoreCorrections, benchPicks);
     });

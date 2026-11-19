@@ -1,4 +1,5 @@
 import { useEffect, useMemo } from 'react';
+import { LAST_SCORED_WEEK } from '../../services/postseasonWeeks';
 import { useSearchParams } from 'react-router-dom';
 import { Shield, UserPlus, Settings, Gift } from 'lucide-react';
 import type {
@@ -101,7 +102,7 @@ export function AdminPanel({
     const board = buildLeaderboard(
       members, draftPicks, captainPicks, gameData,
       league.scoring, manualBonuses, seasonStats, true, spreadPicks,
-      freeAgencyMoves, scoreCorrections, league.current_week, 17, benchPicks
+      freeAgencyMoves, scoreCorrections, league.current_week, LAST_SCORED_WEEK, benchPicks
     );
     return board.map((e, i) => ({
       user_id: e.user_id, display_name: e.display_name,

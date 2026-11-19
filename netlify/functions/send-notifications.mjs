@@ -10,6 +10,7 @@
 // VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT.
 
 import { computeDueNotifications } from '../../src/services/notifications';
+import { postseasonWeek, seasonYearOf, REGULAR_SEASON_LAST_WEEK } from '../../src/services/postseasonWeeks';
 import { ensureVapid, sbGet, claimLogKey, sendToSubscriptions } from './lib/push.mjs';
 
 const CFBD_KEY  = process.env.CFBD_KEY;
@@ -31,7 +32,7 @@ async function cfbdGames(params) {
 
 // GameData limited to the given team ids and one week — just what the
 // notification logic reads (result, scores, completion, kickoff).
-function buildGameData(teamIds, rawGames) {
+function buildGameData(teamIds, rawGames, postseason = false) {
   const gameData = {};
   teamIds.forEach(id => { gameData[id] = {}; });
   for (const g of rawGames) {
@@ -41,7 +42,8 @@ function buildGameData(teamIds, rawGames) {
     const awayPoints = g.away_points ?? g.awayPoints ?? null;
     const startDate  = g.start_date ?? g.startDate ?? '';
     let week = g.week ?? 1;
-    if (week === 1 && startDate && new Date(startDate).getMonth() === 7) week = 0;
+    if (postseason) week = postseasonWeek(startDate, seasonYearOf(startDate, new Date().getFullYear()));
+    else if (week === 1 && startDate && new Date(startDate).getMonth() === 7) week = 0;
     const completed = !!(g.completed || (homePoints != null && awayPoints != null));
     const base = { week, home_score: homePoints, away_score: awayPoints, completed, start_date: startDate };
     if (teamIds.has(homeId)) {
@@ -95,13 +97,18 @@ export default async () => {
       ]);
       if (draftPicks.length === 0) continue;
 
-      const cfbdWeek = Math.max(1, league.current_week);
+      // Past the regular season, every bowl/playoff game lives under CFBD's
+      // single postseason week, so fetch that whole list once and let
+      // postseasonWeek() sort games into this app's week numbers.
+      const postseason = league.current_week > REGULAR_SEASON_LAST_WEEK;
+      const cfbdWeek = postseason ? 'postseason' : Math.max(1, league.current_week);
       if (!gamesByWeek.has(cfbdWeek)) {
-        const seasonType = cfbdWeek > 15 ? 'postseason' : 'regular';
-        gamesByWeek.set(cfbdWeek, await cfbdGames({ year, week: cfbdWeek, seasonType }));
+        gamesByWeek.set(cfbdWeek, postseason
+          ? await cfbdGames({ year, seasonType: 'postseason' })
+          : await cfbdGames({ year, week: cfbdWeek, seasonType: 'regular' }));
       }
       const teamIds = new Set([...draftPicks.map(p => p.team_id), ...moves.map(m => m.added_team_id)]);
-      const gameData = buildGameData(teamIds, gamesByWeek.get(cfbdWeek));
+      const gameData = buildGameData(teamIds, gamesByWeek.get(cfbdWeek), postseason);
 
       const due = computeDueNotifications(
         { league, members, draftPicks, moves, captainPicks, benchPicks, spreadPicks, gameData },

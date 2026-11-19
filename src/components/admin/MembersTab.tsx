@@ -1,4 +1,5 @@
 import { useState, useMemo, useId } from 'react';
+import { LAST_SCORED_WEEK } from '../../services/postseasonWeeks';
 import { Shield, UserPlus, Copy, Check, Trash2, Mail, RotateCcw, AlertTriangle, Loader2, Archive, CalendarClock, Clock, Users, ChevronDown, Minus, Plus } from 'lucide-react';
 import type { League, LeagueMember, LeagueRole, SeasonHistoryEntry, TrophySnapshot, Invite } from '../../types';
 import { Avatar } from '../ui/Avatar';
@@ -24,7 +25,7 @@ interface Props {
 }
 
 const MIN_WEEK = 0;
-const MAX_WEEK = 18;
+const MAX_WEEK = LAST_SCORED_WEEK;
 const dateFmt = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' });
 
 // Converts a stored ISO timestamp to the local-time string a

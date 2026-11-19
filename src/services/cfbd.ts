@@ -1,4 +1,5 @@
 import type { CfbTeam, GameData, GameResult, APRanking, TeamSeasonStats, SpreadData, TeamRatings, LiveGameStatus } from '../types';
+import { postseasonWeek, seasonYearOf, POSTSEASON_FIRST_WEEK } from './postseasonWeeks';
 import { P4_CONFERENCES as P4_CONF_LIST, G6_CONFERENCES as G6_CONF_LIST } from '../types';
 import { supabase } from '../lib/supabase';
 
@@ -256,7 +257,12 @@ export async function fetchSeasonData(teams: CfbTeam[]): Promise<GameData> {
     }
   }
 
-  const allGames = [...regGames, ...postGames];
+  // Postseason games are tagged so they can be given their own week numbers
+  // below (CFBD reports every one of them as week 1).
+  const allGames = [
+    ...regGames,
+    ...postGames.map((g: any) => ({ ...g, __postseason: true })),
+  ];
 
   // Build gameId → venue string after we have games
   const venueMap = new Map<string, string>();
@@ -306,7 +312,9 @@ export async function fetchSeasonData(teams: CfbTeam[]): Promise<GameData> {
     // CFBD returns Week Zero games as week=1 with an August start date.
     // Reclassify: if week=1 and the game is in August, it's actually week 0.
     let week = g.week ?? 1;
-    if (week === 1 && startDate) {
+    if (g.__postseason) {
+      week = postseasonWeek(startDate, seasonYearOf(startDate, year));
+    } else if (week === 1 && startDate) {
       const d = new Date(startDate);
       if (d.getMonth() === 7) week = 0; // month 7 = August
     }
@@ -643,8 +651,15 @@ export async function fetchSpreads(
   const result: SpreadData = {};
   teams.forEach(t => { result[t.id] = null; });
 
+  // Postseason lines are all filed under one CFBD "postseason" week, so
+  // request them without a week and keep only the games that fall in this
+  // app's week (via gameData, whose postseason games are already bucketed).
+  const postseason = week >= POSTSEASON_FIRST_WEEK;
+
   try {
-    const res = await cfbdFetch('/lines', { year, week, seasonType });
+    const res = postseason
+      ? await cfbdFetch('/lines', { year, seasonType: 'postseason' })
+      : await cfbdFetch('/lines', { year, week, seasonType });
     if (!res.ok) return result;
     const data = await res.json();
     if (!Array.isArray(data)) return result;
@@ -676,8 +691,10 @@ export async function fetchSpreads(
       // same as "resolved and mismatched".
       const homeOpponentId = gameData[homeId ?? '']?.[week]?.opponent_id;
       const awayOpponentId = gameData[awayId ?? '']?.[week]?.opponent_id;
-      const homeMatches = homeId && (!homeOpponentId || !awayId || homeOpponentId === awayId);
-      const awayMatches = awayId && (!awayOpponentId || !homeId || awayOpponentId === homeId);
+      // In postseason mode the response spans every bowl/playoff game, so a
+      // team with no game scheduled in this week must not pick up its line.
+      const homeMatches = homeId && (!postseason || homeOpponentId) && (!homeOpponentId || !awayId || homeOpponentId === awayId);
+      const awayMatches = awayId && (!postseason || awayOpponentId) && (!awayOpponentId || !homeId || awayOpponentId === homeId);
 
       const lines: any[] = game.lines ?? [];
       if (!lines.length) continue;

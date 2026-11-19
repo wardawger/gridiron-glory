@@ -23,6 +23,7 @@ import { normalizeScoring } from '../../src/types';
 import { buildLeaderboard, isP4Conference, confCategory } from '../../src/services/scoring';
 import { currentRosters } from '../../src/services/roster';
 import { computeAnalytics } from '../../src/services/analytics';
+import { postseasonWeek, seasonYearOf } from '../../src/services/postseasonWeeks';
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_KEY;
@@ -124,7 +125,9 @@ async function fetchGamesRaw(year) {
     cfbdGet('/games', { year, seasonType: 'regular' }),
     cfbdGet('/games', { year, seasonType: 'postseason' }),
   ]);
-  return [...reg, ...post];
+  // CFBD files every postseason game under week 1; tag them so they get their
+  // own week numbers instead of overwriting each team's real Week 1.
+  return [...reg, ...post.map(g => ({ ...g, __postseason: true }))];
 }
 
 async function fetchRankingsRaw(year) {
@@ -173,7 +176,9 @@ function buildGameDataForTeams(teamIds, rawGames, rankHistory, isCurrentYear) {
     const startDate      = g.start_date      ?? g.startDate      ?? '';
 
     let week = g.week ?? 1;
-    if (week === 1 && startDate) {
+    if (g.__postseason) {
+      week = postseasonWeek(startDate, seasonYearOf(startDate, new Date().getFullYear()));
+    } else if (week === 1 && startDate) {
       const d = new Date(startDate);
       if (d.getMonth() === 7) week = 0;
     }

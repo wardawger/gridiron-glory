@@ -1,4 +1,5 @@
 import { useState, useMemo, useId } from 'react';
+import { ALL_WEEKS } from '../../services/postseasonWeeks';
 import { Plus, Trash2, Loader2, AlertTriangle } from 'lucide-react';
 import type {
   League, LeagueMember, ManualBonus, DraftPick, SpreadPick, FreeAgencyMove, BonusType, ScoreCorrection,
@@ -9,7 +10,7 @@ import { rosterAtWeek } from '../../services/roster';
 import { scoreGame, spreadPointsForOutcome } from '../../services/scoring';
 import { DialogShell } from '../ui/DialogShell';
 
-const WEEKS = Array.from({ length: 18 }, (_, i) => i); // weeks 0–17 — the full scored range, including conf-champ/bowl weeks
+const WEEKS = ALL_WEEKS; // the full scored range, including conf-champ, bowl, and playoff weeks
 
 // The 10 stat-ranking BonusTypes default their award points from the
 // Scoring tab's "Statistical Ranking Bonuses" settings (the single source
