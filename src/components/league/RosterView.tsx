@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
+import { isCaptainEligibleGame } from '../../services/gameKinds';
 import { useNavigate } from 'react-router-dom';
 import { Shield, TrendingUp, TrendingDown, Star, Calendar, List, X, MapPin, Tv, Clock, Coins, ChevronDown, UserCheck, Armchair, Lock, Eye } from 'lucide-react';
 import type { RosterEntry, CaptainPick, GameData, ScoringSettings, LeagueMember, WeeklyScore, GameResult, SpreadPick, SpreadData, FreeAgencyMove, DraftPick, ScoreCorrection, BenchPick, APRanking } from '../../types';
@@ -393,12 +394,14 @@ export function RosterView({
     // because CFBD hasn't populated it, once the league has moved on.
     const isPastWeek = selectedWeek < currentWeek;
     const teamRank = rankByTeamId.get(entry.team_id) ?? null;
+    const captainAllowedInGame = isCaptainEligibleGame(game);
     const atWeekCaptainCap = !isCaptain && weekCaptainCount >= captainMax;
     const canBeCaptain =
       (captainUses < captainSeasonCap || isCaptain) &&
       !atWeekCaptainCap &&
       !captainKickedOff &&
-      !isPastWeek;
+      !isPastWeek &&
+      captainAllowedInGame;
     const oppLogo = (game as any)?.opponent_logo ?? null;
     const isHome  = (game as any)?.is_home  ?? true;
     const gameDateInfo = game ? formatGameDate(game.start_date, game.start_time_tbd, false) : null;
@@ -536,7 +539,13 @@ export function RosterView({
           <p className="mt-2 text-xs text-turf-500">No game this week</p>
         )}
 
-        {isOwner && onSetCaptain && game && (
+        {isOwner && onSetCaptain && game && !captainAllowedInGame && (
+          <p className="mt-3 pt-3 border-t border-turf-800/60 text-xs text-turf-500 flex items-center gap-1">
+            <Star className="w-3 h-3 flex-shrink-0" aria-hidden="true" /> Captains can't be used in conference championships or playoff games
+          </p>
+        )}
+
+        {isOwner && onSetCaptain && game && captainAllowedInGame && (
           <div className="mt-3 pt-3 border-t border-turf-800/60 flex items-center justify-between gap-2">
             <div className="min-w-0">
               <span className={`text-xs font-medium flex items-center gap-1 ${isCaptain ? 'text-gold-400' : 'text-turf-300'}`}>

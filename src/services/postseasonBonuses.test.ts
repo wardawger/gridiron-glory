@@ -62,3 +62,23 @@ describe('computeAutoBonuses', () => {
     expect(out[0].points).toBe(7);
   });
 });
+
+import { isCaptainEligibleGame } from './gameKinds';
+import { calcWeeklyScore } from './scoring';
+
+describe('captain eligibility', () => {
+  it('blocks conference championships and playoff rounds, allows bowls and regular games', () => {
+    for (const k of ['conference_championship', 'cfp_first_round', 'cfp_quarterfinal', 'cfp_semifinal', 'cfp_championship'])
+      expect(isCaptainEligibleGame({ game_kind: k as any })).toBe(false);
+    for (const k of ['regular', 'bowl']) expect(isCaptainEligibleGame({ game_kind: k as any })).toBe(true);
+    expect(isCaptainEligibleGame(undefined)).toBe(true);
+  });
+  it('scores a captain pick on a conference championship at 1x', () => {
+    const mk = (kind: string) => ({ A: { 14: { ...g(14, kind, 'W'), team_score: 30, opponent_score: 10, is_home: true } } }) as any;
+    const score = (kind: string) => calcWeeklyScore('u1', 14, [{ team_id: 'A', team_name: 'Alpha' }] as any,
+      [{ user_id: 'u1', team_id: 'A', week: 14, locked_multiplier: 2 }] as any, mk(kind), scoring);
+    const normal = score("regular").points, cc = score("conference_championship");
+    expect(cc.breakdown[0].is_captain).toBe(false);
+    expect(normal).toBeGreaterThan(cc.points);
+  });
+});

@@ -4,6 +4,7 @@ import type {
   GameData, ManualBonus, TeamSeasonStats, StatRankingBonus,
   SpreadPick, DraftPick, FreeAgencyMove, ScoreCorrection, BenchPick,
 } from '../types';
+import { isCaptainEligibleGame } from './gameKinds';
 import { STAT_BONUS_CATEGORIES, normalizeScoring } from '../types';
 import { LAST_SCORED_WEEK } from './postseasonWeeks';
 import { rosterAtWeek, currentRosters } from './roster';
@@ -162,7 +163,13 @@ export function calcWeeklyScore(
   const captainForfeited =
     minPerWeek > 0 &&
     week >= (settings.captain_min_effective_week ?? 0) &&
-    weekCaptainPicks.length < minPerWeek;
+    weekCaptainPicks.length < minPerWeek &&
+    // No minimum when nothing on the roster can be captained (e.g. a
+    // conference-championship or playoff-only week).
+    roster.some(e => {
+      const g = gameData[e.team_id]?.[week];
+      return g ? isCaptainEligibleGame(g) : false;
+    });
 
   const weekSpreadPicks = spreadPicks.filter(
     p => p.user_id === userId && p.week === week
@@ -175,7 +182,8 @@ export function calcWeeklyScore(
 
   const breakdown: ScoreBreakdown[] = roster.map(entry => {
     const game      = gameData[entry.team_id]?.[week] ?? null;
-    const isCaptain = captainMultiplierByTeam.has(entry.team_id);
+    // Captain picks on conference championship / playoff games score as 1x.
+    const isCaptain = captainMultiplierByTeam.has(entry.team_id) && (!game || isCaptainEligibleGame(game));
     // Forfeiting drops the multiplier to 1 rather than clearing is_captain:
     // the manager did pick this team, and the UI needs to say so while
     // showing that it earned nothing.

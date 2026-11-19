@@ -6,6 +6,7 @@ import type {
   BenchPick, CaptainPick, DraftPick, FreeAgencyMove, GameData, League,
   LeagueMember, SpreadPick,
 } from '../types';
+import { isCaptainEligibleGame } from './gameKinds';
 import { normalizeScoring } from '../types';
 import { currentRosters } from './roster';
 
@@ -126,7 +127,11 @@ export function computeDueNotifications(snap: LeagueSnapshot, now: Date): DueNot
 
     const needs: { kind: Reminder; left: number }[] = [];
 
-    if (scoring.captain_max_per_week > 0) {
+    const captainable = roster.some(t => {
+      const g = gameData[t.team_id]?.[week];
+      return g && !g.completed && isCaptainEligibleGame(g);
+    });
+    if (scoring.captain_max_per_week > 0 && captainable) {
       const needed = Math.max(scoring.captain_min_per_week, 1);
       const have = captainPicks.filter(p => p.user_id === uid && p.week === week).length;
       if (have < needed) needs.push({ kind: 'captain', left: needed - have });

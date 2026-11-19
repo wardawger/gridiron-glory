@@ -52,3 +52,10 @@ export function classifyGame(g: any, postseason: boolean): GameKind {
 }
 
 export const CFP_KINDS: GameKind[] = ['cfp_first_round', 'cfp_quarterfinal', 'cfp_semifinal', 'cfp_championship'];
+
+// Captains don't apply to conference championships or any playoff round.
+// Bowls (non-CFP) stay captain-eligible.
+export function isCaptainEligibleGame(game: { game_kind?: GameKind } | null | undefined): boolean {
+  const k = game?.game_kind;
+  return !(k === 'conference_championship' || (k && CFP_KINDS.includes(k)));
+}
