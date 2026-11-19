@@ -38,6 +38,7 @@ interface Props {
   draftPicks: DraftPick[];
   freeAgencyMoves: FreeAgencyMove[];
   manualBonuses: ManualBonus[];
+  autoBonuses: ManualBonus[];
   spreadPicks: SpreadPick[];
   scoreCorrections: ScoreCorrection[];
   gameData: GameData;
@@ -52,7 +53,7 @@ interface Props {
 const selectCls = 'input [&>option]:bg-turf-800 [&>option]:text-white';
 
 export function AdjustmentsTab({
-  league, members, draftPicks, freeAgencyMoves, manualBonuses, spreadPicks, scoreCorrections, gameData,
+  league, members, draftPicks, freeAgencyMoves, manualBonuses, autoBonuses, spreadPicks, scoreCorrections, gameData,
   onAddBonus, onRemoveBonus, onOverrideSpread, onClearSpreadOverride, onAddCorrection, onRemoveCorrection,
 }: Props) {
   const uid = useId();
@@ -323,6 +324,38 @@ export function AdjustmentsTab({
           {addingBonus ? 'Awarding…' : 'Award Bonus'}
         </button>
       </form>
+
+      {/* Bonuses the app calculated from results — read-only. Adding a manual
+          bonus for the same manager, type, and team replaces the calculated one. */}
+      {autoBonuses.length > 0 && (
+        <div className="card overflow-hidden">
+          <div className="px-5 py-3 border-b border-turf-800">
+            <h3 className="font-medium text-white text-sm">Calculated Automatically</h3>
+            <p className="text-xs text-turf-400 mt-0.5">
+              Bowl, conference championship, and playoff bonuses worked out from game results. To override one, award the same bonus below.
+            </p>
+          </div>
+          <div className="divide-y divide-turf-800 max-h-96 overflow-y-auto overscroll-contain">
+            {autoBonuses.map(b => {
+              const mem = members.find(m => m.user_id === b.user_id);
+              return (
+                <div key={b.id} className="flex items-center gap-4 px-5 py-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium text-white">{mem?.display_name}</span>
+                      <span className="badge-gray text-xs">{BONUS_LABELS[b.type]}</span>
+                    </div>
+                    <p className="text-xs text-turf-500 truncate">{b.team_name}</p>
+                  </div>
+                  <span className={`font-mono font-bold tabular-nums ${b.points >= 0 ? 'text-gold-400' : 'text-red-300'}`}>
+                    {b.points >= 0 ? '+' : '−'}{Math.abs(b.points)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Awarded bonuses list */}
       {manualBonuses.length > 0 && (

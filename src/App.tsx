@@ -1,9 +1,11 @@
-import { useEffect, useState, useRef, lazy, Suspense } from 'react';
+import { useEffect, useMemo, useState, useRef, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth }     from './hooks/useAuth';
 import { useLeague }   from './hooks/useLeague';
 import { useCfbData }  from './hooks/useCfbData';
 import { InstallPrompt } from './components/ui/InstallPrompt';
+import { normalizeScoring } from './types';
+import { computeAutoBonuses } from './services/postseasonBonuses';
 import { PullToRefresh } from './components/ui/PullToRefresh';
 import { OfflineBanner } from './components/ui/OfflineBanner';
 import { LoadErrorScreen } from './components/ui/LoadErrorScreen';
@@ -85,6 +87,15 @@ function AnimatedRoutes({ lg, league, auth, cfb }: AnimatedRoutesProps) {
   const [routeExiting, setRouteExiting] = useState(false);
   const routeTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Bowl, conference championship, and playoff bonuses the app works out from
+  // results; commissioner-entered bonuses take precedence over matching ones.
+  const autoBonuses = useMemo(() => computeAutoBonuses({
+    leagueId: lg.id, members: league.members, draftPicks: league.draftPicks,
+    freeAgencyMoves: league.freeAgencyMoves, gameData: cfb.gameData,
+    scoring: normalizeScoring(lg.scoring), manualBonuses: league.manualBonuses,
+  }), [lg.id, lg.scoring, league.members, league.draftPicks, league.freeAgencyMoves, league.manualBonuses, cfb.gameData]);
+  const allBonuses = useMemo(() => [...league.manualBonuses, ...autoBonuses], [league.manualBonuses, autoBonuses]);
+
   useEffect(() => {
     if (location.pathname === displayedLocation.pathname) return;
     setRouteExiting(true);
@@ -133,7 +144,7 @@ function AnimatedRoutes({ lg, league, auth, cfb }: AnimatedRoutesProps) {
                 members={league.members}
                 draftPicks={league.draftPicks}
                 captainPicks={league.captainPicks}
-                manualBonuses={league.manualBonuses}
+                manualBonuses={allBonuses}
                 spreadPicks={league.spreadPicks}
                 freeAgencyMoves={league.freeAgencyMoves}
                 scoreCorrections={league.scoreCorrections}
@@ -180,7 +191,7 @@ function AnimatedRoutes({ lg, league, auth, cfb }: AnimatedRoutesProps) {
                 captainPicks={league.captainPicks}
                 spreadPicks={league.spreadPicks}
                 freeAgencyMoves={league.freeAgencyMoves}
-                manualBonuses={league.manualBonuses}
+                manualBonuses={allBonuses}
                 gameData={cfb.gameData}
                 scoreCorrections={league.scoreCorrections}
               />
@@ -256,6 +267,7 @@ function AnimatedRoutes({ lg, league, auth, cfb }: AnimatedRoutesProps) {
               draftPicks={league.draftPicks}
               captainPicks={league.captainPicks}
               manualBonuses={league.manualBonuses}
+              autoBonuses={autoBonuses}
               spreadPicks={league.spreadPicks}
               freeAgencyMoves={league.freeAgencyMoves}
               scoreCorrections={league.scoreCorrections}

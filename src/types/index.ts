@@ -540,8 +540,19 @@ export interface TeamRatings {
   sos_rank: number | null; // lower = tougher schedule; preseason estimate until CFBD publishes current-season SOS
 }
 
+// What kind of game this is, for postseason bonus scoring.
+export type GameKind =
+  | 'regular'
+  | 'conference_championship'
+  | 'bowl'
+  | 'cfp_first_round'
+  | 'cfp_quarterfinal'
+  | 'cfp_semifinal'
+  | 'cfp_championship';
+
 export interface GameResult {
   week: number;
+  game_kind?: GameKind;
   opponent: string;
   opponent_id: string;
   opponent_rank: number | null;

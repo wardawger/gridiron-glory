@@ -1,4 +1,5 @@
 import type { CfbTeam, GameData, GameResult, APRanking, TeamSeasonStats, SpreadData, TeamRatings, LiveGameStatus } from '../types';
+import { classifyGame } from './gameKinds';
 import { postseasonWeek, seasonYearOf, POSTSEASON_FIRST_WEEK } from './postseasonWeeks';
 import { P4_CONFERENCES as P4_CONF_LIST, G6_CONFERENCES as G6_CONF_LIST } from '../types';
 import { supabase } from '../lib/supabase';
@@ -320,6 +321,7 @@ export async function fetchSeasonData(teams: CfbTeam[]): Promise<GameData> {
     }
 
     const completed = g.completed || (homePoints != null && awayPoints != null);
+    const gameKind = classifyGame(g, !!g.__postseason);
 
     if (home) {
       const oppRank    = getRankAtWeek(awayTeam, week);
@@ -329,6 +331,7 @@ export async function fetchSeasonData(teams: CfbTeam[]): Promise<GameData> {
       const oppId      = awayId;
       gameData[home.id][week] = {
         week,
+        game_kind:       gameKind,
         opponent:        awayTeam,
         opponent_id:     oppId,
         opponent_logo:   oppLogo,
@@ -359,6 +362,7 @@ export async function fetchSeasonData(teams: CfbTeam[]): Promise<GameData> {
       const oppId      = homeId;
       gameData[away.id][week] = {
         week,
+        game_kind:       gameKind,
         opponent:        homeTeam,
         opponent_id:     oppId,
         opponent_logo:   oppLogo,

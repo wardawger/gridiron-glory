@@ -21,6 +21,8 @@ interface Props {
   draftPicks: DraftPick[];
   captainPicks: CaptainPick[];
   manualBonuses: ManualBonus[];
+  // Bonuses the app calculated itself (bowl, conference championship, playoff).
+  autoBonuses: ManualBonus[];
   spreadPicks: SpreadPick[];
   freeAgencyMoves: FreeAgencyMove[];
   scoreCorrections: ScoreCorrection[];
@@ -59,7 +61,7 @@ const TAB_ORDER = TABS.map(t => t.id);
 const isTab = (v: string | null): v is Tab => v === 'members' || v === 'scoring' || v === 'adjustments';
 
 export function AdminPanel({
-  league, currentUserId, members, draftPicks, captainPicks, manualBonuses, spreadPicks, freeAgencyMoves, scoreCorrections,
+  league, currentUserId, members, draftPicks, captainPicks, manualBonuses, autoBonuses, spreadPicks, freeAgencyMoves, scoreCorrections,
   benchPicks, invites, gameData, seasonStats, teams, isCommissioner,
   onSendInvite, onUpdateWeek, onUpdateScoring, onUpdateDraftSchedule, onUpdateMaxTeams, onAddBonus, onRemoveBonus, onAddCorrection, onRemoveCorrection,
   onResetDraft, onDeleteLeague,
@@ -98,10 +100,11 @@ export function AdminPanel({
   // prop surface (draftPicks/captainPicks/gameData/bonuses/spreadPicks) to
   // call buildLeaderboard — moving the computation into the tab wouldn't
   // actually narrow its dependencies, so only the derived array is passed down.
+  const allBonuses = useMemo(() => [...manualBonuses, ...autoBonuses], [manualBonuses, autoBonuses]);
   const finalStandings = useMemo((): SeasonHistoryEntry[] => {
     const board = buildLeaderboard(
       members, draftPicks, captainPicks, gameData,
-      league.scoring, manualBonuses, seasonStats, true, spreadPicks,
+      league.scoring, allBonuses, seasonStats, true, spreadPicks,
       freeAgencyMoves, scoreCorrections, league.current_week, LAST_SCORED_WEEK, benchPicks
     );
     return board.map((e, i) => ({
@@ -109,13 +112,13 @@ export function AdminPanel({
       avatar_type: e.avatar_type, avatar_value: e.avatar_value,
       total_points: e.total_points, rank: i + 1,
     }));
-  }, [members, draftPicks, captainPicks, gameData, league.scoring, manualBonuses, seasonStats, spreadPicks, freeAgencyMoves, scoreCorrections, league.current_week, benchPicks]);
+  }, [members, draftPicks, captainPicks, gameData, league.scoring, allBonuses, seasonStats, spreadPicks, freeAgencyMoves, scoreCorrections, league.current_week, benchPicks]);
 
   // Snapshotted alongside finalStandings so End Season can freeze both at
   // once — trophies are unrecoverable once the underlying tables are wiped.
   const trophySnapshot = useMemo(
-    () => computeTrophies(members, draftPicks, captainPicks, spreadPicks, freeAgencyMoves, manualBonuses, gameData, league.scoring, scoreCorrections, league.current_week),
-    [members, draftPicks, captainPicks, spreadPicks, freeAgencyMoves, manualBonuses, gameData, league.scoring, scoreCorrections, league.current_week]
+    () => computeTrophies(members, draftPicks, captainPicks, spreadPicks, freeAgencyMoves, allBonuses, gameData, league.scoring, scoreCorrections, league.current_week),
+    [members, draftPicks, captainPicks, spreadPicks, freeAgencyMoves, allBonuses, gameData, league.scoring, scoreCorrections, league.current_week]
   );
 
   if (!isCommissioner) {
@@ -205,6 +208,7 @@ export function AdminPanel({
           draftPicks={draftPicks}
           freeAgencyMoves={freeAgencyMoves}
           manualBonuses={manualBonuses}
+          autoBonuses={autoBonuses}
           spreadPicks={spreadPicks}
           scoreCorrections={scoreCorrections}
           gameData={gameData}
