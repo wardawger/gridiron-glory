@@ -24,6 +24,8 @@ import { buildLeaderboard, isP4Conference, confCategory } from '../../src/servic
 import { currentRosters } from '../../src/services/roster';
 import { computeAnalytics } from '../../src/services/analytics';
 import { postseasonWeek, seasonYearOf } from '../../src/services/postseasonWeeks';
+import { classifyGame } from '../../src/services/gameKinds';
+import { computeAutoBonuses } from '../../src/services/postseasonBonuses';
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_KEY;
@@ -183,6 +185,7 @@ function buildGameDataForTeams(teamIds, rawGames, rankHistory, isCurrentYear) {
       if (d.getMonth() === 7) week = 0;
     }
 
+    const gameKind = classifyGame(g, !!g.__postseason);
     const completed = g.completed || (homePoints != null && awayPoints != null);
 
     if (teamIds.has(homeId)) {
@@ -197,6 +200,7 @@ function buildGameDataForTeams(teamIds, rawGames, rankHistory, isCurrentYear) {
         home_score:     homePoints,
         away_score:     awayPoints,
         completed,
+        game_kind:      gameKind,
         start_date:     startDate,
         is_home:        true,
         venue:          null,
@@ -215,6 +219,7 @@ function buildGameDataForTeams(teamIds, rawGames, rankHistory, isCurrentYear) {
         home_score:     homePoints,
         away_score:     awayPoints,
         completed,
+        game_kind:      gameKind,
         start_date:     startDate,
         is_home:        false,
         venue:          null,
@@ -291,8 +296,13 @@ async function processLeague(league, scoring, dueAt) {
   // Stat ranking bonuses are excluded here (empty seasonStats map) — a small,
   // slow-moving part of total score, unlikely to flip a real waiver ordering.
   const confChampComplete = league.current_week >= 15;
+  // Same calculated bowl/CC/playoff bonuses the app shows, so priority
+  // matches the standings.
+  const autoBonuses = computeAutoBonuses({
+    leagueId: league.id, members, draftPicks, freeAgencyMoves: moves, gameData, scoring, manualBonuses,
+  });
   const leaderboard = buildLeaderboard(
-    members, draftPicks, captainPicks, gameData, scoring, manualBonuses,
+    members, draftPicks, captainPicks, gameData, scoring, [...manualBonuses, ...autoBonuses],
     new Map(), confChampComplete, spreadPicks, moves, scoreCorrections,
     league.current_week, undefined, benchPicks,
   );
